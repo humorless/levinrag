@@ -6,6 +6,6 @@ clj-kondo = "2025.06.05"
 cljfmt = "0.13.1"
 tailwindcss = "4.1.11"
 
-[alias]
+[tool_alias]
 cljfmt = "asdf:https://github.com/b-social/asdf-cljfmt"
 tailwindcss = "asdf:https://github.com/virtualstaticvoid/asdf-tailwindcss"
