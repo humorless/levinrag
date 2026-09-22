@@ -102,7 +102,7 @@ flowchart LR
 | 範疇 | 選擇 | 備註 |
 |---|---|---|
 | 專案骨架 | [Clojure Stack Lite](https://stack.bogoyavlensky.com/) | Integrant、Reitit／Ring／Jetty、Hiccup、Malli、HTMX 2、Alpine.js、Tailwind 4、Babashka tasks、clj-kondo、cljfmt、eftest。**產生時選 SQLite、不選 `:auth`**，之後移除 SQL 相關依賴（見 T0.1）。 |
-| 資料庫 | Datalevin，pin 最新 1.0.x | 嵌入式模式。依官方 `doc/install.md` 設定所需 JVM options。 |
+| 資料庫 | Datalevin，pin `1.1.0`（實際最新版，見 `docs/decisions.md`） | 嵌入式模式。依官方 `doc/install.md` 設定所需 JVM options。 |
 | Markdown 解析 | `org.commonmark/commonmark` ＋ `commonmark-ext-gfm-tables` ＋ `commonmark-ext-yaml-front-matter` | 需要 source spans 取得字元位置。 |
 | YAML | `clj-commons/clj-yaml` | frontmatter 值解析（若 commonmark 擴充已足夠則可省略）。 |
 | HTTP client | `hato` | vLLM 呼叫，JDK HttpClient 包裝，支援逾時。 |
