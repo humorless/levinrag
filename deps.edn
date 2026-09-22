@@ -17,13 +17,19 @@
 
  :paths ["src" "resources"]
 
- ; Datalevin 1.1.0 requires these JDK module opens on every JVM run
- ; (doc/install.md; verified 2026-09-22 — see docs/decisions.md). If the
- ; JVM is ever bumped to 24+, also add "--enable-native-access=ALL-UNNAMED".
- :jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
-            "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]
+ :aliases {; Datalevin 1.1.0 requires these JDK module opens on every JVM run
+           ; (doc/install.md; verified 2026-09-22 — see docs/decisions.md). If
+           ; the JVM is ever bumped to 24+, also add
+           ; "--enable-native-access=ALL-UNNAMED". Top-level :jvm-opts is NOT
+           ; read by the Clojure CLI outside an alias (clojure.org/deps.edn
+           ; reference + clj-kondo's own deps.edn lint both confirm this —
+           ; see docs/decisions.md), so this alias must be combined into
+           ; every task/command that boots a JVM with Datalevin on the
+           ; classpath.
+           :jvm-opts {:jvm-opts ["--add-opens=java.base/java.nio=ALL-UNNAMED"
+                                 "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED"]}
 
- :aliases {:dev {:extra-paths ["dev"]
+           :dev {:extra-paths ["dev"]
                  :extra-deps {integrant/repl {:mvn/version "0.4.0"}
                               ring/ring-devel {:mvn/version "1.14.2"}}}
 
@@ -46,4 +52,8 @@
                    :ns-default slim.app
                    :exec-args {:main-ns hybridrag.core
                                :src-dirs ["src" "resources" "resources-hashed"]}}
-           :neil {:project {:name hybridrag/hybridrag}}}}
+           :neil {:project {:name hybridrag/hybridrag}}
+           :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.7.0"}
+                                cider/cider-nrepl {:mvn/version "0.62.2"}
+                                refactor-nrepl/refactor-nrepl {:mvn/version "3.14.0"}}
+                   :main-opts ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware,refactor-nrepl.middleware/wrap-refactor]"]}}}

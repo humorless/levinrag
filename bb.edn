@@ -14,7 +14,7 @@
                 (clojure "-P"))}
 
   clj-repl {:doc "Run built-in Clojure REPL"
-            :task (shell "clj -A:dev:test")}
+            :task (shell "clj -A:dev:test:jvm-opts")}
 
   fmt-check {:doc "Check code formatting"
              :task (shell "cljfmt" "check")}
@@ -36,7 +36,7 @@
             :task (clojure "-M:outdated --upgrade --force")}
 
   test {:doc "Run tests"
-        :task (clojure "-X:test")}
+        :task (clojure "-X:test:jvm-opts")}
 
   check {:doc "Run all code checks and tests"
          :depends [fmt lint outdated test]}
@@ -61,7 +61,7 @@
          :task (do
                  (run 'css-build)
                  (manifest/hash-assets!)
-                 (clojure "-T:build build"))}
+                 (clojure "-T:build:jvm-opts build"))}
 
   kamal {:doc "Deploy application using Kamal"
          :task (apply shell "kamal" (concat *command-line-args* ["--config-file" ".kamal/deploy.yml"]))}}}
