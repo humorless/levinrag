@@ -131,3 +131,26 @@ independent function" requirement) is unaffected.
 
 See `docs/spikes/acl-query-perf.md` for full numbers and reproduction
 instructions.
+
+## 2026-09-22 — `bb vllm:check` not run against real vLLM through Phase 0
+
+Spec text (SPEC.md T0.2 AC): the three vLLM endpoints (embed/rerank/chat)
+must "皆回傳合理結果" against a real vLLM instance.
+
+Actual: no `VLLM_EMBED_BASE_URL`/`VLLM_RERANK_BASE_URL`/`VLLM_CHAT_BASE_URL`
+(or matching `_MODEL`/`_API_KEY`) were ever set in this development
+environment, and no local vLLM instance was reachable at any point during
+Phase 0 (T0.1 through T0.5). `bb vllm:check` was never run against a real
+endpoint; the client code's correctness is instead covered by the
+stub-server tests in `test/hybridrag/llm/http_test.clj` (T0.2), which
+verify request/response handling and the "API key never appears in
+errors/logs" requirement (SPEC.md §4.3) without a real vLLM present.
+
+Decision: defer the real-endpoint check rather than block Phase 0 on
+infrastructure that doesn't exist yet. Phase 1 depends on
+`hybridrag.llm.embed/embed-batch!` actually working end-to-end (ingestion
+needs real embeddings), so `bb vllm:check` must be run — and pass all
+three `[OK]` lines — against a real vLLM instance before Phase 1's
+ingestion work (T1.4 index writer) can be considered embedding-tested, not
+just unit-tested against a stub. This is a precondition on whoever starts
+Phase 1, not a Phase 0 blocker in itself.
