@@ -93,17 +93,30 @@ Domain name for autoDomain attributes is `keyword->string` of the attribute name
 
 Default analyzer uses standard whitespace + punctuation splitting. Chinese text has no word separators, so **CJK fulltext requires a custom analyzer UDF**.
 
-This is the same approach as Path B for embeddings — we'd register a custom tokenizer via `:udf-registry` and configure it in `:search-domains`:
+The UDF registration mechanism itself is now confirmed working end-to-end
+(see "Minimal executable example" below — a real, whitespace-splitter toy
+analyzer was registered and queried, not just sketched). The *content* of a
+real CJK analyzer (Jieba/HanLP-backed tokenization) is still deferred to the
+implementation phase; this spike only proves the registration mechanism.
+
+Registration shape confirmed by the minimal example:
 
 ```clojure
-{:search-domains 
- {"chunk/text" {:index-position? true
-                :analyzer {:udf/lang :java
-                           :udf/kind :analyzer
-                           :udf/id :cn-tokenize}}}}
+{:runtime-opts   {:udf-registry registry}   ;; an atom from (udf/create-registry)
+ :search-domains {"chunk/text" {:index-position? true
+                                :analyzer {:udf/lang :clojure
+                                           :udf/kind :analyzer
+                                           :udf/id :cn-tokenize}}}}
 ```
 
-The custom analyzer should tokenize Chinese text into characters or words (e.g., using Jieba or a unigram approach). This is deferred to implementation phase.
+The analyzer function itself must be registered separately, before
+`create-conn`, via `(udf/register! registry {:udf/lang :clojure :udf/kind
+:analyzer :udf/id :cn-tokenize} analyzer-fn)`, and must return a seq of
+`[term position offset]` triples per call (same shape as Datalevin's builtin
+`datalevin.analyzer/en-analyzer`). `:udf/lang` can be any keyword you like
+as long as it's consistent between `register!` and the `:analyzer`
+reference — it does not need to be `:java`; a plain Clojure function
+registered under `:udf/lang :clojure` works with no external resolver.
 
 ### 8. :index-position? on Attribute
 
@@ -131,6 +144,107 @@ Attempted setting `:db.fulltext/indexPosition? true` directly on the attribute d
    `:db.vec/domains` (a confirmed Datalevin 1.1.0 write-path bug otherwise
    crashes `transact!` — see the links above for the root cause and the
    working configuration).
+## Minimal executable example
+
+T0.4's lead AC item ("自訂 analyzer 在 Datalog search domain 的註冊方式...含
+可執行的最小範例") was not actually satisfied by the rest of this doc — §7
+above described the registration shape in future/conditional voice without
+ever running it, and cited a `src/sf18.clj` experiment file that does not
+exist anywhere in this repo (dangling reference, removed). This section
+fixes that: a trivial toy analyzer (whitespace splitter + lower-case, **not**
+real CJK tokenization — that's still deferred, see §7) was actually
+registered against a Datalog fulltext search domain and queried, in a fresh
+`clojure -M:jvm-opts -e '...'` process, 2026-09-22.
+
+```clojure
+(require '[datalevin.core :as d]
+         '[datalevin.udf :as udf]
+         '[clojure.string :as str])
+
+;; Toy analyzer: whitespace splitter, lower-cases. Must return a seq of
+;; [term position offset] — same shape as datalevin.analyzer/en-analyzer.
+(defn toy-analyzer [^String text]
+  (loop [words (str/split text #"\s+") pos 0 offset 0 acc []]
+    (if (empty? words)
+      acc
+      (let [w (first words) lw (str/lower-case w)]
+        (recur (rest words) (inc pos) (+ offset (count w) 1)
+               (conj acc [lw pos offset]))))))
+
+(def registry (udf/create-registry))
+
+(udf/register! registry
+               {:udf/lang :clojure :udf/kind :analyzer :udf/id :toy-analyzer}
+               toy-analyzer)
+
+(def schema
+  {:chunk/id   {:db/valueType :db.type/string
+                :db/unique    :db.unique/identity}
+   :chunk/text {:db/valueType           :db.type/string
+                :db/fulltext            true
+                :db.fulltext/autoDomain true}})
+
+(def conn
+  (d/create-conn dir schema
+                  {:runtime-opts   {:udf-registry registry}
+                   :search-domains {"chunk/text"
+                                     {:analyzer {:udf/lang :clojure
+                                                :udf/kind :analyzer
+                                                :udf/id   :toy-analyzer}}}}))
+
+(d/transact! conn [{:chunk/id "d1" :chunk/text "hello world quick fox"}
+                    {:chunk/id "d2" :chunk/text "another quick brown fox"}])
+
+(d/q '[:find ?id ?score
+       :in $ ?q
+       :where
+       [(fulltext $ ?q {:display :refs+scores}) [[?e _ ?v ?score]]]
+       [?e :chunk/id ?id]]
+     (d/db conn) "quick")
+```
+
+**Actual output, this exact run:**
+```
+conn opened OK
+TRANSACT OK
+QUERY OK: #{["d1" 0.0] ["d2" 0.0]}
+```
+
+Both documents matched (both contain "quick"); the 0.0 BM25 score is
+expected, not a bug — with the term present in every document in this
+2-document toy corpus, IDF collapses to `log(N/n) = log(2/2) = 0`.
+
+## Decision
+
+**Confirmed working**: the UDF registration mechanism for custom fulltext
+analyzers against a Datalog `:db.fulltext/autoDomain` search domain. The
+shape is: `(udf/create-registry)` → `(udf/register! registry {:udf/lang _
+:udf/kind :analyzer :udf/id _} analyzer-fn)` → pass `{:runtime-opts
+{:udf-registry registry} :search-domains {"<domain>" {:analyzer
+{:udf/lang _ :udf/kind :analyzer :udf/id _}}}}` to `d/create-conn`. The
+analyzer function's contract: `(fn [^String text]) -> seq of [term position
+offset]`, identical to the builtin `datalevin.analyzer/en-analyzer`'s return
+shape.
+
+**Confirmed result-tuple shape**: `(fulltext $ ?q {:display :refs+scores})`
+against `[[?e _ ?v ?score]]` returns `#{[id score] ...}` — matches §1's
+finding for the builtin analyzer; the custom analyzer doesn't change the
+Datalog integration's result shape, only tokenization.
+
+**Explicitly NOT resolved here, deferred to Phase 1**:
+- Real CJK tokenization content (HanLP/Jieba integration, or a
+  unigram/bigram fallback) — this spike only proves the registration
+  mechanism with a trivial non-CJK toy analyzer.
+- Phrase search (`:index-position? true`) through the Datalog integration —
+  still broken per "Known Issues" #1 above, independent of which analyzer is
+  registered.
+- `:doc-filter` in Datalog — still broken per "Known Issues" #2, independent
+  of the analyzer question.
+
+See `docs/decisions.md`'s T0.4 entry for the SPEC.md-override consequences
+(phrase queries and `:doc-filter` unusable from Datalog; autoDomain domain
+naming) that Phase 2 T2.1 must account for.
+
 ## References
 
 - Datalevin search docs: https://github.com/datalevin/datalevin/blob/master/doc/search.md

@@ -197,6 +197,66 @@ See `docs/spikes/embedding.md` ("Known bug" / "Verified end-to-end"
 sections), `docs/datalevin_debug_notes.md` §1/§4, and
 `docs/spikes/fulltext.md` for full detail and reproduction code.
 
+## 2026-09-22 — T0.4 fulltext spike: three SPEC.md §6.1/§9.3 overrides
+
+Spec text (`SPEC.md` §6.1 store-options draft, `⚠️ VERIFY` at T0.3/T0.4;
+§9.3's own `⚠️ VERIFY (T0.4)` marker; §17 T0.4/T0.5 AC text): draft store
+options show `:search-domains {"chunk_index-text" {:index-position? true
+...}}` (phrase + proximity search enabled via `:index-position? true`);
+§9.3 proposes `:doc-filter` pre-filtering as a fallback "if it applies
+before top-k"; §9.3's own query pattern is written assuming these work as
+documented. T0.4's spike (`docs/spikes/fulltext.md`) found three of these
+literal spec assumptions don't hold as written, but this was never logged
+here as its own override (an earlier exit-check judgment wrongly concluded
+SPEC.md never mentions phrase/index-position/doc-filter at all — it does,
+in the three places cited above).
+
+Actual (`docs/spikes/fulltext.md` §4, §5, §6, "Known Issues" 1–2):
+
+1. **Phrase search / `:index-position? true` does not work through the
+   Datalog `fulltext` integration**, even though it works perfectly against
+   a standalone `d/new-search-engine`. Configuring `{:search-domains
+   {"chunk/index-text" {:index-position? true}}}` at connection time and
+   confirming (by inspection) that the domain does carry `index-position?:
+   true` still produces `Phrase search requires :index-position? true` when
+   the same phrase query is run through Datalog. Root cause unconfirmed
+   (possibly the query engine reading from a different domain/engine
+   instance, or a real 1.1.0 bug); not resolved by this spike.
+
+2. **`:doc-filter` is unusable from Datalog.** Standalone
+   `(d/search engine "quick" {:doc-filter (fn [doc-ref] ...)})` works, but
+   passing the same inline predicate function through the `fulltext`
+   Datalog function's options map fails with a cast error. This directly
+   kills SPEC §9.3's own suggested fallback ("`:doc-filter` 預先過濾") —
+   already noted from the *consuming* side in the T0.5 ACL-query-perf
+   decision entry above, but never logged here as T0.4's own finding.
+
+3. **autoDomain's domain name is `keyword->string` of the attribute,
+   slashes kept** — e.g. `:chunk/index-text` → domain name `"chunk/index-text"`
+   (confirmed: `(u/keyword->string :chunk/text)` → `"chunk/text"`) — not the
+   underscore form `"chunk_index-text"` SPEC §6.1's draft store-options
+   example guessed. (Note this differs from the *vector*-domain
+   auto-naming convention documented separately in this file's
+   `:db.vec/domains` write-path bug entry, which does replace `/` with `_`
+   — the two features use different naming helpers.)
+
+Decision:
+- **Phase 2 T2.1's lexical channel must not depend on phrase queries** (no
+  `{:phrase "..."}` terms in its `fulltext` query construction) until/unless
+  a future spike confirms `:index-position? true` actually works through
+  Datalog — plain BM25 + boolean (`:and`/`:or`) queries are confirmed
+  working and are what T2.1 should use.
+- **`:doc-filter` must not be used as the ACL pre-filter mechanism.** This
+  reinforces (does not duplicate) the T0.5 decision above: the doc-id-set +
+  `contains?` pattern is the required alternative, precisely because
+  `:doc-filter` — SPEC §9.3's own suggested fallback — doesn't work from
+  Datalog.
+- Any code (Phase 1 T1.1 schema, Phase 2 T2.1 queries) that needs to name a
+  fulltext search domain by string must use the attribute's
+  `keyword->string` form (`"chunk/index-text"`), not an underscored guess.
+
+See `docs/spikes/fulltext.md` for full findings and reproduction.
+
 ## 2026-09-22 — `bb vllm:check` not run against real vLLM through Phase 0
 
 Spec text (SPEC.md T0.2 AC): the three vLLM endpoints (embed/rerank/chat)
