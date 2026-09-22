@@ -132,6 +132,71 @@ independent function" requirement) is unaffected.
 See `docs/spikes/acl-query-perf.md` for full numbers and reproduction
 instructions.
 
+## 2026-09-22 — `:db.vec/domains` write-path bug in Datalevin 1.1.0 (confirmed, root-caused)
+
+Spec text: n/a — this corrects a wrong finding in this project's own earlier
+spike docs, not a SPEC.md override. `docs/spikes/embedding.md` (T0.3)
+originally claimed `d/transact!` with a `:db.type/vec` attribute + explicit
+`:db.vec/domains` succeeds; `docs/datalevin_debug_notes.md` §4 separately
+logged the same configuration as an "unresolved bug" with three unconfirmed
+candidate causes, one being a REPL `:reload`/classloader artifact. The two
+docs contradicted each other and neither was verified in a genuinely fresh
+JVM process.
+
+Actual (verified 2026-09-22, whole-branch-review fix wave): reran the
+transact in a fresh, non-`:reload`d `clojure -M:jvm-opts -e '...'` process
+(disposable temp dir, single process invocation — the exact discipline
+`docs/datalevin_debug_notes.md` itself flagged as worth retesting with).
+**The crash reproduces identically in a fresh process — it is a real
+Datalevin 1.1.0 bug, not a classloader artifact.** Root-caused by reading
+`datalevin/storage.clj` in the pinned 1.1.0 jar:
+
+- `init-vector-domains` (~storage.clj:3534) initializes **only** the domains
+  listed in a `:db.vec/domains` schema attribute prop, when that key is
+  present — it does not also initialize the attribute's own auto-derived
+  domain name (`datalevin.vector/attr-domain`: `keyword->string` with `/` →
+  `_`, e.g. `:chunk/vec` → `"chunk_vec"`) in that case.
+- The write path (`prepare-datoms-kv-plan`'s add/delete helpers,
+  ~storage.clj:2946 and ~3053) unconditionally computes the transact target
+  as `(conjv (props :db.vec/domains) (v/attr-domain attr))` — it *always*
+  also targets the attribute's auto-derived domain, regardless of whether
+  `:db.vec/domains` is set.
+- When `:db.vec/domains` is set, this mismatch means the write path targets
+  a domain (the auto-derived one) that was never registered in the
+  `vector-indices` map → `nil` lookup → `IllegalArgumentException: No
+  implementation of method: :add-vec ... found for class: nil`.
+
+**Confirmed working configuration** (also verified end-to-end in the same
+fresh-JVM session): omit `:db.vec/domains` from the schema attribute
+entirely, e.g. `:chunk/vec {:db/valueType :db.type/vec}`. Both paths then
+agree on the domain (the attribute's auto-derived name), and `transact!` +
+`vec-neighbors` queries both work correctly. To override per-domain options,
+key the top-level `:vector-domains` map by that same auto-derived name
+(e.g. `{:vector-domains {"chunk_vec" {:dimensions 1024 :metric-type
+:cosine}}}`) rather than setting `:db.vec/domains` on the schema.
+
+Also corrected in the same investigation: `vec-neighbors`'s Datalog syntax.
+The attribute-keyword form is `[(vec-neighbors $ :chunk/vec ?q-vec {:top n})
+[[?e ?a ?v]]]` (returns `[e a v]` triples, or `[e a v dist]` with `:display
+:refs+dists`) — confirmed both from `datalevin.core/vec-neighbors`'s
+docstring and by running an actual query. A `?qvec ?dims` two-positional-
+argument form previously cited in `docs/datalevin_debug_notes.md` and
+`docs/spikes/fulltext.md` does not exist — `vec-neighbors` has no
+"dimensions" positional argument.
+
+Decision: **Phase 1 T1.1 (index-schema) and T1.4 (index writer) must define
+`:chunk/vec` without `:db.vec/domains`** — `{:db/valueType :db.type/vec}`
+only, relying on the auto-derived `"chunk_vec"` domain name, with
+`:vector-opts {:dimensions <dims> :metric-type :cosine}` (or a
+`:vector-domains {"chunk_vec" {...}}` override) supplied at `create-conn`
+time. This is not a workaround to revisit later — it is the correct,
+verified way to use `:db.type/vec` under Datalevin 1.1.0 until/unless a
+future Datalevin release fixes the domain-list mismatch described above.
+
+See `docs/spikes/embedding.md` ("Known bug" / "Verified end-to-end"
+sections), `docs/datalevin_debug_notes.md` §1/§4, and
+`docs/spikes/fulltext.md` for full detail and reproduction code.
+
 ## 2026-09-22 — `bb vllm:check` not run against real vLLM through Phase 0
 
 Spec text (SPEC.md T0.2 AC): the three vLLM endpoints (embed/rerank/chat)

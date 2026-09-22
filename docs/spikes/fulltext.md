@@ -118,10 +118,19 @@ Attempted setting `:db.fulltext/indexPosition? true` directly on the attribute d
 2. **:doc-filter in Datalog**: Inline function predicate in the fulltext options map doesn't work as expected. Needs a different approach (perhaps a separate query arg rather than inline).
 
 
-3. **Vector search integration unverified**: `vec-neighbors` query syntax `[(vec-neighbors $ ?qvec ?dims {:top n}) [[?e _ ?score]]]` confirmed from source code, but not yet tested with real Datalog + vec attribute transact. Standalone `d/new-vector-index` + `d/search-vec` works. Known blockers:
-   - `:vector-domains` must be specified at `create-conn` time with `:dimensions` and `:metric-type`
-   - Standalone vector index `d/new-vector-index` works independently; Datalog integration path untested
-   - See `src/sf18.clj` for attempt; errors: "dimensions is required" (domain config), "IVectorIndex not found" (conn not attached)
+3. **Vector search integration — now verified working (with a caveat)**: this
+   was resolved during the final whole-branch review (2026-09-22), see
+   `docs/spikes/embedding.md`'s "Known bug"/"Verified end-to-end" sections
+   and `docs/datalevin_debug_notes.md` §4 for the full investigation.
+   Summary: `d/transact!` with a `:db.type/vec` attribute succeeds, and the
+   correct `vec-neighbors` Datalog syntax is the attribute-keyword form
+   `[(vec-neighbors $ :chunk/vec ?qvec {:top n}) [[?e ?a ?v]]]` (returns
+   `[e a v]` triples) — **not** the `?qvec ?dims` two-argument form this
+   section previously claimed; `vec-neighbors` has no positional
+   "dimensions" argument. The caveat: the schema attribute must **not** set
+   `:db.vec/domains` (a confirmed Datalevin 1.1.0 write-path bug otherwise
+   crashes `transact!` — see the links above for the root cause and the
+   working configuration).
 ## References
 
 - Datalevin search docs: https://github.com/datalevin/datalevin/blob/master/doc/search.md
