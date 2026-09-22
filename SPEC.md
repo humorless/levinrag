@@ -80,6 +80,8 @@ flowchart LR
   APP[(app.dtlv: users, tokens, traces)]
 ```
 
+> 💡 若編輯器未內建 mermaid 渲染，可將上方程式碼貼到 [mermaidviewer.com](https://mermaidviewer.com/) 檢視此架構圖。
+
 ### 2.1 關鍵設計決策
 
 | ID | 決策 | 理由 |
