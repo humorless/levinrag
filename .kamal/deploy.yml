@@ -1,0 +1,32 @@
+<% require "dotenv"; Dotenv.load(".env") %>
+
+service: hybridrag
+image: <%= ENV['REGISTRY_USERNAME'] %>/hybridrag
+servers:
+  - <%= ENV['SERVER_IP'] %>
+
+proxy:
+  ssl: true
+  host: <%= ENV['APP_DOMAIN'] %>
+  healthcheck:
+    path: /health
+
+registry:
+  server: ghcr.io
+  username:
+    - REGISTRY_USERNAME
+  password:
+    - REGISTRY_PASSWORD
+
+builder:
+  arch: amd64
+  remote: ssh://root@<%= ENV['SERVER_IP'] %>
+  cache:
+    type: gha
+
+env:
+  secret:
+    - SESSION_SECRET_KEY
+
+volumes:
+  - "/root/hybridrag-db:/app/db"

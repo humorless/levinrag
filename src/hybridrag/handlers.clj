@@ -1,0 +1,15 @@
+(ns hybridrag.handlers
+  (:require [hybridrag.views :as views]
+            [reitit-extras.core :as reitit-extras]
+            [ring.util.response :as response]))
+
+(defn default-handler
+  [error-text status-code]
+  (fn [_]
+    (-> (views/error-page error-text)
+        (reitit-extras/render-html)
+        (response/status status-code))))
+
+(defn home-handler
+  [_]
+  (reitit-extras/render-html views/home-page))

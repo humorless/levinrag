@@ -1,0 +1,14 @@
+{
+  "name": "hybridrag",
+  "short_name": "hybridrag",
+  "start_url": "/",
+  // TODO: add domain of the project
+  // "id": "https://hybridrag.com/",
+  "display": "standalone",
+  "theme_color": "#ffffff",
+  "icons": [
+    { "src": "/assets/images/icon@192px.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/assets/images/icon@512px.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" },
+    { "src": "/assets/images/icon@512px.png", "type": "image/png", "sizes": "512x512" }
+  ]
+}
