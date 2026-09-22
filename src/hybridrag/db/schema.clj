@@ -30,7 +30,9 @@
                     :db/cardinality :db.cardinality/many}})
 
 ; index.dtlv — collections/docs/sections/chunks (SPEC.md §6.1). NOT defined
-; here: :chunk/index-text needs :db/fulltext + :db/embedding + autoDomain
-; options whose exact 1.1.0 syntax Task 3/4 (T0.3/T0.4 spikes) confirm.
-; Defined for real in Phase 1 (T1.1) once those spikes land — see
-; docs/decisions.md. index-conn opens with schema {} until then.
+; here: T0.3 chose Path B (docs/spikes/embedding.md) — :chunk/index-text
+; needs :db/fulltext + :db.fulltext/autoDomain (no :db/embedding: the
+; embedding vector lives in a separate :chunk/vec attribute, :db.type/vec,
+; computed application-side). Exact 1.1.0 syntax for both confirmed by the
+; T0.3/T0.4 spikes. Defined for real in Phase 1 (T1.1) once those land —
+; see docs/decisions.md. index-conn opens with schema {} until then.

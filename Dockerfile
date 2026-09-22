@@ -34,5 +34,13 @@ WORKDIR /app
 COPY --from=build /app/target/standalone.jar /app/standalone.jar
 
 EXPOSE 80
-# Increase the max memory limit to your needs
-CMD ["java", "-Xmx256m", "-jar", "standalone.jar"]
+# --add-opens flags are required by Datalevin 1.1.0 on every JVM invocation
+# that touches it (see deps.edn's :jvm-opts alias comment and
+# docs/decisions.md) -- the uberjar's runtime CMD needs them too, the local
+# :jvm-opts alias only covers clojure/bb invocations. -Xmx bumped from the
+# untouched template default (256m) to 512m: more realistic for an embedded
+# LMDB store plus a growing chunk index. Increase further to your needs.
+CMD ["java", \
+     "--add-opens=java.base/java.nio=ALL-UNNAMED", \
+     "--add-opens=java.base/sun.nio.ch=ALL-UNNAMED", \
+     "-Xmx512m", "-jar", "standalone.jar"]

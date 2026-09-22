@@ -21,6 +21,26 @@ unchanged from 1.0.2, and `get-conn`/`close`/`db` have identical
 signatures in both versions (1.1.0 only adds new optional WAL/HA params
 this project doesn't use).
 
+## 2026-09-22 — top-level `:jvm-opts` in `deps.edn` is not read by the Clojure CLI
+
+Spec text: the plan originally specified a top-level `:jvm-opts ["--add-opens=..." ...]`
+entry in `deps.edn` to supply the JDK module-opens flags Datalevin 1.1.0
+needs on every JVM invocation.
+
+Actual: the Clojure CLI/`deps.edn` reference confirms top-level `:jvm-opts`
+in `deps.edn` is not read by the `clojure`/`clj` CLI outside of an alias —
+only `:aliases {<alias> {:jvm-opts [...]}}` is honored, and the flags must
+be pulled in by naming that alias on the command line (`-M:jvm-opts` etc).
+`clj-kondo`'s own `deps.edn` lint independently confirms the same reading.
+
+Decision: moved the required `--add-opens=java.base/java.nio=ALL-UNNAMED`
+and `--add-opens=java.base/sun.nio.ch=ALL-UNNAMED` flags into a dedicated
+`:jvm-opts` alias in `deps.edn` (`{:aliases {:jvm-opts {:jvm-opts [...]}}}`),
+which is then combined into every task/command that boots a JVM with
+Datalevin on the classpath (`bb test`, `bb clj-repl`, `bb build`, the
+standalone Dockerfile `CMD`, spike scripts, etc — see the alias's own
+comment in `deps.edn` for the full list of callers).
+
 ## 2026-09-22 — index.dtlv schema deferred to Phase 1
 
 Spec text (SPEC.md §6.1, §0.3): defines the full index-schema including
