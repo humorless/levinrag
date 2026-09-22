@@ -66,3 +66,59 @@ Decision: **Path B** — `:chunk/index-text` is `:db.type/string` with
 and buildable without a running vLLM instance.
 
 See `docs/spikes/embedding.md` for full spike findings and query syntax.
+
+## 2026-09-22 — ACL query pattern (SPEC §9.3): join-based over-fetch too slow at scale
+
+Spec text (`SPEC.md` §9.3, T0.5 AC): the lexical channel's ACL filter is
+over-fetch top-200 fulltext hits, then a Datalog join
+`[?e :chunk/doc ?d] [?d :doc/effective-groups ?g]` against the user's
+group list bound via `:in $ ?q [?g ...]`. AC: p50 < 100 ms at 10k docs /
+100k chunks / 50 groups, else propose an alternative here (the spec text
+itself suggests `:doc-filter` pre-filtering, "if it applies before
+top-k").
+
+Actual (T0.5 spike, `docs/spikes/acl-query-perf.md`): measured p50 for
+the literal query at that scale, worst case (user in all 50 groups) —
+101-103 ms across two corrected-corpus runs, 168.50 ms in an earlier run.
+**Fails the plan's own AC.** Root-cause isolation (rerunning against a
+corpus where fulltext matched zero chunks) showed the same
+cost-scales-with-group-count pattern even with zero fulltext candidates,
+meaning Datalevin 1.1.0's query planner does not scope the ACL join to
+the (≤200) over-fetch window — cost instead scales with the size of the
+user's accessible corpus. `:doc-filter`, the spec's own suggested
+fallback, was already found broken in Datalog integration by T0.4
+(`docs/spikes/fulltext.md`) — not usable as-is.
+
+Decision: **Phase 2 T2.1 must implement the lexical channel's ACL filter
+as doc-id-set + `contains?`, not the literal §9.3 join-through-group-list
+query**:
+
+```clojure
+(defn accessible-doc-ids [index-db user-groups]
+  (set (d/q '[:find [?d ...]
+              :in $ [?g ...]
+              :where [?d :doc/effective-groups ?g]]
+            index-db user-groups)))
+
+(d/q '[:find ?cid ?score
+       :in $ ?q ?doc-set
+       :where
+       [(fulltext $ :chunk/index-text ?q {:top 200 :display :refs+scores})
+        [[?e _ _ ?score]]]
+       [?e :chunk/doc ?d]
+       [(contains? ?doc-set ?d)]
+       [?e :chunk/id ?cid]]
+     index-db query-text (accessible-doc-ids index-db user-groups))
+```
+
+Verified equal result sets to the literal §9.3 query for the same
+query/groups. Measured ~100x faster at 50 groups (p50 ≈ 0.1-1 ms
+including precompute, vs. ≈101 ms for the join), and flat as group count
+grows, unlike the join. `accessible-doc-ids` is a good candidate to cache
+per session/request (group membership changes far less often than
+queries are issued); T2.1 should decide whether to cache it or recompute
+it per query. The admin bypass path (no ACL clause, per §9.3's
+"must be an independent function" requirement) is unaffected.
+
+See `docs/spikes/acl-query-perf.md` for full numbers, the scaling curve,
+and the root-cause experiment.
