@@ -157,6 +157,43 @@
          [?e :chunk/id ?cid]]
        index-db query-text user-groups))
 
+;; ---------------------------------------------------------------------------
+;; Alternative query: accessible-doc-ids + contains? (docs/decisions.md
+;; "ACL query pattern (SPEC §9.3): join-based over-fetch too slow at
+;; scale"). Precomputes the user's accessible doc-id set with a small
+;; standalone query (no fulltext step), then filters fulltext candidates
+;; with a plain `contains?` predicate instead of joining through the
+;; group list directly. Committed here (not just run once at a REPL) so
+;; the "verified equal results, faster" claim in the decision doc is
+;; reproducible via -main below.
+;; ---------------------------------------------------------------------------
+
+(defn accessible-doc-ids
+  "The set of doc entity ids reachable from any of user-groups, via the
+  same :doc/effective-groups edges the literal §9.3 join uses — just
+  materialized once as a Clojure set instead of joined per-candidate."
+  [index-db user-groups]
+  (set (d/q '[:find [?d ...]
+              :in $ [?g ...]
+              :where [?d :doc/effective-groups ?g]]
+            index-db user-groups)))
+
+(defn acl-query-doc-set
+  "Same fulltext over-fetch as acl-query, but ACL-filtered via a
+  precomputed accessible-doc-set + contains? instead of joining through
+  the group list. accessible-doc-set is whatever accessible-doc-ids
+  returned for the same user-groups the caller would pass to acl-query."
+  [index-db query-text accessible-doc-set]
+  (d/q '[:find ?cid ?score
+         :in $ ?q ?doc-set
+         :where
+         [(fulltext $ :chunk/index-text ?q {:top 200 :display :refs+scores})
+          [[?e _ _ ?score]]]
+         [?e :chunk/doc ?d]
+         [(contains? ?doc-set ?d)]
+         [?e :chunk/id ?cid]]
+       index-db query-text accessible-doc-set))
+
 (defn- rand-query-text [rng]
   ;; A single random term. Every chunk is 12 space-joined draws from a
   ;; 20-term vocabulary, so a single term hits ~46% of chunks
@@ -191,6 +228,56 @@
                            t0     (System/nanoTime)
                            _      (acl-query index-db q groups)
                            t1     (System/nanoTime)]
+                       (/ (- t1 t0) 1e6))))
+        timed    (sort (drop warmup ms))]
+    {:n-user-groups n-user-groups
+     :runs          runs
+     :p50-ms        (percentile timed 0.5)
+     :p90-ms        (percentile timed 0.9)
+     :min-ms        (first timed)
+     :max-ms        (last timed)}))
+
+(defn correctness-check
+  "Sanity check that the doc-set alternative (acl-query-doc-set) returns
+  the exact same result set as the literal SPEC §9.3 query (acl-query),
+  for the same query text and group set. Returns a map including :equal?"
+  [index-db all-groups n-user-groups seed]
+  (let [rng      (java.util.Random. seed)
+        groups   (if (>= n-user-groups (count all-groups))
+                   all-groups
+                   (sample-without-replacement rng all-groups n-user-groups))
+        q        (rand-query-text rng)
+        joined   (set (acl-query index-db q groups))
+        doc-set  (set (acl-query-doc-set index-db q (accessible-doc-ids index-db groups)))]
+    {:n-user-groups n-user-groups
+     :query         q
+     :join-count    (count joined)
+     :doc-set-count (count doc-set)
+     :equal?        (= joined doc-set)}))
+
+(defn bench-case-doc-set
+  "Same benchmark methodology as bench-case (varies query text every run,
+  and — for n-user-groups < total — which groups are sampled every run),
+  but times acl-query-doc-set instead, including the accessible-doc-ids
+  precompute in every timed run (i.e. this measures the no-caching worst
+  case; caching accessible-doc-ids per session/request, since group
+  membership changes far less often than queries are issued, would only
+  make this faster still)."
+  [index-db all-groups n-user-groups runs seed]
+  (let [rng      (java.util.Random. seed)
+        warmup   5
+        total    (+ warmup runs)
+        ms       (doall
+                   (for [_ (range total)]
+                     (let [q       (rand-query-text rng)
+                           groups  (if (>= n-user-groups (count all-groups))
+                                     all-groups
+                                     (sample-without-replacement
+                                       rng all-groups n-user-groups))
+                           t0      (System/nanoTime)
+                           doc-set (accessible-doc-ids index-db groups)
+                           _       (acl-query-doc-set index-db q doc-set)
+                           t1      (System/nanoTime)]
                        (/ (- t1 t0) 1e6))))
         timed    (sort (drop warmup ms))]
     {:n-user-groups n-user-groups
@@ -268,6 +355,22 @@
             (doseq [{:keys [label n]} cases]
               (let [{:keys [p50-ms p90-ms min-ms max-ms runs]}
                     (bench-case db all-groups n runs-per-case (+ 1000 n))]
+                (println (format "%-16s %5d %10.2f %10.2f %10.2f %10.2f"
+                                  label runs p50-ms p90-ms min-ms max-ms))))
+
+            (println "\n== Correctness check: acl-query-doc-set vs. literal acl-query ==")
+            (doseq [{:keys [label n]} cases]
+              (let [{:keys [query join-count doc-set-count equal?]}
+                    (correctness-check db all-groups n (+ 2000 n))]
+                (println (format "%-16s query=%-6s join=%-4d doc-set=%-4d equal?=%s"
+                                  label query join-count doc-set-count equal?))))
+
+            (println "\n== Alternative: accessible-doc-ids + contains? ==")
+            (println (format "%-16s %5s %10s %10s %10s %10s"
+                              "case" "runs" "p50(ms)" "p90(ms)" "min(ms)" "max(ms)"))
+            (doseq [{:keys [label n]} cases]
+              (let [{:keys [p50-ms p90-ms min-ms max-ms runs]}
+                    (bench-case-doc-set db all-groups n runs-per-case (+ 3000 n))]
                 (println (format "%-16s %5d %10.2f %10.2f %10.2f %10.2f"
                                   label runs p50-ms p90-ms min-ms max-ms))))))
         (finally

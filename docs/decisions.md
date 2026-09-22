@@ -78,16 +78,18 @@ itself suggests `:doc-filter` pre-filtering, "if it applies before
 top-k").
 
 Actual (T0.5 spike, `docs/spikes/acl-query-perf.md`): measured p50 for
-the literal query at that scale, worst case (user in all 50 groups) —
-101-103 ms across two corrected-corpus runs, 168.50 ms in an earlier run.
-**Fails the plan's own AC.** Root-cause isolation (rerunning against a
-corpus where fulltext matched zero chunks) showed the same
-cost-scales-with-group-count pattern even with zero fulltext candidates,
-meaning Datalevin 1.1.0's query planner does not scope the ACL join to
-the (≤200) over-fetch window — cost instead scales with the size of the
-user's accessible corpus. `:doc-filter`, the spec's own suggested
-fallback, was already found broken in Datalog integration by T0.4
-(`docs/spikes/fulltext.md`) — not usable as-is.
+the literal query at that scale, worst case (user in all 50 groups),
+across 4 independent corrected-corpus runs of committed code
+(`dev/spikes/gen_synthetic_corpus.clj -main`) — 99.55, 100.29, 101.32,
+102.77 ms. p50 straddles the 100 ms line run-to-run and p90 exceeds it
+every time (126.91-133.77 ms). **Does not reliably meet the plan's own
+AC.** (An exploratory, non-committed REPL investigation suggested the
+cost tracks the size of the user's accessible corpus rather than the
+fulltext over-fetch window — see `docs/spikes/acl-query-perf.md`'s "Root
+cause" section, explicitly marked there as a hypothesis, not a verified
+fact.) `:doc-filter`, the spec's own suggested fallback, was already
+found broken in Datalog integration by T0.4 (`docs/spikes/fulltext.md`)
+— not usable as-is.
 
 Decision: **Phase 2 T2.1 must implement the lexical channel's ACL filter
 as doc-id-set + `contains?`, not the literal §9.3 join-through-group-list
@@ -111,14 +113,21 @@ query**:
      index-db query-text (accessible-doc-ids index-db user-groups))
 ```
 
-Verified equal result sets to the literal §9.3 query for the same
-query/groups. Measured ~100x faster at 50 groups (p50 ≈ 0.1-1 ms
-including precompute, vs. ≈101 ms for the join), and flat as group count
-grows, unlike the join. `accessible-doc-ids` is a good candidate to cache
-per session/request (group membership changes far less often than
-queries are issued); T2.1 should decide whether to cache it or recompute
-it per query. The admin bypass path (no ACL clause, per §9.3's
-"must be an independent function" requirement) is unaffected.
+This alternative — `accessible-doc-ids`, `acl-query-doc-set`,
+`correctness-check`, `bench-case-doc-set` — is committed in
+`dev/spikes/gen_synthetic_corpus.clj` and run automatically by `-main`,
+so the claims below are reproducible from the repo. Verified equal
+result sets to the literal §9.3 query for the same query/groups on every
+case checked (2 runs × {1, 3, 50} groups, all `equal? true`, e.g.
+200/200 matching tuples at 50 groups both runs). Measured 47-59x faster
+p50 at 50 groups (1.69-2.11 ms including the `accessible-doc-ids`
+precompute done fresh inside every timed run, vs. 99.55-102.77 ms for the
+join). `accessible-doc-ids` is a good candidate to cache per
+session/request (group membership changes far less often than queries
+are issued, and the benchmark above already recomputes it from scratch
+every run); T2.1 should decide whether to cache it or recompute it per
+query. The admin bypass path (no ACL clause, per §9.3's "must be an
+independent function" requirement) is unaffected.
 
-See `docs/spikes/acl-query-perf.md` for full numbers, the scaling curve,
-and the root-cause experiment.
+See `docs/spikes/acl-query-perf.md` for full numbers and reproduction
+instructions.

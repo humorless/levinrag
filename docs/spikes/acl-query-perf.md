@@ -89,57 +89,63 @@ groups.
 
 ## Results — headline (SPEC §9.3 query, as-written)
 
-Two independent full runs of `dev/spikes/gen_synthetic_corpus.clj`'s
-default parameters (fresh 10k/100k/50-group corpus regenerated each
-time, 50 timed runs/case):
+All numbers below are from `-main`'s own printed output — every table in
+this section is reproducible by running the command in "Reproducing"
+below; none of it comes from an unlogged/one-off REPL session. Four
+independent full runs of `dev/spikes/gen_synthetic_corpus.clj`'s default
+parameters (fresh 10k/100k/50-group corpus regenerated each time, 50
+timed runs/case):
 
-| case          | run 1 p50 | run 1 p90 | run 2 p50 | run 2 p90 |
-|---------------|----------:|----------:|----------:|----------:|
-| 1 group       |   6.43 ms |  21.77 ms |   6.90 ms |  22.98 ms |
-| 3 groups      |  27.09 ms |  31.82 ms |  26.44 ms |  30.08 ms |
-| all 50 groups | 102.77 ms | 129.07 ms | 101.32 ms | 127.16 ms |
+| case          | run 1 p50 | run 1 p90 | run 2 p50 | run 2 p90 | run 3 p50 | run 3 p90 | run 4 p50 | run 4 p90 |
+|---------------|----------:|----------:|----------:|----------:|----------:|----------:|----------:|----------:|
+| 1 group       |   6.43 ms |  21.77 ms |   6.90 ms |  22.98 ms |   6.49 ms |  24.35 ms |   6.11 ms |  22.38 ms |
+| 3 groups      |  27.09 ms |  31.82 ms |  26.44 ms |  30.08 ms |  26.53 ms |  32.00 ms |  26.49 ms |  30.84 ms |
+| all 50 groups | 102.77 ms | 129.07 ms | 101.32 ms | 127.16 ms | 100.29 ms | 133.77 ms |  99.55 ms | 126.91 ms |
 
-**AC (`p50 < 100 ms`): met for 1 and 3 groups, FAILS for the all-50-groups
-case** — p50 landed at ~101-103 ms in both corrected-corpus runs, and at
-168.50 ms in an earlier pre-fix run against a corpus whose queries
-matched nothing (see root cause below — the failure is not specific to
-real fulltext hits).
+(An earlier, fifth run against a since-fixed corpus — see the
+CJK-tokenization correction in Setup — measured 168.50 ms p50 for the
+all-50-groups case. Not included in the table above since that corpus
+predates the fix, but noted because it's consistent with everything
+below: cost at 50 groups is high regardless of whether fulltext genuinely
+matches anything, see Root cause.)
 
-## Scaling curve and root cause
+**AC (`p50 < 100 ms`): comfortably met for 1 and 3 groups. For the
+all-50-groups case, p50 hovers right at the 100 ms line — 99.55-102.77 ms
+across 4 runs, straddling both sides of the threshold — while p90
+consistently and clearly exceeds it every single run (126.91-133.77 ms).**
+This is not a dramatic blowout, but it is not a reliable pass either: a
+metric whose median sits on the threshold and swings across it
+run-to-run, with its p90 always over budget, does not satisfy "p50 <
+100 ms" as a dependable guarantee at this scale. Per `SPEC.md` T0.5's own
+AC fallback, this counts as a case needing the alternative documented
+below and in `docs/decisions.md`.
 
-A finer-grained sweep (single JVM process, 30 runs/case after 5 warm-up,
-same corrected corpus) shows cost does not stay near the 1-group baseline
-as group count grows, though the exact shape is noisy (GC/JIT jitter on
-a single dev machine — not a claimed precise functional form):
+## Root cause (exploratory — not committed, treat as a hypothesis)
 
-| n user-groups | accessible docs | p50 (join-based) |
-|---:|---:|---:|
-| 1  |   ~400 | 9.93 ms |
-| 3  |  ~1100 | 28.47 ms |
-| 5  |  ~1800 | 34.91 ms |
-| 10 |  ~3500 | 62.78 ms |
-| 20 |  ~6100 | **107.26 ms** |
-| 30 |  ~7900 | 39.48 ms |
-| 40 |  ~9200 | 45.79 ms |
-| 50 | 10,000 | 56.07 ms |
+**This section reports an exploratory REPL investigation that is not
+committed as code and is not independently reproducible from the repo.**
+It is kept here only as the working hypothesis for *why* the all-50-groups
+case is expensive, and is not what the AC verdict or the T2.1 mandate
+below rest on — those rest entirely on the committed, reproducible
+correctness check and timing comparison in the next section.
 
-**Root-cause isolation experiment**: run against the earlier
-tokenizer-broken corpus (fulltext step matches exactly zero chunks — see
-Setup), the join-based query showed the *same* cost-scales-with-group-count
-pattern (5.76 ms @ 1 group → 88.10 ms @ 50 groups) even though the
-fulltext step contributed zero candidates. This means the cost is **not**
-coming from the fulltext top-k step at all — it means Datalevin 1.1.0's
-query planner does not scope evaluation of
+During the investigation, rerunning the join-based query against an
+earlier corpus whose fulltext queries matched **zero** chunks (the
+pre-fix, unseparated-CJK-blob corpus — see Setup) still showed cost
+rising sharply with group count (single-digit ms at 1 group, tens-to-90ms
+range at 50 groups), even though the fulltext step contributed zero
+candidates in every one of those queries. That's suggestive that
+Datalevin 1.1.0's query planner does not scope evaluation of
 `[?d :doc/effective-groups ?g]` + `:in [?g ...]` to the (≤200) fulltext
-candidates. Cost instead scales with the number of doc/group membership
-edges matching the input group list, i.e. roughly the size of the
-*accessible corpus*, not the size of the over-fetch window. This defeats
-the over-fetch-then-join design intent of `SPEC.md` §9.3: a user with
-broad group membership (common for e.g. an "all-staff" group) pays a cost
-proportional to their entire accessible corpus on every lexical query,
-regardless of how selective the search term is.
+candidates, and that cost instead tracks the number of doc/group
+membership edges matching the input group list — i.e. roughly the size of
+the *accessible corpus* — rather than the size of the over-fetch window.
+If true, this would defeat the over-fetch-then-join design intent of
+`SPEC.md` §9.3 for any user with broad group membership. Flagging this as
+a hypothesis worth confirming with committed benchmark code in a future
+pass, not as a verified fact.
 
-## Alternative (verified working, no `:doc-filter` dependency)
+## Alternative (verified working via committed code, no `:doc-filter` dependency)
 
 `SPEC.md` §9.3 itself proposes `:doc-filter` pre-filtering as the
 fallback if the join is too slow, but `docs/spikes/fulltext.md` already
@@ -148,7 +154,11 @@ error on the inline predicate fn) — not currently usable. Instead:
 precompute the user's **accessible doc-id set** with a small, cheap
 Datalog query (no fulltext step at all), then filter the fulltext
 candidates against that set with a plain `contains?` predicate instead of
-joining through the group list:
+joining through the group list. This is now committed code in
+`dev/spikes/gen_synthetic_corpus.clj` — `accessible-doc-ids`,
+`acl-query-doc-set`, `correctness-check`, and `bench-case-doc-set` — run
+automatically by `-main` right after the headline benchmark above, so the
+claims below are reproducible from the repo, not a one-off REPL result:
 
 ```clojure
 (defn accessible-doc-ids [index-db user-groups]
@@ -157,66 +167,67 @@ joining through the group list:
               :where [?d :doc/effective-groups ?g]]
             index-db user-groups)))
 
-(d/q '[:find ?cid ?score
-       :in $ ?q ?doc-set
-       :where
-       [(fulltext $ :chunk/index-text ?q {:top 200 :display :refs+scores})
-        [[?e _ _ ?score]]]
-       [?e :chunk/doc ?d]
-       [(contains? ?doc-set ?d)]
-       [?e :chunk/id ?cid]]
-     index-db query-text (accessible-doc-ids index-db user-groups))
+(defn acl-query-doc-set [index-db query-text accessible-doc-set]
+  (d/q '[:find ?cid ?score
+         :in $ ?q ?doc-set
+         :where
+         [(fulltext $ :chunk/index-text ?q {:top 200 :display :refs+scores})
+          [[?e _ _ ?score]]]
+         [?e :chunk/doc ?d]
+         [(contains? ?doc-set ?d)]
+         [?e :chunk/id ?cid]]
+       index-db query-text accessible-doc-set))
 ```
 
-**Correctness verified**: for the same query text and group set, this
-returns an identical result set to the SPEC §9.3 join-based query
-(checked directly, `equal? true`, 20/20 matching tuples for a
-representative 3-group case with a real hit-producing term).
+**Correctness, as printed by `-main` (2 runs, one query/group-set per
+case, chosen the same way the timing benchmark chooses them)**:
 
-**Timings** (corrected corpus, doc-set precomputed once per case outside
-the timed loop — i.e. this models a per-query recompute, not even a
-cached-per-session one; 30 runs/case after 5 warm-up):
+| case          | run 1: join vs. doc-set counts | run 1 equal? | run 2: join vs. doc-set counts | run 2 equal? |
+|---------------|:-------------------------------:|:---:|:-------------------------------:|:---:|
+| 1 group       | 7 vs. 7     | true | 7 vs. 7     | true |
+| 3 groups      | 31 vs. 31   | true | 31 vs. 31   | true |
+| all 50 groups | 200 vs. 200 | true | 200 vs. 200 | true |
 
-| n user-groups | accessible docs | p50 | p90 |
-|---:|---:|---:|---:|
-| 1  |    402 | 0.07 ms | 3.23 ms |
-| 3  |  1,134 | 0.07 ms | 4.48 ms |
-| 5  |  1,840 | 0.10 ms | 7.56 ms |
-| 10 |  3,525 | 0.10 ms | 9.83 ms |
-| 20 |  6,141 | 0.10 ms | 13.87 ms |
-| 30 |  7,923 | 0.10 ms | 14.71 ms |
-| 40 |  9,215 | 0.10 ms | 17.46 ms |
-| 50 | 10,000 (entire corpus) | 0.10 ms | 18.76 ms |
+**Timings, as printed by `-main` (`bench-case-doc-set` — same 50
+runs/case, 5-warmup, varying-query/varying-groups methodology as the
+headline benchmark, with `accessible-doc-ids` recomputed *inside* every
+timed run, i.e. no session-level caching credit taken)**:
 
-Plus a one-time `accessible-doc-ids` precompute cost, measured separately
-at the worst case (all 50 groups, entire corpus reachable): **p50 =
-0.86 ms**. Even summing worst-case precompute + query (~1 ms p50), the
-doc-set approach is roughly **100x faster** than the join-based approach
-at 50 groups, and — unlike the join — stays flat as group count grows.
+| case          | run 1 p50 | run 1 p90 | run 2 p50 | run 2 p90 |
+|---------------|----------:|----------:|----------:|----------:|
+| 1 group       | 3.63 ms | 4.50 ms | 3.50 ms | 4.61 ms |
+| 3 groups      | 5.29 ms | 6.44 ms | 5.49 ms | 6.56 ms |
+| all 50 groups | 2.11 ms | 18.21 ms | 1.69 ms | 15.21 ms |
+
+At 50 groups — the case that fails the AC above — the doc-set alternative
+is **47-59x faster on p50** than the literal join query (99.55-102.77 ms
+→ 1.69-2.11 ms), with correctness verified identical on every run
+checked, and this holds even though the benchmark recomputes
+`accessible-doc-ids` from scratch on every single query (a real
+deployment could cache it per session/request, making this only faster).
 
 ## Decision
 
 **The literal SPEC §9.3 query (over-fetch 200 + Datalog join through
 `[?g ...]`) does not reliably meet the plan's own `p50 < 100 ms` AC** at
-10k docs / 100k chunks / 50 groups: it failed in every one of the three
-full runs performed (168.50 ms, 102.77 ms, 101.32 ms), and a finer sweep
-shows the failure region starts well below 50 groups (crossed 100 ms
-already at 20 groups in one run). Per `SPEC.md` T0.5's own AC fallback, a
-`docs/decisions.md` entry has been added proposing the doc-id-set +
-`contains?` alternative above as the query shape Phase 2's T2.1 must
-actually implement.
+10k docs / 100k chunks / 50 groups: across 4 corrected-corpus runs, p50
+for the all-50-groups case straddled the 100 ms line (99.55-102.77 ms)
+and p90 exceeded it every time (126.91-133.77 ms). Per `SPEC.md` T0.5's
+own AC fallback, a `docs/decisions.md` entry has been added proposing the
+doc-id-set + `contains?` alternative above — verified correct and
+47-59x faster at 50 groups via committed, rerunnable code — as the query
+shape Phase 2's T2.1 must actually implement.
 
 **Consequence for Phase 2 T2.1**: implement the lexical channel using the
 doc-id-set + `contains?` pattern, not the literal §9.3 join-through-group-list
 query. The `[?d :doc/effective-groups ?g]` / `:in [?g ...]` join is still
-useful, but only as the (cheap, ~1 ms even at max fan-out) definition of
-`accessible-doc-ids` — not inlined into the same query as the fulltext
-scan. `accessible-doc-ids` is a natural candidate to cache per
-session/request since group membership changes far less often than
-queries are issued, which would make the ACL filter cost effectively
-free beyond the fulltext scan itself; T2.1 should decide whether to cache
-it or recompute it per query (recomputing per query, as measured above,
-is already fast enough on its own).
+useful, but only as the definition of `accessible-doc-ids` — not inlined
+into the same query as the fulltext scan. `accessible-doc-ids` is a
+natural candidate to cache per session/request since group membership
+changes far less often than queries are issued, which would make the ACL
+filter cost effectively free beyond the fulltext scan itself; T2.1 should
+decide whether to cache it or recompute it per query (recomputing per
+query, as measured above, is already fast enough on its own).
 
 The admin bypass path (`SPEC.md` §9.3: "admin 走不含 ACL clause 的查詢，
 必須是獨立函式") is unaffected by this finding — it has no group filter
@@ -227,6 +238,13 @@ at all, so this spike's numbers don't apply to it either way.
 ```bash
 clojure -M:jvm-opts -e '(load-file "dev/spikes/gen_synthetic_corpus.clj")(spikes.gen-synthetic-corpus/-main)'
 ```
+
+`-main` prints, in order: the headline join-based benchmark ("== Results
+=="), the correctness check comparing `acl-query` vs. `acl-query-doc-set`
+for each case ("== Correctness check =="), and the doc-set alternative's
+own timing benchmark ("== Alternative: accessible-doc-ids + contains?
+=="). Every number cited in this doc came from one of those three
+sections' output.
 
 See the script's docstring for why it's invoked via `load-file` rather
 than `-m`/`:dev` extra-paths (auto-loading `dev/user.clj`'s full REPL dep
