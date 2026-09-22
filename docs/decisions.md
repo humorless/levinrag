@@ -47,3 +47,22 @@ Generation command actually used: `cljstack hybridrag . --db sqlite
 hybridrag . --db sqlite --overwrite` — target-dir `.` so the project
 lands directly in the repo root instead of a nested `hybridrag/`
 subdirectory. `:auth` left at its default (`false`).
+
+
+## 2026-09-22 — Embedding path: Path B chosen
+
+Spec text (SPEC.md §6.1 draft store-options): shows `:chunk/index-text` with
+both `:db/fulltext` and `:db/embedding` on the same attribute.
+
+Actual: Path A (`:db/embedding` + `:openai-compatible`) requires `VLLM_EMBED_
+API_KEY` at connection time and attempts to call vLLM during `transact!`.
+Path B (`:db.type/vec` + application-side embedding) has no vLLM dependency
+for schema definition or data insertion.
+
+Decision: **Path B** — `:chunk/index-text` is `:db.type/string` with
+`:db/fulltext` for lexical search. Embedding vector stored separately in
+`:chunk/vec` (`:db.type/vec`) computed at application time via
+`hybridrag.llm.embed/embed-batch!`. This keeps the full stack testable
+and buildable without a running vLLM instance.
+
+See `docs/spikes/embedding.md` for full spike findings and query syntax.
