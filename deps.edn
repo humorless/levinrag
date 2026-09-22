@@ -12,6 +12,9 @@
         io.github.abogoyavlensky/reitit-extras {:mvn/version "0.2.2"}
         ring/ring-jetty-adapter {:mvn/version "1.14.2"}
         io.github.abogoyavlensky/manifest-edn {:mvn/version "0.1.1"}
+        ; http client + json
+        hato/hato {:mvn/version "1.0.0"}
+        metosin/jsonista {:mvn/version "0.3.13"}
         ; db (embedded, no external db server — SPEC.md D1/D2)
         datalevin/datalevin {:mvn/version "1.1.0"}}
 
@@ -56,4 +59,5 @@
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.7.0"}
                                 cider/cider-nrepl {:mvn/version "0.62.2"}
                                 refactor-nrepl/refactor-nrepl {:mvn/version "3.14.0"}}
-                   :main-opts ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware,refactor-nrepl.middleware/wrap-refactor]"]}}}
+                   :main-opts ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware,refactor-nrepl.middleware/wrap-refactor]"]}
+                   :vllm-check {:exec-fn hybridrag.llm.check/run-check!}}}

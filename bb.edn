@@ -63,5 +63,8 @@
                  (manifest/hash-assets!)
                  (clojure "-T:build:jvm-opts build"))}
 
+vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
+            :task (clojure "-X:vllm-check:run-check!")}
+
   kamal {:doc "Deploy application using Kamal"
          :task (apply shell "kamal" (concat *command-line-args* ["--config-file" ".kamal/deploy.yml"]))}}}
