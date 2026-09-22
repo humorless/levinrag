@@ -362,8 +362,13 @@ ingestion 報告（EDN，同時寫入 `data/ingest-reports/<ts>.edn`）：新增
 
 ---
 
-## 8. 中文 analyzer
+## 8. 中文 analyzer（斷詞）
 
+> **優先級：** HanLP 1.x（首选）＞ Jieba（備援）。
+
+> **理由：** HanLP 1.x 的 `HanLP.newSegment()` 內建精準模式與字典，準確率較高；Clojure 可直接呼叫 `hanlp.jar`（Maven：`com.hankcs:hanlp:portable-1.8.4` 或 `com.hankcs:hanlp:hanlp-1.8.4`）。Jieba 作為第二選擇（Maven：`com.huaban:jieba-analysis:1.0.2`，Python Jieba 的 Java port，API 與 Python 版相近）。
+
+> `⚠️ VERIFY`：HanLP 1.x portable jar 在 Clojure 中的呼叫方式（Java interop 與記憶體佔用）
 Datalevin 預設 analyzer 對中文幾乎無效，必須自訂。`⚠️ VERIFY`：Clojure 端如何為 Datalog search domain 註冊 analyzer（直接傳 fn，或需透過 UDF registry）；analyzer 是 runtime 狀態，每次開啟 DB 都必須提供。
 
 ### 8.1 索引端 `cjk-analyzer`
