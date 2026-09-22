@@ -1,37 +1,27 @@
 (ns hybridrag.test-utils
   (:require [hickory.core :as hickory]
-            [hybridrag.db :as db]
+            [hybridrag.db.app-conn :as app-conn]
+            [hybridrag.db.index-conn :as index-conn]
             [hybridrag.server :as server]
             [integrant-extras.tests :as ig-extras]))
 
 (def ^:const TEST-CSRF-TOKEN "test-csrf-token")
 (def ^:const TEST-SECRET-KEY "test-secret-key")
 
-(defn with-truncated-tables
-  "Remove all data from all tables except migrations."
-  [f]
-  (let [db (::db/db ig-extras/*test-system*)]
-    (doseq [table (->> {:select [:name]
-                        :from [:sqlite_master]
-                        :where [:= :type "table"]}
-                       (db/exec! db)
-                       (map (comp keyword :name)))
-            :when (not= :ragtime_migrations table)]
-      (db/exec! db {:delete-from table}))
-    (f)))
-
 (defn response->hickory
   "Convert a Ring response body to a Hickory document."
   [response]
-  (-> response
-      :body
-      (hickory/parse)
-      (hickory/as-hickory)))
+  (-> response :body hickory/parse hickory/as-hickory))
 
-(defn db
-  "Get the database connection from the test system."
+(defn index-conn
+  "Get the index.dtlv connection from the test system."
   []
-  (::db/db ig-extras/*test-system*))
+  (::index-conn/index-conn ig-extras/*test-system*))
+
+(defn app-conn
+  "Get the app.dtlv connection from the test system."
+  []
+  (::app-conn/app-conn ig-extras/*test-system*))
 
 (defn server
   "Get the server instance from the test system."

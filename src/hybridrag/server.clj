@@ -24,8 +24,7 @@
             [ring.middleware.session :as ring-session]
             [ring.middleware.session.cookie :as ring-session-cookie]
             [ring.middleware.ssl :as ring-ssl]
-            [ring.middleware.x-headers :as x-headers])
-  (:import com.zaxxer.hikari.HikariDataSource))
+            [ring.middleware.x-headers :as x-headers]))
 
 (defmethod ig/assert-key ::server
   [_ params]
@@ -40,9 +39,8 @@
                 [:auto-reload? boolean?]
                 [:cache-assets? {:optional true} boolean?]
                 [:cache-control {:optional true} string?]]]
-              [:db [:fn
-                    {:error/message "Invalid datasource type"}
-                    #(instance? HikariDataSource %)]]]}))
+              [:index-conn [:fn {:error/message "Missing index-conn"} some?]]
+              [:app-conn [:fn {:error/message "Missing app-conn"} some?]]]}))
 
 (defn ring-handler
   "Return main application handler for server-side rendering."

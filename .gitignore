@@ -27,3 +27,5 @@ output/
 resources/public/css/output.*
 */manifest.edn
 resources-hashed/
+data/
+data-test/

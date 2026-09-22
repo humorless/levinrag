@@ -1,6 +1,10 @@
-{:hybridrag.db/db
- {:jdbc-url #profile {:default "jdbc:sqlite:db/hybridrag.sqlite"
-                      :test "jdbc:sqlite::memory:"}}
+{:hybridrag.db.index-conn/index-conn
+ {:dir #profile {:default "data/index.dtlv"
+                 :test "data-test/index.dtlv"}}
+
+ :hybridrag.db.app-conn/app-conn
+ {:dir #profile {:default "data/app.dtlv"
+                 :test "data-test/app.dtlv"}}
 
  :hybridrag.server/server
  {:options {:port #profile {:default 8000
@@ -12,4 +16,5 @@
                                     :dev true}
             :cache-assets? #profile {:default false
                                      :prod true}}
-  :db #ig/ref :hybridrag.db/db}}
+  :index-conn #ig/ref :hybridrag.db.index-conn/index-conn
+  :app-conn #ig/ref :hybridrag.db.app-conn/app-conn}}

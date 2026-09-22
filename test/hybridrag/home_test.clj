@@ -10,9 +10,6 @@
 (use-fixtures :once
   (ig-extras/with-system))
 
-(use-fixtures :each
-  test-utils/with-truncated-tables)
-
 (deftest test-home-page-is-loaded-correctly
   (let [url (reitit-extras/get-server-url (test-utils/server) :host)
         body (test-utils/response->hickory (http/get url))]
