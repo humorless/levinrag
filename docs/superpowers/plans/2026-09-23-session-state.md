@@ -155,3 +155,59 @@ test/hybridrag/ingest/
 
 詳細狀態請讀: docs/superpowers/plans/2026-09-23-session-state.md
 ```
+
+---
+
+## 2026-09-23 session end
+
+**Session ID**: 2026-09-23-session-state
+**Commit**: `f720091`
+**Test Status**: 76 assertions, 11 failures, 5 errors
+
+### 待修復的問題
+
+#### ACL tests (4 failures)
+1. `test-apply-acl-overrides-deny-takes-precedence` - deny/allow 同群組時 deny 應優先
+2. `test-parent-dir` (L151, L152) - parent-dir logic 錯誤
+3. `test-apply-acl-overrides-deny` - deny overrides 問題
+4. `test-nearest-collection-edn` (L147) - missing file 應 return nil
+
+#### Walker tests (7 failures)
+1. `test-parse-frontmatter-empty-frontmatter` (L40) - empty frontmatter 應 return `{}`
+2. `test-parse-frontmatter-read-groups` (L33) - tags 是 symbol 不是 string
+3. `test-parse-frontmatter-extracts-title` (L24) - same as above
+4. `test-parse-frontmatter-extra-fields` (L51, L52) - same as above
+5. `test-acceptable-extension-md` (L65) - dotfile `.hidden.md` 應 return false
+6. `test-find-collection-edns-from-fs` (L106, L108, L110, L112) - find-collection-edns 無法正確找到 _collection.edn
+
+### 下一步提示詞
+
+將以下內容貼給新的 pi agent:
+
+```
+請繼續修復測試問題並完成 T1.1。目前狀態:
+
+- walker.clj: 161 行，括號平衡，clj-kondo 0 errors
+- acl.clj: 159 行，括號平衡，clj-kondo 0 errors (1 warning)
+
+測試狀態: 76 assertions, 11 failures, 5 errors
+
+主要問題:
+1. `apply-acl-overrides` 的 'deny takes precedence' 邏輯 - 需確保當 group 在 deny 和 allow 中時，deny win
+2. `parse-frontmatter` - empty frontmatter `---\n---\nContent` 應 return `{}` 而不是 `nil`
+3. `acceptable-extension?` - dotfile `.hidden.md` 應 return false
+4. `find-collection-edns` - 需確認 Path relativize 邏輯
+
+關鍵修復提示:
+- `apply-acl-overrides`: 處理 `denied` 和 `allowed` 後，用 `(clojure.set/difference allowed denied)` 移除同時在兩者中的 groups
+- `parse-frontmatter`: 用 `---\n(.*?)\n?---` 正則表達式匹配 empty body
+- `acceptable-extension?`: 確保 `> ext 0` 檢查來過濾 dotfiles
+
+測試命令:
+```bash
+clojure -X:test
+clj-kondo --lint src/hybridrag/ingest/walker.clj src/hybridrag/ingest/acl.clj
+```
+
+詳細狀態: docs/superpowers/plans/2026-09-23-session-state.md
+```
