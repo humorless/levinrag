@@ -1,0 +1,99 @@
+# vLLM 設定指南
+
+本專案需要三個 vLLM endpoints 才能運作：
+
+## 環境變數設定
+
+在啟動應用程式前，設定以下環境變數：
+
+### 方式一：個別設定（推薦）
+
+```bash
+# Embedding service
+export VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
+export VLLM_EMBED_MODEL="your-embedding-model"
+export VLLM_EMBED_API_KEY="your-api-key-here"
+
+# Rerank service
+export VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
+export VLLM_RERANK_PATH="/v1/rerank"  # 或 "/rerank"，取決於 vLLM 部署
+export VLLM_RERANK_MODEL="your-reranker-model"
+export VLLM_RERANK_API_KEY="your-api-key-here"
+
+# Chat service（必填）
+export VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
+export VLLM_CHAT_MODEL="your-chat-model"
+export VLLM_CHAT_API_KEY="your-api-key-here"
+```
+
+### 方式二：使用單一 API key（fallback）
+
+```bash
+export VLLM_API_KEY="your-api-key-here"
+export VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
+export VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
+export VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
+```
+
+## 預設模型對應
+
+根據 SPEC.md 的設計，預設使用以下模型：
+
+| 用途 | Model ID (預設) | 說明 |
+|------|----------------|------|
+| Embedding | `BAAI/bge-m3` | 1024 維，多語，中文佳 |
+| Rerank | `BAAI/bge-reranker-v2-m3` | 多語 cross-encoder |
+| Chat | (任一可用模型) | 無預設值，必須設定 |
+
+## 測試 endpoints
+
+### 測試 embedding
+
+```bash
+curl -X POST http://localhost:8001/v1/embeddings \
+  -H "Authorization: Bearer $VLLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "your-model", "input": ["測試"]}'
+```
+
+### 測試 rerank
+
+```bash
+curl -X POST http://localhost:8002/v1/rerank \
+  -H "Authorization: Bearer $VLLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "your-model", "query": "測試", "documents": ["候選一", "候選二"], "top_n": 2}'
+```
+
+### 測試 chat
+
+```bash
+curl -X POST http://localhost:8003/v1/chat/completions \
+  -H "Authorization: Bearer $VLLM_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"model": "your-model", "messages": [{"role": "user", "content": "你好"}], "temperature": 0.0, "max_tokens": 16}'
+```
+
+## 驗證設定
+
+設定好環境變數後，執行：
+
+```bash
+bb vllm:check
+```
+
+應該會看到：
+
+```
+[OK]   embed
+[OK]   rerank
+[OK]   chat
+```
+
+## 注意事項
+
+- **不要 commit API key 到 git**（包括這個文件）
+- 如果 vLLM server 已經在運行，不需要額外設定
+- 第一次使用會自動下載模型（約 2-16GB）
+- 如果 `/v1/rerank` 路徑錯誤，嘗試改為 `/rerank`
+- 如果需要更詳細的 vLLM 啟動指令，請參考 `docs/vllm.md`（如果有的話）
