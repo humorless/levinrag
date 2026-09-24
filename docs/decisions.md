@@ -484,3 +484,22 @@ Two consequences for Phase 2:
 - Local latency (~2 s for 40 docs) is fine for development and eval but
   says nothing about the §1.2 p50 < 800 ms target, which assumes a GPU
   vLLM deployment.
+
+
+## 2026-09-24 — T2.0 auth: token prefix, CLI behavior
+
+Spec text (SPEC.md §6.2 app-schema, §13): tokens are 32 random bytes shown
+once, only the sha256 stored; `bb token:revoke <prefix>`.
+
+- **`:token/prefix` added to app-schema** (first 8 chars of the base64url
+  token). §6.2 stores only `:token/hash`, which leaves nothing a human can
+  pass to `token:revoke`. 8 of 43 characters (48 of 256 bits) is kept;
+  the remaining 208 bits keep the token unguessable from the prefix.
+  Revoking an ambiguous prefix is refused.
+- `user:create` sets no password (§13 lists `user:passwd` separately); a
+  user without a password can still get API tokens. `user:passwd` prompts
+  twice via the console (stdin when there is none) and requires ≥ 8 chars.
+- Unauthenticated API calls get **401** `{"error": {"code":
+  "unauthorized"}}`; the principal lookup re-reads the user's current
+  groups on every request, so `user:groups` takes effect immediately for
+  existing tokens.

@@ -69,6 +69,21 @@ vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
   ingest {:doc "Incrementally ingest CORPUS_DIR into DATA_DIR/index.dtlv"
           :task (clojure "-M:jvm-opts -m hybridrag.ingest.cli ingest")}
 
+  user:create {:doc "Create a user: bb user:create alice --groups all,hr [--admin]"
+               :task (apply clojure "-M:jvm-opts -m hybridrag.auth.cli user:create" *command-line-args*)}
+
+  user:groups {:doc "Replace a user's groups: bb user:groups alice all,hr,finance"
+               :task (apply clojure "-M:jvm-opts -m hybridrag.auth.cli user:groups" *command-line-args*)}
+
+  user:passwd {:doc "Set a user's password (prompted): bb user:passwd alice"
+               :task (apply clojure "-M:jvm-opts -m hybridrag.auth.cli user:passwd" *command-line-args*)}
+
+  token:create {:doc "Create an API token (shown once): bb token:create alice --label cli"
+                :task (apply clojure "-M:jvm-opts -m hybridrag.auth.cli token:create" *command-line-args*)}
+
+  token:revoke {:doc "Revoke an API token by prefix: bb token:revoke <prefix>"
+                :task (apply clojure "-M:jvm-opts -m hybridrag.auth.cli token:revoke" *command-line-args*)}
+
   reindex {:doc "Delete DATA_DIR/index.dtlv and ingest CORPUS_DIR from scratch"
            :task (clojure "-M:jvm-opts -m hybridrag.ingest.cli reindex")}
 

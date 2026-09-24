@@ -14,6 +14,9 @@
 
    :token/hash {:db/valueType :db.type/string
                 :db/unique :db.unique/identity}
+   ; first 8 chars of the plaintext token, so `bb token:revoke <prefix>`
+   ; can find it; not in SPEC §6.2, see docs/decisions.md
+   :token/prefix {:db/valueType :db.type/string}
    :token/user {:db/valueType :db.type/ref}
    :token/label {:db/valueType :db.type/string}
    :token/created-at {:db/valueType :db.type/instant}
