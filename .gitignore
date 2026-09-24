@@ -1,3 +1,4 @@
+no-commit/*
 .idea
 .classpath
 .clj-kondo/*
