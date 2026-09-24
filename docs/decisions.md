@@ -683,7 +683,11 @@ Spec text (SPEC.md §4.2, §10, §11, §14).
   200 would look like a bug to the user.
 - **`:uncited-answer` exemption** for "not found" replies is a regex
   (找不到 / 查無 / 沒有相關 / not found / no relevant / cannot find).
-- **Chat 200 without `choices[0].message.content`** is a chat dependency
+- **Chat `content: null` with a message present** (reasoning parsers
+  do this when thinking used up `max_tokens`) is an empty reply →
+  `:empty-answer`; `:generate :finish-reason` records why. A 19+ digit
+  bracketed number counts as an invalid citation instead of throwing.
+- **Chat 200 without `choices[0].message`** is a chat dependency
   failure (`:llm/endpoint :chat`) → `/ask` 503 `dependency_unavailable`,
   like embed failures on `/search`. Chat errors are not degraded to a 200:
   without generation `/ask` has no answer to give.
@@ -691,8 +695,10 @@ Spec text (SPEC.md §4.2, §10, §11, §14).
   candidates after rerank, or all below threshold" — `select-ids` already
   applies `rerank-min-score` before packing).
 - **Config**: `VLLM_CHAT_EXTRA_BODY` (JSON object, new env var) feeds
-  `:chat/extra-body`; `temperature` / `max-tokens` / `extra-body` can
-  also be overridden through the search component's `:opts`. Missing
+  `:chat/extra-body`; the chat parameters can also be overridden through
+  the search component's `:opts` as `:chat/temperature`,
+  `:chat/max-tokens`, `:chat/extra-body` (namespaced: plain `:max-tokens`
+  there is the context budget, SPEC §5 — fixed after review). Missing
   `VLLM_CHAT_BASE_URL` → 503 on `/ask` (not a startup failure, so
   `/search` keeps working without a chat model).
 - **Trace**: `:generate {:ms :model :prompt-tokens :completion-tokens

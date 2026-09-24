@@ -7,7 +7,9 @@
             [hybridrag.retrieval.pipeline :as pipeline]))
 
 (def default-opts
-  "SPEC.md §10.1 chat parameters; each can be overridden through opts."
+  "SPEC.md §10.1 chat parameters, as passed to chat-fn. Overridden through
+   opts as :chat/temperature, :chat/max-tokens, :chat/extra-body — plain
+   :max-tokens in opts is the pipeline's context budget (SPEC.md §5)."
   {:temperature 0.2
    :max-tokens 1024
    :extra-body nil})
@@ -34,7 +36,11 @@
   ;; bracket count stays even
   #"[\[［【]\s*(\d+(?:\s*[,，、]\s*\d+)*)\s*[\]］】](?!\x28)")
 
-(defn- numbers [group] (mapv parse-long (re-seq #"\d+" group)))
+(defn- numbers
+  "Integers in a citation group; one too long for a long counts as 0
+   (invalid)."
+  [group]
+  (mapv #(or (parse-long %) 0) (re-seq #"\d+" group)))
 
 (defn parse-citations
   "Citations in `s` given `n` passages. Returns {:text :cited :invalid}:
@@ -63,12 +69,17 @@
 (def ^:private not-found-re #"找不到|查無|沒有相關|(?i)not found|no relevant|cannot find")
 
 (defn- content
-  "The reply text; a response without one (e.g. HTTP 200 with an error
-   payload) is a chat dependency failure."
+  "The reply text. A null content (reasoning servers return it when
+   thinking used up max_tokens) is an empty reply; a response without a
+   message (e.g. HTTP 200 with an error payload) is a chat dependency
+   failure."
   [resp]
-  (let [c (get-in resp [:choices 0 :message :content])]
-    (if (string? c)
-      c
+  (let [msg (get-in resp [:choices 0 :message])
+        c (:content msg)]
+    (cond
+      (string? c) c
+      (and (map? msg) (nil? c)) ""
+      :else
       (throw (ex-info "chat response missing choices[0].message.content"
                       {:llm/endpoint :chat
                        :http/status 200
@@ -97,7 +108,11 @@
              :stages (:stages res))
       (let [t0 (System/nanoTime)
             resp (chat-fn (messages (prompt) passages query)
-                          (merge default-opts (select-keys opts (keys default-opts))))
+                          (merge default-opts
+                                 (into {} (for [k (keys default-opts)
+                                                :let [ck (keyword "chat" (name k))]
+                                                :when (contains? opts ck)]
+                                            [k (opts ck)]))))
             ms (quot (- (System/nanoTime) t0) 1000000)
             {:keys [text cited invalid]} (parse-citations (strip-think (content resp)) (count passages))
             blank? (str/blank? text)
@@ -115,4 +130,5 @@
                                          :model (:model resp)
                                          :prompt-tokens (get-in resp [:usage :prompt_tokens])
                                          :completion-tokens (get-in resp [:usage :completion_tokens])
+                                         :finish-reason (get-in resp [:choices 0 :finish_reason])
                                          :invalid-citations invalid}))))))

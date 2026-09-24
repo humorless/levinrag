@@ -99,3 +99,32 @@ task in SPEC.md §17. See SPEC.md §20 for the spec author's own backlog.
 - **Query-side exact-token matching for identifiers** (e.g. `v2.7.3` only
   ranks 7th lexically because of the `v2` fragment). Evaluate before
   deviating from §8.2.
+
+## From Phase 3 review (2026-09-25)
+
+Deferred minors (reviewer-confirmed, not fixed):
+
+- **Full-width digits in citations** (`［１］`): Java `\d` is ASCII-only, so
+  they are not recognized and the answer gets a false `:uncited-answer`.
+  Cheap fix: `(?U)` on `citation-re` and the `numbers` regex. Ranges
+  (`[1-3]`) likewise unrecognized.
+- **`</think>` without an opening tag** (models whose template pre-fills
+  `<think>`, served without a reasoning parser) is not stripped: the user
+  sees the reasoning. Drop everything up to a leftover `</think>`.
+- **Invalid or non-object `VLLM_CHAT_EXTRA_BODY`** → 500 on every `/ask`.
+  Validate `map?` and fail at `ig/init-key` instead.
+- **Passage text inserted verbatim into `<sources>`**: a document
+  containing `</sources>` can re-frame the prompt (indirect prompt
+  injection by document authors; no ACL impact). Neutralize the tags.
+- **§18.3 test checks output, not model input**: also assert restricted
+  titles/paths never appear in the `messages` handed to the chat stub.
+
+Set aside by the reviewer, for later phases:
+
+- **No trace when `/search` or `/ask` fails with 503** (§14 says every
+  request writes one) → T5.1.
+- **`llm/http.clj`**: other `IOException`s and non-JSON 200 bodies give
+  500 instead of 503 → T5.1.
+- **No-evidence only fires for users with nothing readable** while
+  `:rerank-min-score` is nil (the semantic channel always returns
+  neighbours) — calibrate the threshold with the book-corpus eval.

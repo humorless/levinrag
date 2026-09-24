@@ -88,19 +88,10 @@
     (is (= {:model "stub"
             :prompt-tokens 100
             :completion-tokens 20
+            :finish-reason nil
             :invalid-citations [9]}
            (dissoc (get-in res [:stages :generate]) :ms)))
     (is (not (contains? (get-in res [:stages :flags]) :uncited-answer)))))
-
-(deftest test-ask-chat-opts-override
-  (let [seen (atom nil)]
-    (answer/ask! (deps-with found (fn [m o] (reset! seen o) ((chat-reply "x[1]") m o)))
-                 {} "q" {:temperature 0.7
-                         :extra-body {:a 1}
-                         :final-k 3})
-    (is (= {:temperature 0.7
-            :max-tokens 1024
-            :extra-body {:a 1}} @seen))))
 
 (deftest test-ask-uncited-and-not-found
   (is (contains? (get-in (answer/ask! (deps-with found (chat-reply "特休依年資計算。")) {} "q" {}) [:stages :flags])
@@ -123,9 +114,48 @@
     (is (contains? (get-in res [:stages :flags]) :empty-answer))
     (is (= [] (:citations res)))))
 
+(deftest test-ask-chat-opts-override
+  (let [seen (atom nil)]
+    (answer/ask! (deps-with found (fn [m o] (reset! seen o) ((chat-reply "x[1]") m o)))
+                 {} "q" {:chat/temperature 0.7
+                         :chat/max-tokens 2048
+                         :chat/extra-body {:a 1}
+                         :final-k 3})
+    (is (= {:temperature 0.7
+            :max-tokens 2048
+            :extra-body {:a 1}} @seen))))
+
+(deftest test-pipeline-max-tokens-stays-out-of-chat
+  ;; :max-tokens in opts is the context budget (SPEC §5), not max_tokens
+  (let [seen (atom nil)
+        searched (atom nil)]
+    (answer/ask! {:search-fn (fn [_ _ _ opts] (reset! searched opts) found)
+                  :chat-fn (fn [m o] (reset! seen o) ((chat-reply "x[1]") m o))}
+                 {} "q" {:max-tokens 6000
+                         :chat/max-tokens 512})
+    (is (= 512 (:max-tokens @seen)))
+    (is (= 6000 (:max-tokens @searched)))))
+
 (deftest test-chat-malformed
-  (doseq [bad [{:error "model not loaded"} {:choices []} {:choices [{:message {:content nil}}]}]]
+  (doseq [bad [{:error "model not loaded"} {:choices []} {:choices [{:finish_reason "stop"}]}]]
     (let [e (try (answer/ask! (deps-with found (fn [_ _] bad)) {} "q" {})
                  nil
                  (catch clojure.lang.ExceptionInfo e e))]
       (is (= :chat (:llm/endpoint (ex-data e))) (pr-str bad)))))
+
+(deftest test-null-content-is-empty-answer
+  ;; reasoning parsers return content null when thinking used up max_tokens
+  (let [res (answer/ask! (deps-with found (fn [_ _] {:model "stub"
+                                                     :choices [{:message {:content nil
+                                                                          :reasoning_content "想到一半"}
+                                                                :finish_reason "length"}]}))
+                         {} "q" {})]
+    (is (= answer/empty-answer-message (:answer res)))
+    (is (contains? (get-in res [:stages :flags]) :empty-answer))
+    (is (= "length" (get-in res [:stages :generate :finish-reason])))))
+
+(deftest test-huge-bracket-number
+  (let [{:keys [text cited invalid]} (answer/parse-citations "帳號[12345678901234567890]見[1]" 2)]
+    (is (= [1] cited))
+    (is (= 1 (count invalid)))
+    (is (= "帳號見[1]" text))))
