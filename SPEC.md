@@ -455,15 +455,22 @@ principal (username, groups, admin?) + query
 
 ```clojure
 (defn rrf
-  "Fuse best-first lists of chunk ids by reciprocal rank. Missing = no contribution."
+  "Fuse best-first lists of chunk ids by reciprocal rank. Missing = no
+   contribution. Ties go to the better rank in the first list (lexical),
+   then the next list, then the id — fully deterministic."
   [k & ranked-lists]
-  (->> ranked-lists
-       (mapcat (fn [ids] (map-indexed (fn [i id] [id (/ 1.0 (+ k i 1))]) ids)))
-       (reduce (fn [m [id s]] (update m id (fnil + 0.0) s)) {})
-       (sort-by val >)))
+  (let [rank-maps (mapv #(into {} (map-indexed (fn [i id] [id i])) %) ranked-lists)
+        scores (reduce (fn [m [id s]] (update m id (fnil + 0.0) s))
+                       {}
+                       (mapcat (fn [ids] (map-indexed (fn [i id] [id (/ 1.0 (+ k i 1))]) ids))
+                               ranked-lists))]
+    (->> scores
+         (sort-by (fn [[id s]]
+                    (into [(- s)] (conj (mapv #(get % id Long/MAX_VALUE) rank-maps) id))))
+         vec)))
 ```
 
-平手時以 lexical rank 較佳者優先（穩定排序，測試需覆蓋）。
+平手時以 lexical rank 較佳者優先，其次 semantic rank，最後 chunk id；排序必須完全確定，測試需覆蓋平手情境。**不可用 `(sort-by val >)`**：同分時順序取決於 map 的內部順序，會讓平手測試失去意義。
 
 ### 9.5 Graph 通道（MVP 版）
 
