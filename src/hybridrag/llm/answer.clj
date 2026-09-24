@@ -63,7 +63,7 @@
    {:role "user"
     :content (str "<sources>\n"
                   (str/join "\n\n" (for [{:keys [n text] :as p} passages]
-                                     (str "[" n "] " (:doc/title p) "｜" (str/join " > " (:section/trail p)) "\n" text)))
+                                     (str "[" n "] " (:doc/title p) "｜" (:section/trail p) "\n" text)))
                   "\n</sources>\n\n問題：" query)}])
 
 (def ^:private not-found-re #"找不到|查無|沒有相關|(?i)not found|no relevant|cannot find")

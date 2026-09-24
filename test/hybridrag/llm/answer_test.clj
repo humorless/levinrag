@@ -32,13 +32,13 @@
   [{:n 1
     :doc/path "hr/leave.md"
     :doc/title "請假規定"
-    :section/trail ["請假規定" "特休"]
+    :section/trail "請假規定 > 特休"
     :chunk-ids ["hr/leave.md::1"]
     :text "特休依年資計算。"}
    {:n 2
     :doc/path "hr/onboard.md"
     :doc/title "新人報到"
-    :section/trail ["新人報到"]
+    :section/trail "新人報到"
     :chunk-ids ["hr/onboard.md::0"]
     :text "報到當天領取識別證。"}])
 
