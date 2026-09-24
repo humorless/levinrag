@@ -37,7 +37,8 @@
                 [:session-secret-key string?]
                 [:auto-reload? boolean?]
                 [:cache-assets? {:optional true} boolean?]
-                [:cache-control {:optional true} string?]]]
+                [:cache-control {:optional true} string?]
+                [:secure-cookies? {:optional true} boolean?]]]
               [:index-conn [:fn {:error/message "Missing index-conn"} some?]]
               [:app-conn [:fn {:error/message "Missing app-conn"} some?]]
               [:search [:fn {:error/message "Missing search"} some?]]]}))
@@ -64,8 +65,9 @@
                              [default-charset/wrap-default-charset "utf-8"]
                              ring-cookies/wrap-cookies
                              [ring-session/wrap-session
-                              {:cookie-attrs {:secure true
-                                              :http-only true}
+                              {:cookie-attrs {:secure (boolean (:secure-cookies? options))
+                                              :http-only true
+                                              :same-site :lax}
                                :flash true
                                :store session-store}]
                              ; add handler options to request

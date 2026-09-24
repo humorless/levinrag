@@ -18,7 +18,9 @@
             :auto-reload? #profile {:default false
                                     :dev true}
             :cache-assets? #profile {:default false
-                                     :prod true}}
+                                     :prod true}
+            :secure-cookies? #profile {:default false
+                                       :prod true}}
   :index-conn #ig/ref :hybridrag.db.index-conn/index-conn
   :app-conn #ig/ref :hybridrag.db.app-conn/app-conn
   :search #ig/ref :hybridrag.retrieval.system/search}}

@@ -11,10 +11,6 @@
         (reitit-extras/render-html)
         (response/status status-code))))
 
-(defn home-handler
-  [_]
-  (reitit-extras/render-html views/home-page))
-
 (defn- conn-ok?
   "True if `conn` is a live, queryable Datalevin connection."
   [conn]
