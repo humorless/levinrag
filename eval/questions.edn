@@ -1,0 +1,118 @@
+;; Eval question bank for corpus-sample/ (SPEC.md §15.1, §15.3).
+;;
+;; Seed users (§15.3): alice [all hr], bob [all engineering],
+;; carol [all finance], admin (reads everything).
+;;
+;; :expected-docs — docs a correct retrieval should rank (recall/MRR).
+;; :must-not-docs — docs the user cannot read; any appearance is an ACL leak.
+;; :tags — :acl (negative case), :identifier (exact ID match),
+;;         :cross-doc (answer spans linked docs). Informational only.
+[;; --- single-doc questions ---
+ {:id "leave-01" :user "alice" :query "特休天數怎麼計算？"
+  :expected-docs ["hr/leave.md"]}
+ {:id "leave-02" :user "alice" :query "病假一年最多可以請幾天？"
+  :expected-docs ["hr/leave.md"]}
+ {:id "perf-01" :user "alice" :query "考績 A 等的人數比例上限是多少？"
+  :expected-docs ["hr/performance.md"]}
+ {:id "salary-01" :user "alice" :query "每個月幾號發薪水？"
+  :expected-docs ["hr/payroll/salary.md"]}
+ {:id "holiday-01" :user "bob" :query "2025 年端午節連假放幾天？"
+  :expected-docs ["public/holidays-2025.md"]}
+ {:id "office-01" :user "carol" :query "訪客來公司要怎麼登記？"
+  :expected-docs ["public/office-guide.md"]}
+ {:id "deploy-01" :user "bob" :query "production 部署需要幾個人核准？"
+  :expected-docs ["engineering/deploy-guide.md"]}
+ {:id "deploy-02" :user "bob" :query "錯誤率超過多少就要回滾？"
+  :expected-docs ["engineering/deploy-guide.md"]}
+ {:id "incident-01" :user "bob" :query "SEV1 事故的回應時間是多久？"
+  :expected-docs ["engineering/incident-runbook.md"]}
+ {:id "expense-01" :user "carol" :query "到台北出差，住宿每晚上限多少錢？"
+  :expected-docs ["finance/expense-policy.md"]}
+ {:id "invoice-01" :user "carol" :query "供應商的付款條件是什麼？"
+  :expected-docs ["finance/invoice-guide.md"]}
+ {:id "vpn-01" :user "bob" :query "VPN 閒置多久會自動斷線？"
+  :expected-docs ["it/vpn.txt"]}
+ {:id "laptop-01" :user "alice" :query "筆電用幾年可以申請換新？"
+  :expected-docs ["it/maintenance.md"]}
+ {:id "party-01" :user "bob" :query "尾牙在哪裡舉辦？"
+  :expected-docs ["hr/announcements/year-end-party.md"]}
+ {:id "release-01" :user "bob" :query "哪一版修正了庫存同步延遲的問題？"
+  :expected-docs ["engineering/release-notes.md"]}
+ {:id "budget-01" :user "admin" :query "2025 年度營運預算總額是多少？"
+  :expected-docs ["finance/budget-2025.md"]}
+ {:id "invest-01" :user "admin" :query "申訴案件的調查要在幾天內完成？"
+  :expected-docs ["hr/investigations/case-handling.md"]}
+
+ ;; --- exact identifiers ---
+ {:id "id-01" :user "bob" :query "SKU-A1234 是什麼零件？"
+  :expected-docs ["engineering/specs/sku-catalog.md" "engineering/specs/api-v2.md"]
+  :tags [:identifier]}
+ {:id "id-02" :user "alice" :query "HR-07 是什麼表單？"
+  :expected-docs ["hr/leave.md"]
+  :tags [:identifier]}
+ {:id "id-03" :user "carol" :query "FN-12 要在出貨後幾天內提出？"
+  :expected-docs ["finance/invoice-guide.md"]
+  :tags [:identifier]}
+ {:id "id-04" :user "bob" :query "API 錯誤碼 E2001 代表什麼？"
+  :expected-docs ["engineering/specs/api-v2.md"]
+  :tags [:identifier]}
+ {:id "id-05" :user "alice" :query "IT-02 表單什麼時候要送？"
+  :expected-docs ["it/account-setup.md"]
+  :tags [:identifier]}
+ {:id "id-06" :user "carol" :query "GA-03 補發工本費多少？"
+  :expected-docs ["public/office-guide.md"]
+  :tags [:identifier]}
+ {:id "id-07" :user "bob" :query "v2.7.3 改了什麼？"
+  :expected-docs ["engineering/release-notes.md"]
+  :tags [:identifier]}
+
+ ;; --- cross-document (linked docs) ---
+ {:id "x-01" :user "alice" :query "年終獎金的考績係數怎麼決定？考績 A 等最多幾成的人？"
+  :expected-docs ["hr/payroll/bonus.md" "hr/performance.md"]
+  :tags [:cross-doc]}
+ {:id "x-02" :user "alice" :query "新人報到當天要交什麼資料？公司帳號又是怎麼申請的？"
+  :expected-docs ["hr/onboarding.md" "it/account-setup.md"]
+  :tags [:cross-doc]}
+ {:id "x-03" :user "bob" :query "部署後錯誤率太高，回滾之後事故要怎麼處理？"
+  :expected-docs ["engineering/deploy-guide.md" "engineering/incident-runbook.md"]
+  :tags [:cross-doc]}
+ {:id "x-04" :user "carol" :query "報支費用要附的發票，抬頭或統編寫錯會怎樣？"
+  :expected-docs ["finance/expense-policy.md" "finance/invoice-guide.md"]
+  :tags [:cross-doc]}
+ {:id "x-05" :user "alice" :query "國定假日出勤工資怎麼算？2025 國慶連假是哪幾天？"
+  :expected-docs ["hr/leave.md" "public/holidays-2025.md"]
+  :tags [:cross-doc]}
+ {:id "x-06" :user "bob" :query "API v2 範例裡的 SKU-B2210 是什麼料號，交期多久？"
+  :expected-docs ["engineering/specs/api-v2.md" "engineering/specs/sku-catalog.md"]
+  :tags [:cross-doc :identifier]}
+
+ ;; --- ACL negative cases ---
+ {:id "acl-01" :user "bob" :query "年終獎金的發放標準"
+  :must-not-docs ["hr/payroll/bonus.md"]
+  :tags [:acl]}
+ {:id "acl-02" :user "carol" :query "薪資結構與職級有哪些？"
+  :must-not-docs ["hr/payroll/salary.md"]
+  :tags [:acl]}
+ ;; frontmatter read_groups overrides (not unions) the finance collection
+ {:id "acl-03" :user "carol" :query "2025 年度預算的部門分配"
+  :must-not-docs ["finance/budget-2025.md"]
+  :tags [:acl]}
+ ;; nested _collection.edn narrows hr/ to hr-lead
+ {:id "acl-04" :user "alice" :query "申訴調查的處理程序"
+  :must-not-docs ["hr/investigations/case-handling.md"]
+  :tags [:acl]}
+ {:id "acl-05" :user "alice" :query "SKU-A1234 的庫存 API 錯誤碼"
+  :must-not-docs ["engineering/specs/api-v2.md" "engineering/specs/sku-catalog.md"]
+  :tags [:acl :identifier]}
+ {:id "acl-06" :user "bob" :query "出差住宿費上限"
+  :must-not-docs ["finance/expense-policy.md"]
+  :tags [:acl]}
+ ;; procurement.md links to sku-catalog.md; the graph channel must not
+ ;; surface the linked doc to a user who cannot read it
+ {:id "acl-07" :user "carol" :query "採購新零件要怎麼申請料號？"
+  :expected-docs ["finance/procurement.md"]
+  :must-not-docs ["engineering/specs/sku-catalog.md"]
+  :tags [:acl :cross-doc]}
+ {:id "acl-08" :user "alice" :query "資本支出的上限是多少？"
+  :must-not-docs ["finance/budget-2025.md"]
+  :tags [:acl]}]
