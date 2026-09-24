@@ -592,3 +592,38 @@ Spec text (SPEC.md §11, §12, §14).
 - The pipeline's defaults are SPEC §5's; `resources/config.edn` wires an
   empty `:opts` map for later overrides. Rerank and embed config still come
   from `VLLM_*` env vars at call time.
+
+
+## 2026-09-24 — T2.6 eval: first real run; the sample corpus saturates
+
+Spec text (SPEC.md §15.2, §17 T2.6 AC: five-variant report, ACL leaks = 0,
+results written).
+
+First real run (bge-m3 Q8_0 via LM Studio, bge-reranker-v2-m3 Q8_0 via
+llama.cpp, M1 16 GB, `corpus-sample/` reindexed with the CJK analyzer),
+`eval/results/20260924-223132.edn` (not committed; `eval/results/` is
+gitignored):
+
+| variant | recall@5 | recall@10 | MRR@10 | leaks |
+|---|---|---|---|---|
+| lexical | 1.000 | 1.000 | 0.978 | 0 |
+| semantic | 1.000 | 1.000 | 0.984 | 0 |
+| hybrid | 1.000 | 1.000 | 1.000 | 0 |
+| hybrid+rerank | 1.000 | 1.000 | 1.000 | 0 |
+| hybrid+rerank+graph | 1.000 | 1.000 | 1.000 | 0 |
+
+Longest chunk 378 est. tokens. Rerank p50 ≈ 1.35 s / p95 ≈ 3.5 s locally;
+every other stage ≤ ~40 ms p50.
+
+- **ACL leaks = 0 on real models** (the AC). The harness is also tested to
+  count leaks when handed a principal that can read a must-not doc.
+- **The metrics cannot rank the variants yet.** With 22 docs and up to 50
+  candidates per query, nearly every readable doc is in the top 10, so
+  recall saturates; only MRR moves. This is a property of the sample
+  corpus, not the harness. Meaningful variant comparison (and calibrating
+  `rerank-min-score`) needs a larger corpus or harder questions — backlog.
+- Metric keys are `:recall-5 :recall-10 :mrr-10` (`@` is not legal in a
+  Clojure keyword). A question counts toward recall/MRR only if it has
+  `:expected-docs`; ACL-only questions count only toward leaks.
+- Eval principals come from `eval/users.edn` (the §15.3 seed users), so
+  `bb eval` does not depend on app.dtlv.

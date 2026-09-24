@@ -29,3 +29,6 @@ resources/public/css/output.*
 resources-hashed/
 data/
 data-test/
+
+# eval run outputs
+/eval/results/
