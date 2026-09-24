@@ -69,9 +69,7 @@
     (is (pos? (:acl-leaks report)))))
 
 (deftest test-section-level-scoring
-  (let [rerank-stub (fn [_ docs _] (vec (map-indexed (fn [i _] {:index i
-                                                                :relevance-score (- (double i))}) docs)))
-        report (harness/run-eval {:retriever (rd/retriever fx/*index* fx/hash-embed)
+  (let [report (harness/run-eval {:retriever (rd/retriever fx/*index* fx/hash-embed)
                                   :rerank-fn rerank-stub}
                                  fx/*index*
                                  {:questions [{:id "s1"
