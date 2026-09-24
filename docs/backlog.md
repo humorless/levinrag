@@ -38,3 +38,53 @@ task in SPEC.md §17. See SPEC.md §20 for the spec author's own backlog.
   during T5.1 whether a damaged/closed store can still report `"ok"` —
   if so, a trivial query or datom-count would be a real liveness probe
   instead.
+
+## From design review (2026-09-24)
+
+- **SSO via Keycloak (OIDC).** SPEC §1.3 lists SSO as a non-goal, but
+  production use needs it: local passwords make offboarding a manual
+  `bb user:groups` step, and a forgotten one is an ACL leak that §18.3
+  cannot catch. Keycloak is the chosen IdP. Notes for when this is
+  promoted to a task:
+  - Keycloak can emit a `groups` claim with plain group names (group
+    mapper, "full group path" off), so groups can map 1:1 to the
+    `:read-groups` strings in `_collection.edn` — no GUID mapping table.
+  - Two ways in: (a) in-app authorization code flow + PKCE, verifying the
+    ID token against Keycloak's JWKS (`ring-oauth2` / `buddy-sign` /
+    nimbus-jose-jwt); (b) oauth2-proxy in front passing
+    `X-Forwarded-Email` / `X-Forwarded-Groups`. (b) needs no OIDC code
+    but levinrag must then bind to localhost or verify the proxy, since
+    those headers are otherwise forgeable. Needs its own §18.3 tests.
+  - Key users by `iss` + `sub`, not email (emails change); reserve e.g.
+    `:user/oidc-sub` in `app.dtlv`.
+  - Groups are captured at login, so session max-age bounds how long a
+    revoked group stays effective (e.g. 8h) — pick deliberately.
+  - API tokens (§13) never expire and bypass the IdP; a user disabled in
+    Keycloak keeps a working token. Add expiry or tie tokens to IdP
+    status.
+  - Cheap prep that keeps this additive: at T2.0, keep "identity source"
+    separate from the principal. Password, OIDC, and proxy headers should
+    all resolve to the same `{:username :groups :admin?}`, so Retriever
+    and ACL code never know where identity came from.
+
+- **End-user chat UX (question answering, citations, conversation
+  history).** Evaluated LibreChat for this and rejected it as too heavy
+  (Node + MongoDB + Meilisearch vs. §1.1's single JVM). The Phase 4 UI is
+  single-shot Q&A plus a debug panel, aimed at the developer. For
+  day-to-day use by colleagues, these are the missing pieces:
+  - Conversation history (per-user list of past conversations; could
+    reuse `app.dtlv` traces as the storage base).
+  - Multi-turn follow-ups ("那主管呢？"). Only retrieving on the last
+    message recalls poorly; this depends on query rewriting (SPEC §20),
+    so the two should be promoted together.
+  - Citation UX: clickable `[n]` jumping to a source panel and to the
+    highlighted range in the doc viewer (T4.3 is the base).
+  - Streaming output (SPEC T5.4) — expected by users of a chat UI.
+    Tension with T3.1: citation validation runs on the complete answer
+    and strips invalid `[n]`, but streamed text is already sent. Decide
+    between a trailing correction, delayed client-side rendering, or
+    buffering citations when streaming is promoted.
+  - Markdown rendering of answers, copy button, 👍/👎 feedback (the
+    feedback item is already in SPEC §20).
+  Keep the debug panel as a developer view next to the chat view, not
+  replaced by it.

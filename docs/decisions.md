@@ -328,3 +328,30 @@ See `VLLM_SETUP.md` for configuration instructions.
 
 This is not a spec deviation - SPEC §4 was always complete. This entry
 records that the infrastructure mentioned in §4.1 is now available.
+
+
+## 2026-09-24 — Principal is decoupled from identity source (prep for Keycloak SSO)
+
+Spec text (SPEC.md §13, T2.0): session cookie for the Web UI, bearer
+tokens for the API, users and groups managed via `bb user:*`. SSO is a
+non-goal (§1.3).
+
+Context: production use will need SSO, and Keycloak is the chosen IdP
+(see `docs/backlog.md`, "SSO via Keycloak (OIDC)"). SSO itself stays out
+of the MVP, but T2.0 is where identity handling gets wired in. If T2.0
+couples "bearer token → user lookup" directly into the handlers and
+Retriever callers, adding OIDC later means reworking them.
+
+Decision: T2.0 treats authentication entry points (password session, API
+token, later OIDC or trusted proxy headers) as adapters whose only output
+is a principal map `{:username .. :groups #{..} :admin? ..}`. Everything
+downstream (pipeline, Retriever, ACL, trace) consumes only the principal
+and never inspects how it was obtained. No OIDC code is written in the
+MVP; this only fixes the shape of the seam.
+
+This is compatible with the T0.5 ACL decision (accessible-doc-id set
+computed from groups): that computation depends on `:groups`, not on
+where the groups came from.
+
+This is not a spec deviation — §13's mechanisms are implemented as
+written. It constrains how T2.0 structures them.
