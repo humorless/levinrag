@@ -74,13 +74,13 @@
                             (if (= (:type ov) :deny)
                               (clojure.set/union acc (set (:groups ov)))
                               acc))
-                          #{} 
+                          #{}
                           overrides)
            allowed (reduce (fn [acc ov]
                              (if (= (:type ov) :allow)
                                (clojure.set/union acc (set (:groups ov)))
                                acc))
-                           #{} 
+                           #{}
                            overrides)]
        (-> (set groups)
            (clojure.set/difference denied)
@@ -97,17 +97,17 @@
   ([dir-path collection-edns]
    (resolve-collection-groups-with-overrides dir-path collection-edns []))
   ([dir-path collection-edns root-read-groups]
-   (let [declared (resolve-collection-effective-groups dir-path collection-edns root-read-groups)]
-     (let [nearest-entry (loop [d (str/trim dir-path)]
-                           (let [entry (get collection-edns d)]
-                             (if (and entry (:read-groups entry))
-                               entry
-                               (let [p (parent-dir d)]
-                                 (if (= p d)
-                                   nil
-                                   (recur p))))))
-           overrides (when nearest-entry (:acl-overrides nearest-entry))]
-       (apply-acl-overrides declared overrides)))))
+   (let [declared (resolve-collection-effective-groups dir-path collection-edns root-read-groups)
+         nearest-entry (loop [d (str/trim dir-path)]
+                         (let [entry (get collection-edns d)]
+                           (if (and entry (:read-groups entry))
+                             entry
+                             (let [p (parent-dir d)]
+                               (if (= p d)
+                                 nil
+                                 (recur p))))))
+         overrides (when nearest-entry (:acl-overrides nearest-entry))]
+     (apply-acl-overrides declared overrides))))
 
 ;; --- File group resolution ---
 

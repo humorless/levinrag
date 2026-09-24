@@ -7,8 +7,7 @@
    - walk-corpus: full pipeline with ACL resolution"
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [hybridrag.ingest.walker :as walker]
-            [hybridrag.ingest.acl :as acl]))
+            [hybridrag.ingest.walker :as walker]))
 
 ;; --- Extension filtering ---
 
@@ -29,18 +28,17 @@
     (.mkdirs (io/file tmp-dir "sub"))
     (let [f (io/file tmp-dir "sub" "test.md")]
       (.createNewFile f)
-      (let [meta (walker/file-meta tmp-dir f)]
-        (is (= "sub/test.md" (:rel-path meta)))
-        (is (string? (:abs-path meta)))
-        (is (number? (:size meta)))
-        (is (number? (:mtime meta))))
+      (let [fm (walker/file-meta tmp-dir f)]
+        (is (= "sub/test.md" (:rel-path fm)))
+        (is (string? (:abs-path fm)))
+        (is (number? (:size fm)))
+        (is (number? (:mtime fm))))
       (.delete f))
     (.delete (io/file tmp-dir "sub"))
     (.delete tmp-dir)))
 
-
 (deftest test-find-collection-edns-from-fs
-  "Discover _collection.edn from a temporary directory structure."
+  ;; Discover _collection.edn from a temporary directory structure.
   (let [tmp-dir (io/file (System/getProperty "java.io.tmpdir") "test-collection-edns")]
     (try
       (.mkdirs tmp-dir)
@@ -56,13 +54,17 @@
       (spit (io/file tmp-dir "eng" "_collection.edn") "{:name \"Eng\" :read-groups [\"eng\"]}")
 
       (let [edns (walker/find-collection-edns tmp-dir)]
-        (is (= {:name "Root", :read-groups ["all"]}
+        (is (= {:name "Root",
+                :read-groups ["all"]}
                (get edns "")))
-        (is (= {:name "HR", :read-groups ["hr"]}
+        (is (= {:name "HR",
+                :read-groups ["hr"]}
                (get edns "hr")))
-        (is (= {:name "Payroll", :read-groups ["hr" "finance"]}
+        (is (= {:name "Payroll",
+                :read-groups ["hr" "finance"]}
                (get edns "hr/payroll")))
-        (is (= {:name "Eng", :read-groups ["eng"]}
+        (is (= {:name "Eng",
+                :read-groups ["eng"]}
                (get edns "eng"))))
       (finally
         ;; Cleanup
@@ -81,7 +83,7 @@
 ;; --- Full walk ---
 
 (deftest test-walk-corpus-structure
-  "Walk a temp corpus dir with ACL structure, verify all files found."
+  ;; Walk a temp corpus dir with ACL structure, verify all files found.
   (let [tmp-dir (io/file (System/getProperty "java.io.tmpdir") "test-walk-corpus")]
     (try
       (.mkdirs tmp-dir)
@@ -131,7 +133,7 @@
           (.delete f))))))
 
 (deftest test-walk-corpus-skips-dotfiles
-  "Walker should skip .hidden files and dot-directories."
+  ;; Walker should skip .hidden files and dot-directories.
   (let [tmp-dir (io/file (System/getProperty "java.io.tmpdir") "test-dotfiles")]
     (try
       (.mkdirs tmp-dir)
@@ -150,7 +152,7 @@
           (.delete f))))))
 
 (deftest test-collect-markdown-files-only
-  "collect-markdown-files returns only accepted extensions."
+  ;; collect-markdown-files returns only accepted extensions.
   (let [tmp-dir (io/file (System/getProperty "java.io.tmpdir") "test-extensions")]
     (try
       (.mkdirs tmp-dir)

@@ -87,19 +87,19 @@
 title: \"Employee Handbook\"
 tags: [hr, policy]
 ---
-Content here."]
-    (let [fm (md/parse-frontmatter md)]
-      (is (= "Employee Handbook" (:title fm)))
-      (is (= ["hr" "policy"] (:tags fm))))))
+Content here."
+        fm (md/parse-frontmatter md)]
+    (is (= "Employee Handbook" (:title fm)))
+    (is (= ["hr" "policy"] (:tags fm)))))
 
 (deftest test-parse-frontmatter-read-groups
   (let [md "---
 title: Leave Policy
 read_groups: [all, hr]
 ---
-Leave days are calculated..."]
-    (let [fm (md/parse-frontmatter md)]
-      (is (= ["all" "hr"] (:read_groups fm))))))
+Leave days are calculated..."
+        fm (md/parse-frontmatter md)]
+    (is (= ["all" "hr"] (:read_groups fm)))))
 
 (deftest test-parse-frontmatter-no-frontmatter
   (is (nil? (md/parse-frontmatter "No frontmatter here.")))
@@ -109,17 +109,17 @@ Leave days are calculated..."]
   (is (= {} (md/parse-frontmatter "---\n---\nContent"))))
 
 (deftest test-parse-frontmatter-extra-fields
-  "Non-standard fields should be stored as-is in the frontmatter map."
+  ;; Non-standard fields should be stored as-is in the frontmatter map.
   (let [md "---
 title: API Spec
 custom_key: custom_value
 version: 2.5
 ---
-Content"]
-    (let [fm (md/parse-frontmatter md)]
-      (is (= "API Spec" (:title fm)))
-      (is (= "custom_value" (:custom_key fm)))
-      (is (= 2.5 (:version fm))))))
+Content"
+        fm (md/parse-frontmatter md)]
+    (is (= "API Spec" (:title fm)))
+    (is (= "custom_value" (:custom_key fm)))
+    (is (= 2.5 (:version fm)))))
 
 (deftest test-links
   (let [s "# T\nsee [a](../hr/leave.md#x) and [[請假規定]] and [[Page|alias]].\n\n`[[in-code]]` [web](https://x.y)\n\n```\n[[fenced]] [c](c.md)\n```\n\n| a |\n|---|\n| [[Cell]] [t](t.md) |\n"]
