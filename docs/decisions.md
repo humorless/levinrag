@@ -641,8 +641,8 @@ Spec text (SPEC.md §8): "HanLP 1.x（首选）＞ Jieba（備援）"; §8.1–�
 specify overlapping bigrams.
 Decision (user, 2026-09-24): **keep the §8.1 bigram analyzer.** HanLP and
 bigram+HanLP are not adopted; the `:spike-hanlp` alias stays spike-only
-and nothing in `src/` depends on HanLP. §8's priority line is superseded
-by this entry; §8.1–§8.3 stand as written. No reindex needed (bigram is
+and nothing in `src/` depends on HanLP. §8's priority line was rewritten to
+match §8.1 (bigram only); §8.1–§8.3 stand as written. No reindex needed (bigram is
 what index.dtlv already uses).
 
 Evidence (`docs/spikes/cjk-analyzer.md`):
