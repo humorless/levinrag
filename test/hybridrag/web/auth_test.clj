@@ -49,7 +49,8 @@
 (deftest test-login-next-is-same-site
   (let [c (wc/client (wf/handler))]
     (is (= "/docs/hr/leave.md?chunk=x" (location (wc/login! c "alice" "alice-pw" "/docs/hr/leave.md?chunk=x")))))
-  (doseq [bad ["//evil.example" "/\\evil.example" "https://evil.example" "javascript:alert(1)" ""]]
+  (doseq [bad ["//evil.example" "/\\evil.example" "https://evil.example" "javascript:alert(1)" ""
+               "/\t/evil.example" "/\n/evil.example" "/\r/evil.example" "/a\\b" "/ok\u0000x"]]
     (let [c (wc/client (wf/handler))]
       (is (= "/" (location (wc/login! c "alice" "alice-pw" bad))) bad)))
   (testing "the login page carries next into the form"

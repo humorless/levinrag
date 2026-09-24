@@ -128,3 +128,32 @@ Set aside by the reviewer, for later phases:
 - **No-evidence only fires for users with nothing readable** while
   `:rerank-min-score` is nil (the semantic channel always returns
   neighbours) — calibrate the threshold with the book-corpus eval.
+
+## From Phase 4 review (2026-09-25)
+
+Deferred minors (reviewer findings, not fixed):
+
+- **`docs/lookup` has the admin bypass inside a shared function**
+  (`(or (:admin? principal) ...)`); SPEC §9 asks for a separate admin
+  function, not a parameter switch. Split into `lookup-admin` /
+  `lookup-acl`, or record the exception.
+- **Two sources for `CORPUS_DIR`/`DATA_DIR`**: the server reads
+  `config.edn` (`#or [#env CORPUS_DIR "./corpus"]`), the runner reads
+  `config/corpus-config`; they can drift (e.g. `CORPUS_DIR=""`), and the
+  runner ignores the `:test` profile's `data-test/`. Pass both from
+  `config.edn`.
+- **`trace/recent` pulls and sorts every trace** on each `/admin` load;
+  use a range scan on `:trace/at` or cap it.
+- **No session lifetime**: cookie-store sessions never expire and logout
+  cannot revoke a copied cookie. Store issued-at and reject old sessions
+  in `wrap-session-auth`.
+- **`/login` has no rate limiting or lockout** (spec silent).
+
+Set aside by the reviewer:
+
+- `bb ingest` from the CLI concurrently with a web-triggered job
+  (multi-process locking).
+- An existing but empty `CORPUS_DIR` still empties the index from the
+  admin button (only a missing dir is refused).
+- External images in rendered Markdown load from third-party hosts
+  (privacy, not active content).

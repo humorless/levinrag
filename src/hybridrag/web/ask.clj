@@ -91,10 +91,11 @@
   "Every candidate with its per-stage numbers. Ranks and rerank scores
    are read from the stored trace (its :top lists keep 20 per channel;
    below that the candidate's own channel rank is shown)."
-  [candidates {:trace/keys [id stages]}]
+  [candidates {:trace/keys [id stages degraded]}]
   (let [lex (rank-map (get-in stages [:lexical :top]))
         sem (rank-map (get-in stages [:semantic :top]))
         rerank (into {} (get-in stages [:rerank :scores]))
+        rrf (into {} (get-in stages [:fusion :top]))
         rank (fn [m ch c] (or (m (:chunk/id c)) (get-in c [:channels ch :rank]) "–"))
         th (fn [label] [:th {:class ["px-2" "py-1" "text-left" "font-medium"]} label])
         td (fn [col v] [:td {:data-col col
@@ -114,7 +115,7 @@
            (td "chunk" (:chunk/id c))
            (td "lexical" (str (rank lex :lexical c)))
            (td "semantic" (str (rank sem :semantic c)))
-           (td "rrf" (fmt "%.4f" (:rrf c)))
+           (td "rrf" (fmt "%.4f" (or (rrf (:chunk/id c)) (:rrf c))))
            (td "graph" (if (get-in c [:channels :graph]) "✓" ""))
            (td "rerank" (fmt "%.3f" (or (rerank (:chunk/id c)) (:rerank c))))
            (td "selected" (if (:selected? c) "✓" ""))])]]]
@@ -129,7 +130,10 @@
              " · completion " (:completion-tokens generate)
              (when (seq (:invalid-citations generate)) (str " · 無效引用 " (:invalid-citations generate))))])
      (when (seq flags)
-       [:p {:class ["mt-1" "text-xs" "text-amber-700"]} (str "flags " (str/join " " (map name flags)))])]))
+       [:p {:class ["mt-1" "text-xs" "text-amber-700"]} (str "flags " (str/join " " (map name flags)))])
+     (when (seq degraded)
+       [:p {:class ["mt-1" "text-xs" "text-red-700"]} "degraded "
+        [:span {:data-degraded "true"} (str/join " " (map name degraded))]])]))
 
 (defn- result-view [res trace debug?]
   [:div
@@ -147,6 +151,13 @@
    :headers {"Content-Type" "text/html; charset=utf-8"}
    :body (str (hiccup/html content))})
 
+(defn- unexpected
+  "Any other failure: logged, and shown as a notice (HTMX does not swap a
+   500, so the user would otherwise see nothing)."
+  [e]
+  (log/error e "[ASK] unexpected failure")
+  (fragment (notice :error "發生錯誤，請稍後再試。")))
+
 (defn ask
   "POST /ask (HTMX): the result fragment for the #result target."
   [{:keys [form-params context principal]}]
@@ -163,4 +174,6 @@
           (if-let [endpoint (:llm/endpoint (ex-data e))]
             (do (log/warn "[ASK] dependency failed:" endpoint (ex-message e))
                 (fragment (notice :error (str "問答服務暫時無法使用（" (name endpoint) "）。"))))
-            (throw e)))))))
+            (unexpected e)))
+        (catch Exception e
+          (unexpected e))))))

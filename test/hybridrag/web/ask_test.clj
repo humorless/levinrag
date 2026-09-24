@@ -111,3 +111,27 @@
                   links (map #(get-in % [:attrs :href]) (sel (s/attr :href #(str/starts-with? % "/docs/")) body))]]
       (is (not-any? #(str/starts-with? % (str path "::")) rows) (str user " saw " path " in Debug"))
       (is (not-any? #(str/starts-with? % (str (web-ask/doc-href path nil) "?")) links) (str user " saw " path " in sources")))))
+
+(deftest test-unexpected-error-is-a-notice
+  ;; HTMX does not swap 5xx: an unexpected failure must still come back
+  ;; as a 200 fragment the user can see
+  (let [{:keys [status body]} (ask! (wf/logged-in "alice" :chat-fn (fn [_ _] (throw (RuntimeException. "boom")))) "特休")]
+    (is (= 200 status))
+    (is (str/includes? body "發生錯誤"))))
+
+(deftest test-debug-panel-degraded-and-rrf-from-trace
+  (let [body (:body (ask! (wf/logged-in "alice" :rerank-fn (fn [& _] (throw (ex-info "x" {})))) "特休" :debug? true))
+        [panel] (sel (s/attr :data-trace-id some?) body)
+        t (trace/fetch (d/db wf/*app*) (parse-uuid (get-in panel [:attrs :data-trace-id])))
+        rrf (into {} (get-in t [:trace/stages :fusion :top]))
+        [deg] (s/select (s/attr :data-degraded some?) panel)]
+    (is (= "rerank-failed" (str/trim (text deg))))
+    (doseq [row (s/select (s/attr :data-chunk-id some?) panel)
+            :let [id (get-in row [:attrs :data-chunk-id])]
+            :when (rrf id)]
+      (is (= (format "%.4f" (double (rrf id)))
+             (str/trim (text (first (s/select (s/attr :data-col #(= % "rrf")) row)))))
+          id))))
+
+(deftest test-layout-loads-error-handler
+  (is (str/includes? (:body (wc/request! (wf/logged-in "alice") :get "/")) "/assets/js/app.js")))

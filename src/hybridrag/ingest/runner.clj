@@ -56,8 +56,9 @@
                                            (assoc s :current job))))]
     (if (= :running (get-in old [:current :status]))
       {:conflict (:current old)}
-      (do (future (run-job! runner job))
-          {:job job}))))
+      (let [fut (future (run-job! runner job))]
+        (swap! jobs assoc :future fut)
+        {:job job}))))
 
 (defn latest
   "The running or most recent job, or nil."
@@ -100,3 +101,13 @@
                   :embed-fn #(embed/embed-all! embed-cfg % 32)}
                  (dissoc opts :index-conn)
                  {:index-conn index-conn}))))
+
+(def ^:private halt-wait-ms 120000)
+
+(defmethod ig/halt-key! ::runner
+  [_ {:keys [jobs]}]
+  ;; the index-conn halts after the runner: let a running job finish
+  ;; instead of writing into a closed environment
+  (when-let [fut (:future @jobs)]
+    (when (= ::timeout (deref fut halt-wait-ms ::timeout))
+      (log/warn "[INGEST] job still running after" halt-wait-ms "ms; halting anyway"))))

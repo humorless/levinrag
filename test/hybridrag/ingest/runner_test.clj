@@ -7,7 +7,8 @@
             [hybridrag.db.index-conn :as index-conn]
             [hybridrag.fixtures :as fx]
             [hybridrag.ingest.runner :as runner]
-            [hybridrag.tmp :as tmp]))
+            [hybridrag.tmp :as tmp]
+            [integrant.core :as ig]))
 
 (defn wait-done
   "Poll until job `id` is no longer :running (≤ 30 s); returns the job."
@@ -85,3 +86,17 @@
       (dotimes [_ 22]
         (wait-done r (:id (:job (runner/start! r)))))
       (is (= 20 (count (runner/history r)))))))
+
+(deftest test-halt-waits-for-running-job
+  (let [gate (promise)]
+    (with-runner {:corpus-dir "corpus-sample"
+                  :embed-fn (fn [texts] @gate (fx/hash-embed texts))}
+      (fn [r _ _]
+        (let [{:keys [job]} (runner/start! r)
+              halted (future (ig/halt-key! ::runner/runner r))]
+          (Thread/sleep 300)
+          (is (not (realized? halted)) "halt waits while the job runs")
+          (deliver gate true)
+          (deref halted 30000 :timeout)
+          (is (realized? halted))
+          (is (= :done (:status (runner/job r (:id job))))))))))

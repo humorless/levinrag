@@ -18,20 +18,27 @@
   (when d (.format (java.text.SimpleDateFormat. "yyyy-MM-dd HH:mm:ss") d)))
 
 (defn- status-view
-  "Status of `job`; while it runs the element re-fetches itself every 2 s."
-  [job]
-  (case (:status job)
-    nil [:div#ingest-status {:class ["text-sm" "text-slate-500"]} "尚未在此伺服器執行 ingest。"]
-    :running [:div#ingest-status {:hx-get "/admin/ingest/status"
-                                  :hx-trigger "every 2s"
-                                  :hx-swap "outerHTML"
-                                  :class ["text-sm" "text-sky-700"]}
-              (str "執行中（開始於 " (fmt-time (:started-at job)) "）…")]
-    :done [:div#ingest-status {:class ["text-sm"]}
-           [:p {:class ["text-emerald-700"]} (str "完成（" (fmt-time (:finished-at job)) "）")]
-           [:pre {:class ["mt-2" "overflow-x-auto" "rounded" "bg-slate-100" "p-2" "text-xs"]} (report/summary (:report job))]]
-    :failed [:div#ingest-status {:class ["text-sm" "text-red-700"]}
-             (str "失敗（" (fmt-time (:finished-at job)) "）：" (:error job))]))
+  "#ingest-status for `job`; while it runs the element re-fetches itself
+   every 2 s. `note` (optional) is shown inside the same element, so the
+   next poll replaces it."
+  ([job] (status-view job nil))
+  ([job note]
+   (let [[attrs body] (case (:status job)
+                        nil [{:class ["text-sm" "text-slate-500"]} "尚未在此伺服器執行 ingest。"]
+                        :running [{:hx-get "/admin/ingest/status"
+                                   :hx-trigger "every 2s"
+                                   :hx-swap "outerHTML"
+                                   :class ["text-sm" "text-sky-700"]}
+                                  (str "執行中（開始於 " (fmt-time (:started-at job)) "）…")]
+                        :done [{:class ["text-sm"]}
+                               (list [:p {:class ["text-emerald-700"]} (str "完成（" (fmt-time (:finished-at job)) "）")]
+                                     [:pre {:class ["mt-2" "overflow-x-auto" "rounded" "bg-slate-100" "p-2" "text-xs"]}
+                                      (report/summary (:report job))])]
+                        :failed [{:class ["text-sm" "text-red-700"]}
+                                 (str "失敗（" (fmt-time (:finished-at job)) "）：" (:error job))])]
+     [:div (assoc attrs :id "ingest-status")
+      (when note [:p {:class ["text-amber-800"]} note])
+      body])))
 
 (defn page [{:keys [context]
              :as request}]
@@ -71,9 +78,7 @@
 (defn start-ingest [{:keys [context]}]
   (let [{:keys [job conflict]} (runner/start! (:ingest context))]
     (fragment (if conflict
-                [:div
-                 [:p {:class ["text-sm" "text-amber-800"]} "已有 ingest 在執行"]
-                 (status-view conflict)]
+                (status-view conflict "已有 ingest 在執行")
                 (status-view job)))))
 
 (defn ingest-status [{:keys [context]}]

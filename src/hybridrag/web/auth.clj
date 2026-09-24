@@ -2,8 +2,7 @@
   "Session login for the web UI (SPEC.md §13). The session holds only the
    username; the principal is re-read from app.dtlv on every request so
    group and admin changes apply at once."
-  (:require [clojure.string :as str]
-            [datalevin.core :as d]
+  (:require [datalevin.core :as d]
             [hybridrag.auth.users :as users]
             [hybridrag.web.layout :as layout]
             [reitit-extras.core :as reitit-extras]
@@ -11,12 +10,12 @@
             [ring.util.response :as response]))
 
 (defn safe-next
-  "`path` when it is a same-site path, else \"/\"."
+  "`path` when it is a same-site path, else \"/\". Browsers drop tab/CR/LF
+   inside URLs and treat backslash as slash, so any control character or
+   backslash is rejected, not only a `//` or `/\\` prefix."
   [path]
   (if (and (string? path)
-           (str/starts-with? path "/")
-           (not (str/starts-with? path "//"))
-           (not (str/starts-with? path "/\\")))
+           (re-matches #"/(?![/\\])[^\x00-\x1f\x7f\\]*" path))
     path
     "/"))
 

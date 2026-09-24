@@ -3,6 +3,7 @@
    latest report, recent traces and trace detail; 404 for non-admins."
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
+            [hickory.core :as hickory]
             [hybridrag.fixtures :as fx]
             [hybridrag.ingest.runner :as runner]
             [hybridrag.tmp :as tmp]
@@ -98,3 +99,16 @@
     (doseq [[m u] [[:get "/admin"] [:post "/admin/ingest"] [:get "/admin/ingest/status"]
                    [:get (str "/admin/traces/" (random-uuid))]]]
       (is (= 404 (:status (if (= m :post) (wc/post! c u {}) (wc/request! c m u)))) u))))
+
+(deftest test-conflict-fragment-is-the-status-element
+  ;; the conflict note must live inside #ingest-status, so the next poll
+  ;; (outerHTML swap of #ingest-status) replaces it
+  (wf/with-blocking-runner
+    (fn [r gate]
+      (let [c (wf/logged-in "admin" :context {:ingest r})]
+        (htmx c :post "/admin/ingest")
+        (let [frag (:body (htmx c :post "/admin/ingest"))]
+          (is (= "ingest-status" (-> (hickory/parse-fragment frag) first hickory/as-hickory :attrs :id)))
+          (is (str/includes? frag "已有 ingest 在執行")))
+        (deliver gate true)
+        (is (not (str/includes? (poll-done c) "已有 ingest 在執行")))))))

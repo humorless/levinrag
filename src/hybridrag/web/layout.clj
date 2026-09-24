@@ -60,6 +60,8 @@
     [:script {:src (manifest/asset "js/htmx.min.js")
               :defer true}]
     [:script {:src (manifest/asset "js/alpinejs.min.js")
+              :defer true}]
+    [:script {:src (manifest/asset "js/app.js")
               :defer true}]]])
 
 (defn render
