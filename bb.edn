@@ -66,5 +66,11 @@
 vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
             :task (clojure "-X:vllm-check")}
 
+  ingest {:doc "Incrementally ingest CORPUS_DIR into DATA_DIR/index.dtlv"
+          :task (clojure "-M:jvm-opts -m hybridrag.ingest.cli ingest")}
+
+  reindex {:doc "Delete DATA_DIR/index.dtlv and ingest CORPUS_DIR from scratch"
+           :task (clojure "-M:jvm-opts -m hybridrag.ingest.cli reindex")}
+
   kamal {:doc "Deploy application using Kamal"
          :task (apply shell "kamal" (concat *command-line-args* ["--config-file" ".kamal/deploy.yml"]))}}}

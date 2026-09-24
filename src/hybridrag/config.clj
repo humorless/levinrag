@@ -1,6 +1,7 @@
 (ns hybridrag.config
   "Plain env-var config for standalone CLI tools (bb tasks) that must not
-   boot the full Integrant/Ring system. See SPEC.md §5 for the full table.")
+   boot the full Integrant/Ring system. See SPEC.md §5 for the full table."
+  (:require [clojure.string :as str]))
 
 (defn- env [k] (System/getenv k))
 (defn- env-or [k default] (or (env k) default))
@@ -21,3 +22,13 @@
   {:base-url (env "VLLM_CHAT_BASE_URL")
    :model (env "VLLM_CHAT_MODEL")
    :api-key (or (env "VLLM_CHAT_API_KEY") (env "VLLM_API_KEY"))})
+
+(defn corpus-config
+  "Ingestion settings (SPEC.md §5). ROOT_READ_GROUPS is comma-separated."
+  []
+  {:data-dir (env-or "DATA_DIR" "./data")
+   :corpus-dir (env-or "CORPUS_DIR" "./corpus")
+   :root-read-groups (->> (str/split (env-or "ROOT_READ_GROUPS" "") #",")
+                          (map str/trim)
+                          (remove str/blank?)
+                          vec)})

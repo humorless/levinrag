@@ -12,9 +12,9 @@
   (:require [clojure.edn :as edn]
             [clojure.string :as str])
   (:import [org.commonmark.ext.front.matter YamlFrontMatterBlock YamlFrontMatterExtension]
-           [org.commonmark.ext.gfm.tables TableBlock TablesExtension]
+           [org.commonmark.ext.gfm.tables TableBlock TableCell TablesExtension]
            [org.commonmark.node BlockQuote Code FencedCodeBlock Heading HtmlBlock
-            IndentedCodeBlock ListBlock Node Paragraph SoftLineBreak Text ThematicBreak]
+            IndentedCodeBlock Link ListBlock Node Paragraph SoftLineBreak Text ThematicBreak]
            [org.commonmark.parser IncludeSourceSpans Parser]))
 
 (def ^:private ^Parser parser
@@ -34,13 +34,15 @@
      :char-end (+ (.getInputIndex e) (.getLength e))}))
 
 (defn- plain-text
-  "Inline text of a node with markup stripped."
-  [^Node n]
-  (cond
-    (instance? Text n) (.getLiteral ^Text n)
-    (instance? Code n) (.getLiteral ^Code n)
-    (instance? SoftLineBreak n) " "
-    :else (apply str (map plain-text (children n)))))
+  "Inline text of a node with markup stripped. With `code?` false, code
+   spans become a space instead of their literal."
+  ([n] (plain-text n true))
+  ([^Node n code?]
+   (cond
+     (instance? Text n) (.getLiteral ^Text n)
+     (instance? Code n) (if code? (.getLiteral ^Code n) " ")
+     (instance? SoftLineBreak n) " "
+     :else (apply str (map #(plain-text % code?) (children n))))))
 
 (defn- block-type [^Node n]
   (condp instance? n
@@ -72,8 +74,8 @@
                      (seq (:blocks sec)) (assoc :char-end (:char-end (peek (:blocks sec))))))
     sections))
 
-(defn- parse-sections [^String md]
-  (loop [[n & more :as nodes] (children (.parse parser md))
+(defn- parse-sections [^Node root]
+  (loop [[n & more :as nodes] (children root)
          stack []
          cur nil
          sections []]
@@ -135,6 +137,28 @@
       {}
       (str/split-lines body))))
 
+;; --- Links (SPEC.md §7.5) ---
+
+(defn- node-seq [^Node n]
+  (mapcat #(cons % (node-seq %)) (children n)))
+
+(defn- link-destinations
+  "Destinations of all inline links, in document order. Code spans and
+   code blocks never produce Link nodes."
+  [^Node root]
+  (->> (node-seq root)
+       (filter #(instance? Link %))
+       (mapv #(.getDestination ^Link %))))
+
+(defn- wikilinks
+  "Names inside [[...]] in paragraph, heading and table-cell text.
+   An alias or anchor ([[Page|alias]], [[Page#part]]) is dropped."
+  [^Node root]
+  (->> (node-seq root)
+       (filter #(or (instance? Paragraph %) (instance? Heading %) (instance? TableCell %)))
+       (mapcat #(re-seq #"\[\[([^\]\[|#]+)(?:[|#][^\]\[]*)?\]\]" (plain-text % false)))
+       (mapv (comp str/trim second))))
+
 (defn parse-markdown
   "Parse Markdown into {:frontmatter <map or nil>, :sections [section ...]}.
 
@@ -143,10 +167,16 @@
              :char-start, :char-end,
              :blocks [{:type, :char-start, :char-end} ...]}
    Block :type is one of :paragraph :code :table :list :blockquote :html
-   :other; thematic breaks are dropped."
+   :other; thematic breaks are dropped.
+
+   :links holds the raw link targets for §7.5 resolution:
+   {:paths [<Markdown link destinations>], :wiki [<[[Page Name]] names>]}."
   [^String md]
-  {:frontmatter (parse-frontmatter md)
-   :sections (parse-sections md)})
+  (let [root (.parse parser md)]
+    {:frontmatter (parse-frontmatter md)
+     :sections (parse-sections root)
+     :links {:paths (link-destinations root)
+             :wiki (wikilinks root)}}))
 
 (defn parse-text
   "Parse a .txt file: one level-0 section whose blocks are the

@@ -120,3 +120,9 @@ Content"]
       (is (= "API Spec" (:title fm)))
       (is (= "custom_value" (:custom_key fm)))
       (is (= 2.5 (:version fm))))))
+
+(deftest test-links
+  (let [s "# T\nsee [a](../hr/leave.md#x) and [[請假規定]] and [[Page|alias]].\n\n`[[in-code]]` [web](https://x.y)\n\n```\n[[fenced]] [c](c.md)\n```\n\n| a |\n|---|\n| [[Cell]] [t](t.md) |\n"]
+    (is (= {:paths ["../hr/leave.md#x" "https://x.y" "t.md"]
+            :wiki ["請假規定" "Page" "Cell"]}
+           (:links (md/parse-markdown s))))))

@@ -386,3 +386,45 @@ text leaves room, all in `hybridrag.ingest.chunker` / `.tokens`:
 - `.txt` files are parsed by `markdown/parse-text` into the same section
   shape (one level-0 section, blank-line-separated paragraphs as blocks),
   so the chunker has one input format.
+
+
+## 2026-09-24 — T1.4 index writer: schema, in-place re-index, link pass
+
+Spec text (SPEC.md §6.1 index-schema, §7.5 links, §7.6 incremental flow).
+
+- **index-schema is defined in T1.4, not T1.0.** The Phase 1 plan's T1.0
+  (vec-domain verification + schema) was never committed; `schema.clj`
+  still said "index-conn opens with schema {}". T1.4 writes it: §6.1 with
+  the Path B change (`:chunk/index-text` fulltext only, vector in
+  `:chunk/vec {:db/valueType :db.type/vec}` with no `:db.vec/domains`,
+  dims/metric via `:vector-opts`), plus two additions: `:chunk/hard-cut?`
+  (T1.3's marker) and `:doc/raw-links` (below). Every Datalevin call used
+  was checked at the REPL against 1.1.0 first.
+- **Re-indexing a doc updates entities in place.** §7.6 says "in ONE
+  transaction: retract old sections/chunks of this doc, upsert doc, add
+  new ones". Doing it literally — `retractEntity` + re-adding the same
+  unique `:chunk/id` in one tx — fails in Datalevin 1.1.0 with fulltext
+  "Document does not exist." (the tx is rolled back, nothing is
+  corrupted). Instead, still in one transaction: surviving ids are
+  upserted with explicit retractions of attributes/values the new version
+  drops, and ids that no longer exist are `retractEntity`'d. Verified that
+  both the fulltext and vector indexes then reflect only the new text.
+- **Links are re-resolved for all docs each run**, not only "docs touched
+  in this run and docs linking to deleted docs". Raw link targets are
+  stored per doc (`:doc/raw-links`), so the pass is DB-only and cheap, and
+  it also fixes a case the spec's rule misses: an unchanged doc whose link
+  target is added in a later run.
+- **Embedding is per doc** (batches of 32 within a doc), not one batch
+  across all files. Keeps per-file error isolation: a failed embed call
+  leaves that doc unwritten and the rest of the run continues.
+- **No CJK analyzer yet.** `:chunk/index-text` uses Datalevin's default
+  analyzer (§8 says it is nearly useless for Chinese). §17 puts no
+  analyzer task in Phase 1; the lexical channel (T2.1) needs it. Since the
+  analyzer applies at write time, adding it requires `bb reindex`.
+- **Index lag** is `:unfinished-count` from `d/wait-for-secondary-index`.
+  Fulltext indexing is not configured `:async`, so it is 0 in practice.
+- `bb ingest` / `bb reindex` exit 1 if any file failed.
+- **Not yet run against real vLLM**: no `VLLM_*` config in this
+  environment. End-to-end ingest/rerun/reindex was verified through the
+  real HTTP client against a local stub `/v1/embeddings` returning
+  1024-dim vectors.
