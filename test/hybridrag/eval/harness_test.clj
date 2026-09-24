@@ -67,3 +67,25 @@
                                   :principals {"bob" admin}
                                   :variant-names ["lexical"]})]
     (is (pos? (:acl-leaks report)))))
+
+(deftest test-section-level-scoring
+  (let [rerank-stub (fn [_ docs _] (vec (map-indexed (fn [i _] {:index i
+                                                                :relevance-score (- (double i))}) docs)))
+        report (harness/run-eval {:retriever (rd/retriever fx/*index* fx/hash-embed)
+                                  :rerank-fn rerank-stub}
+                                 fx/*index*
+                                 {:questions [{:id "s1"
+                                               :user "alice"
+                                               :query "特休天數依年資計算"
+                                               :expected-sections ["hr/leave.md#2"]}
+                                              {:id "s2"
+                                               :user "alice"
+                                               :query "特休天數依年資計算"
+                                               :expected-sections ["hr/leave.md#9"]}]
+                                  :principals (harness/load-principals "eval/users.edn")
+                                  :variant-names ["lexical"]})
+        [r1 r2] (get-in report [:variants "lexical" :rows])]
+    (is (every? #(re-find #"#\d+$" %) (:docs r1)) "ranking is over section ids")
+    (is (= "hr/leave.md#2" (first (:docs r1))) "天數計算 is section 2 of leave.md")
+    (is (= 1.0 (:mrr-10 r1)))
+    (is (= 0.0 (:recall-10 r2)) "a section id that does not exist is never found")))

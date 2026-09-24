@@ -53,14 +53,33 @@
 
 ;; --- run ---
 
-(defn- run-one [deps principal {:keys [query expected-docs must-not-docs]} opts]
+(defn- section-ids
+  "chunk id → section id for the given chunk ids."
+  [db chunk-ids]
+  (into {} (d/q '[:find ?cid ?sid :in $ [?cid ...]
+                  :where [?c :chunk/id ?cid] [?c :chunk/section ?s] [?s :section/id ?sid]]
+                db (vec chunk-ids))))
+
+(defn ranked-sections
+  "Distinct section ids in the order their chunks appear."
+  [db candidates]
+  (let [sid (section-ids db (map :chunk/id candidates))]
+    (vec (distinct (keep (comp sid :chunk/id) candidates)))))
+
+(defn- run-one
+  "One question. Scored at section level when it has :expected-sections
+   (\"<path>#<n>\" ids), else at doc level with :expected-docs."
+  [deps db principal {:keys [query expected-docs expected-sections must-not-docs]} opts]
   (let [res (pipeline/search deps principal query opts)
         docs (ranked-docs (:candidates res))
+        [expected ranking] (if (seq expected-sections)
+                             [expected-sections (ranked-sections db (:candidates res))]
+                             [expected-docs docs])
         shown (into (set docs) (map :doc/path (:passages res)))]
-    {:docs (vec (take 10 docs))
-     :recall-5 (recall-at 5 expected-docs docs)
-     :recall-10 (recall-at 10 expected-docs docs)
-     :mrr-10 (mrr-at 10 expected-docs docs)
+    {:docs (vec (take 10 ranking))
+     :recall-5 (recall-at 5 expected ranking)
+     :recall-10 (recall-at 10 expected ranking)
+     :mrr-10 (mrr-at 10 expected ranking)
      :leaks (vec (filter shown must-not-docs))
      :degraded (:degraded res)
      :stage-ms (into {} (keep (fn [[k v]] (when-let [ms (:ms v)] [k ms]))) (:stages res))}))
@@ -83,14 +102,15 @@
 (defn run-eval
   "Evaluate `questions` for the named `variant-names`. `deps` is the
    pipeline deps map; `principals` maps user names to principals;
-   `index-conn` is only read for the longest-chunk statistic."
+   `index-conn` is read for section ids and the longest-chunk statistic."
   [deps index-conn {:keys [questions principals variant-names opts]}]
   (let [per-variant (into (array-map)
                           (for [v variant-names]
                             (let [rows (mapv (fn [q]
                                                (let [p (or (principals (:user q))
                                                            (throw (ex-info (str "unknown user " (:user q)) {:q (:id q)})))]
-                                                 (assoc (run-one deps p q (merge opts (variants v))) :id (:id q))))
+                                                 (assoc (run-one deps (d/db index-conn) p q (merge opts (variants v)))
+                                                        :id (:id q))))
                                              questions)]
                               [v {:summary (summarize rows)
                                   :rows rows}])))]
