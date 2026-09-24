@@ -57,7 +57,8 @@
   (let [level (.getLevel h)
         heading (str/trim (plain-text h))
         stack (conj (vec (take-while #(< (:level %) level) trail-stack))
-                    {:level level :heading heading})]
+                    {:level level
+                     :heading heading})]
     [stack
      (merge {:level level
              :heading heading
@@ -89,7 +90,10 @@
 
       :else
       (let [block (assoc (span n) :type (block-type n))
-            cur (or cur {:level 0 :heading nil :trail [] :blocks []
+            cur (or cur {:level 0
+                         :heading nil
+                         :trail []
+                         :blocks []
                          :char-start (:char-start block)})]
         (recur more stack (update cur :blocks conj block) sections)))))
 
@@ -143,6 +147,29 @@
   [^String md]
   {:frontmatter (parse-frontmatter md)
    :sections (parse-sections md)})
+
+(defn parse-text
+  "Parse a .txt file: one level-0 section whose blocks are the
+   blank-line-separated paragraphs (SPEC.md §7.3 step 6). Same shape as
+   parse-markdown; plain text has no frontmatter."
+  [^String s]
+  (let [m (re-matcher #"(?m)(?:^[^\n]*\S[^\n]*(?:\n|\z))+" s)
+        blocks (loop [acc []]
+                 (if (.find m)
+                   (recur (conj acc {:type :paragraph
+                                     :char-start (.start m)
+                                     :char-end (cond-> (.end m)
+                                                 (str/ends-with? (.group m) "\n") dec)}))
+                   acc))]
+    {:frontmatter nil
+     :sections (if (seq blocks)
+                 [{:level 0
+                   :heading nil
+                   :trail []
+                   :blocks blocks
+                   :char-start (:char-start (first blocks))
+                   :char-end (:char-end (peek blocks))}]
+                 [])}))
 
 (defn doc-title
   "Document title: frontmatter title → first H1 → file name without

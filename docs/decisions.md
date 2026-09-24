@@ -355,3 +355,34 @@ where the groups came from.
 
 This is not a spec deviation — §13's mechanisms are implemented as
 written. It constrains how T2.0 structures them.
+
+
+## 2026-09-24 — T1.3 chunker: where SPEC §7.3/§7.7 was ambiguous
+
+Spec text (SPEC.md §7.3 steps 1–6, §7.4, §7.7). Choices made where the
+text leaves room, all in `hybridrag.ingest.chunker` / `.tokens`:
+
+- **Line breaks are cut points in prose.** Step 3 splits an oversized
+  block at `。！？；` / `. ! ?`+whitespace, then hard-cuts. A list or
+  paragraph with no sentence punctuation would be hard-cut mid-item, so a
+  line break is also a cut point before falling back to a hard cut. Code
+  blocks and tables still cut at line breaks only.
+- **Overlap uses the same cut points, and fits inside max.** The next
+  chunk starts at the earliest cut point in the previous chunk whose
+  suffix fits in `min(overlap-tokens, max-tokens − first-unit tokens)`.
+  Result: every chunk, overlap included, is a contiguous span of the file
+  (`char-start`/`char-end` restore it exactly) and no chunk exceeds max.
+  Hard-cut pieces have no inner cut points, so they carry no overlap.
+- **Step 5's min-tokens test counts only the tail's own content**, not
+  the overlap it inherited. Otherwise the overlap (up to 60 tokens) alone
+  keeps a tiny tail from ever being merged.
+- **Token estimate counts non-ASCII letters/digits as run characters**
+  (§7.7 names only ASCII). Full-width `ＨＲ０７` or accented Latin would
+  otherwise count 0, which is not conservative.
+- **Heading-only sections produce no chunks**; their heading still shows
+  up in child sections' trails.
+- **Contextual header omits the `章節：` line for level-0 content**
+  (no heading trail).
+- `.txt` files are parsed by `markdown/parse-text` into the same section
+  shape (one level-0 section, blank-line-separated paragraphs as blocks),
+  so the chunker has one input format.
