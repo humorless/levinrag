@@ -6,6 +6,9 @@
  {:dir #profile {:default "data/app.dtlv"
                  :test "data-test/app.dtlv"}}
 
+ :hybridrag.retrieval.system/search
+ {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn}
+
  :hybridrag.server/server
  {:options {:port #profile {:default 8000
                             :prod 80
@@ -17,4 +20,5 @@
             :cache-assets? #profile {:default false
                                      :prod true}}
   :index-conn #ig/ref :hybridrag.db.index-conn/index-conn
-  :app-conn #ig/ref :hybridrag.db.app-conn/app-conn}}
+  :app-conn #ig/ref :hybridrag.db.app-conn/app-conn
+  :search #ig/ref :hybridrag.retrieval.system/search}}

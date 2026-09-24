@@ -572,3 +572,23 @@ Spec text (SPEC.md §9.7).
   becomes a blank line.
 - A run left with only neighbors after its selected chunk was dropped is
   not emitted as a passage.
+
+
+## 2026-09-24 — T2.5 /search: CSRF scope, errors, trace size
+
+Spec text (SPEC.md §11, §12, §14).
+
+- **CSRF only on web routes.** Stack Lite put `wrap-anti-forgery` in the
+  global middleware, which would reject every API POST. It now wraps the
+  web route group only; `/api/v1/*` is authenticated by bearer token,
+  which a browser never attaches by itself, so a cross-site request
+  cannot ride on it. §12's HTMX-with-CSRF requirement is unaffected.
+- Invalid bodies get **400** `invalid_request`; an embedding failure gets
+  **503** `dependency_unavailable` (the rerank failure path stays a 200
+  with `degraded: ["rerank_failed"]`, per §9.6). §11 defines no codes for
+  these, so these are new; they follow its error format.
+- Trace `top` lists keep the first 20 entries per stage (§14 says ids and
+  scores only, no size); the full candidate list is in the response.
+- The pipeline's defaults are SPEC §5's; `resources/config.edn` wires an
+  empty `:opts` map for later overrides. Rerank and embed config still come
+  from `VLLM_*` env vars at call time.

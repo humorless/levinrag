@@ -14,7 +14,6 @@
             [reitit.ring.middleware.muuntaja :as muuntaja]
             [reitit.ring.middleware.parameters :as ring-parameters]
             [ring.adapter.jetty :as jetty]
-            [ring.middleware.anti-forgery :as anti-forgery]
             [ring.middleware.content-type :as content-type]
             [ring.middleware.cookies :as ring-cookies]
             [ring.middleware.default-charset :as default-charset]
@@ -40,7 +39,8 @@
                 [:cache-assets? {:optional true} boolean?]
                 [:cache-control {:optional true} string?]]]
               [:index-conn [:fn {:error/message "Missing index-conn"} some?]]
-              [:app-conn [:fn {:error/message "Missing app-conn"} some?]]]}))
+              [:app-conn [:fn {:error/message "Missing app-conn"} some?]]
+              [:search [:fn {:error/message "Missing search"} some?]]]}))
 
 (defn ring-handler
   "Return main application handler for server-side rendering."
@@ -77,8 +77,7 @@
                              keyword-params/wrap-keyword-params
                              ; negotiate request and response
                              muuntaja/format-middleware
-                             ; check CSRF token
-                             anti-forgery/wrap-anti-forgery
+                             ; CSRF check is route-level (web routes only), see routes.clj
                              ; handle exceptions
                              reitit-extras/exception-middleware
                              ; coerce request and response to spec
