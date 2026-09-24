@@ -115,6 +115,24 @@ export VLLM_API_KEY=lm-studio        # LM Studio 不檢查 key，但 client 需�
 - **LM Studio 沒有 rerank endpoint。** 對不存在的路徑它會回 **HTTP 200 + `{"error": ...}`**，
   rerank client 必須檢查回應結構（SPEC §4.2），系統會降級為 RRF 排序。
 
+### Chat：LM Studio（Qwen3-8B）
+
+```bash
+lms load qwen/qwen3-8b --context-length 8192   # 約 4.6 GB；context 需容納約 6000 token 的資料 + 1024 輸出
+
+export VLLM_CHAT_BASE_URL=http://localhost:1234/v1
+export VLLM_CHAT_MODEL=qwen/qwen3-8b
+export VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # 關閉 Qwen3 的思考模式
+```
+
+- `VLLM_CHAT_EXTRA_BODY` 是 JSON 物件，原樣合併進 chat request body（SPEC §4.2 的 `:chat/extra-body`）。
+- **LM Studio 不理會 `chat_template_kwargs.enable_thinking`**（vLLM 用的寫法）；要用
+  `reasoning_effort: "none"`。思考內容放在獨立的 `reasoning_content` 欄位，不在 `content` 裡的
+  `<think>`；思考吃光 `max_tokens` 時 `content` 為空字串，`/ask` 會回固定訊息並在 trace 標 `:empty-answer`。
+- M1 16 GB 實測（樣本語料、`特休天數怎麼計算？`）：`/ask` 全程思考開啟約 29 s，關閉約 9.4 s，
+  兩者都得到帶引用的正確回答。
+- vLLM 上的 Qwen3 則用 `VLLM_CHAT_EXTRA_BODY='{"chat_template_kwargs":{"enable_thinking":false}}'`。
+
 ### Rerank：llama.cpp `llama-server`
 
 LM Studio 沒有 rerank，改用 llama.cpp（`brew install llama.cpp`，不需要 sudo）：

@@ -1,5 +1,6 @@
 (ns hybridrag.routes
-  (:require [hybridrag.api.search :as search]
+  (:require [hybridrag.api.ask :as ask]
+            [hybridrag.api.search :as search]
             [hybridrag.auth.middleware :as auth]
             [hybridrag.handlers :as handlers]
             [ring.middleware.anti-forgery :as anti-forgery]))
@@ -18,4 +19,7 @@
     ["" {:middleware [auth/wrap-bearer-auth]}
      ["/search" {:name ::search
                  :post {:handler search/handler
-                        :parameters {:body search/request-schema}}}]]]])
+                        :parameters {:body search/request-schema}}}]
+     ["/ask" {:name ::ask
+              :post {:handler ask/handler
+                     :parameters {:body ask/request-schema}}}]]]])

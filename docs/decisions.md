@@ -666,3 +666,40 @@ queried alone only matches single-character runs in documents (§8.1
 emits unigrams only for runs of length 1), so e.g. a one-character
 query misses every occurrence inside longer runs. Revisit if real
 queries show it matters (fix would be indexing unigrams too, + reindex).
+
+
+## 2026-09-24 — T3.1–T3.2 generation details
+
+Spec text (SPEC.md §4.2, §10, §11, §14).
+
+- **Citation formats accepted**: `[n]`, `[n][m]`, `[n, m]` (also `，` `、`),
+  full-width `［n］` and `【n】`; all are rewritten to `[n]`. Out-of-range
+  numbers (including `[0]` and years like `[2024]`) are removed and listed
+  in `:generate :invalid-citations`. Markdown link text `[x](..)` and
+  non-numeric brackets are left alone.
+- **Empty answer after stripping** (the model only "thought", or its
+  thinking used up `max_tokens`) → fixed reply 「模型沒有產生回答，請稍後再試。」,
+  no citations, flag `:empty-answer`. §10 does not cover this; an empty
+  200 would look like a bug to the user.
+- **`:uncited-answer` exemption** for "not found" replies is a regex
+  (找不到 / 查無 / 沒有相關 / not found / no relevant / cannot find).
+- **Chat 200 without `choices[0].message.content`** is a chat dependency
+  failure (`:llm/endpoint :chat`) → `/ask` 503 `dependency_unavailable`,
+  like embed failures on `/search`. Chat errors are not degraded to a 200:
+  without generation `/ask` has no answer to give.
+- **No-evidence** = the pipeline produced no passages (§10.3's "no
+  candidates after rerank, or all below threshold" — `select-ids` already
+  applies `rerank-min-score` before packing).
+- **Config**: `VLLM_CHAT_EXTRA_BODY` (JSON object, new env var) feeds
+  `:chat/extra-body`; `temperature` / `max-tokens` / `extra-body` can
+  also be overridden through the search component's `:opts`. Missing
+  `VLLM_CHAT_BASE_URL` → 503 on `/ask` (not a startup failure, so
+  `/search` keeps working without a chat model).
+- **Trace**: `:generate {:ms :model :prompt-tokens :completion-tokens
+  :invalid-citations}`; answer flags join `:flags`; the answer text is
+  stored in `:trace/answer`. Citations reuse `/search`'s passage JSON.
+- **Real-model check (T3.2 AC)**: Qwen3-8B on LM Studio, bge-m3,
+  bge-reranker-v2-m3; `test-ask-real-model` passes (answer cites
+  `hr/leave.md`). LM Studio ignores `chat_template_kwargs` and puts
+  thinking in `reasoning_content`, not `<think>`; `reasoning_effort:
+  "none"` turns it off (29 s → 9.4 s per `/ask`). See `VLLM_SETUP.md`.

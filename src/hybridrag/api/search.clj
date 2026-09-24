@@ -13,7 +13,7 @@
                                      :max 50}]]
    [:graph {:optional true} :boolean]])
 
-(defn- passage-json [p]
+(defn passage-json [p]
   {:n (:n p)
    :doc_path (:doc/path p)
    :doc_title (:doc/title p)
@@ -22,13 +22,16 @@
    :char_range (:char-range p)
    :text (:text p)})
 
-(defn- candidate-json [c]
+(defn candidate-json [c]
   {:chunk_id (:chunk/id c)
    :doc_path (:doc/path c)
    :channels (:channels c)
    :rrf (:rrf c)
    :rerank (:rerank c)
    :selected (:selected? c)})
+
+(defn degraded-json [degraded]
+  (mapv #(case % :rerank-failed "rerank_failed" (name %)) degraded))
 
 (defn handler
   [{:keys [context principal parameters errors]}]
@@ -54,7 +57,7 @@
           {:status 200
            :body {:passages (mapv passage-json (:passages res))
                   :candidates (mapv candidate-json (:candidates res))
-                  :degraded (mapv #(case % :rerank-failed "rerank_failed" (name %)) (:degraded res))
+                  :degraded (degraded-json (:degraded res))
                   :trace_id (str trace-id)}})
         (catch clojure.lang.ExceptionInfo e
           (if-let [endpoint (:llm/endpoint (ex-data e))]

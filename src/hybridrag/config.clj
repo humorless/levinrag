@@ -1,7 +1,8 @@
 (ns hybridrag.config
   "Plain env-var config for standalone CLI tools (bb tasks) that must not
    boot the full Integrant/Ring system. See SPEC.md §5 for the full table."
-  (:require [clojure.string :as str]))
+  (:require [clojure.string :as str]
+            [jsonista.core :as json]))
 
 (defn- env [k] (System/getenv k))
 (defn- env-or [k default] (or (env k) default))
@@ -18,9 +19,18 @@
    :model (env-or "VLLM_RERANK_MODEL" "BAAI/bge-reranker-v2-m3")
    :api-key (or (env "VLLM_RERANK_API_KEY") (env "VLLM_API_KEY"))})
 
+(defn- json-env
+  "Env var holding a JSON object, parsed with keyword keys; nil if unset."
+  [k]
+  (when-let [s (env k)]
+    (try (json/read-value s json/keyword-keys-object-mapper)
+         (catch Exception e
+           (throw (ex-info (str k " is not valid JSON") {:env k} e))))))
+
 (defn chat-config []
   {:base-url (env "VLLM_CHAT_BASE_URL")
    :model (env "VLLM_CHAT_MODEL")
+   :extra-body (json-env "VLLM_CHAT_EXTRA_BODY")
    :api-key (or (env "VLLM_CHAT_API_KEY") (env "VLLM_API_KEY"))})
 
 (defn corpus-config
