@@ -56,6 +56,10 @@
                               :runner :eftest
                               :runner-opts {:multithread? false}}}
 
+           ; CJK analyzer spike only (docs/spikes/cjk-analyzer.md); not a runtime dep
+           ; use together with :dev (dev/ path): -M:jvm-opts:test:dev:spike-hanlp
+           :spike-hanlp {:extra-deps {com.hankcs/hanlp {:mvn/version "portable-1.8.6"}}}
+
            :outdated {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1276"}}
                       :main-opts ["-m" "antq.core" "--no-diff"]}
 

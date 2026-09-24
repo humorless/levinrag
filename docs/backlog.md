@@ -96,9 +96,6 @@ task in SPEC.md §17. See SPEC.md §20 for the spec author's own backlog.
   T2.6), so the eval cannot yet show whether semantic, rerank or graph
   help, nor calibrate `rerank-min-score`. Needs more docs per topic (near
   duplicates, distractors) and questions whose answer is not in the title.
-- **HanLP / Jieba word segmentation** as an alternative to the §8.1 bigram
-  analyzer (SPEC §8 names HanLP as preferred). Compare in eval once the
-  corpus above exists; switching needs `bb reindex`.
 - **Query-side exact-token matching for identifiers** (e.g. `v2.7.3` only
   ranks 7th lexically because of the `v2` fragment). Evaluate before
   deviating from §8.2.

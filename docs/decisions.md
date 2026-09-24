@@ -509,16 +509,20 @@ once, only the sha256 stored; `bb token:revoke <prefix>`.
 
 Spec text (SPEC.md §8, §9.2, §9.3).
 
-- **Analyzer = the §8.1 algorithm, no HanLP/Jieba.** §8 names HanLP 1.x as
-  preferred, but §8.1–§8.3 specify an overlapping-bigram analyzer and its
-  test vectors are bigrams; a word segmenter would fail them. Implemented
-  §8.1 exactly (`hybridrag.search.analyzer`), registered as a Datalevin
-  UDF in `index-conn/open`. HanLP/Jieba → backlog. Datalevin 1.1.0 uses
-  the index analyzer for queries when `:query-analyzer` is omitted
-  (`search.clj:1674`), which is what §8.2 asks for. Opening index.dtlv
-  without the UDF registry is refused by Datalevin, so the analyzer
-  cannot silently fall back to the default. **Existing index.dtlv files
-  must be rebuilt: `bb reindex`.**
+- **Analyzer: bigram for now — OPEN, pending the user's decision.** §8
+  states HanLP 1.x > Jieba as the tokenizer priority (added deliberately in
+  `4ac13e2`), while §8.1–§8.3 still specify an overlapping-bigram analyzer
+  with bigram test vectors. T2.1 implemented §8.1 and moved HanLP to the
+  backlog; that resolved a conflict with an explicit user decision without
+  asking, so it is **not** a settled decision (corrected 2026-09-24 after
+  review). The bigram analyzer stays in place while a spike measures
+  HanLP on the Traditional Chinese corpus (`docs/spikes/cjk-analyzer.md`);
+  bigram vs HanLP vs both is decided afterwards. Mechanics that hold for
+  any choice: registered as a Datalevin UDF in `index-conn/open`;
+  Datalevin 1.1.0 uses the index analyzer for queries when
+  `:query-analyzer` is omitted (`search.clj:1674`); opening index.dtlv
+  without the UDF registry is refused. **Changing the analyzer requires
+  `bb reindex`.**
 - **`channel` returns a map, not a bare list**:
   `{:candidates :extended :raw-hits :after-acl :starved?}`. §9.5 step 3
   needs the full ACL-filtered over-fetch list and §14 needs the counts;
