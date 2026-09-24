@@ -557,3 +557,18 @@ structure) keep RRF order with graph candidates last, flag
   score, otherwise the stage degrades.
 - The rerank client's read timeout is now taken from its config map
   (default still 10 s, §4.3), so tests can exercise the timeout path.
+
+
+## 2026-09-24 — T2.4 context packing details
+
+Spec text (SPEC.md §9.7).
+
+- Passages merge consecutive ordinals **within one section** only (§9.7
+  says "same document"), so each passage has a single accurate
+  `:section/trail`; with ±1 neighbors being same-section anyway, this only
+  affects two selected chunks that happen to be adjacent across a heading.
+- Overlap is removed by char offset (chunks are exact file spans), so a
+  merged passage equals the original file span; a gap between chunks
+  becomes a blank line.
+- A run left with only neighbors after its selected chunk was dropped is
+  not emitted as a passage.

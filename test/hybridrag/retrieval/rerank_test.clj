@@ -2,7 +2,7 @@
   "Rerank + degradation (SPEC.md §9.6, T2.3 AC: timeout, HTTP 500 and
    HTTP 200 with an error payload all degrade and are flagged). Failure
    cases go through the real rerank client against a stub server."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.test :refer [deftest is]]
             [hybridrag.llm.rerank-client :as rr]
             [hybridrag.retrieval.rerank :as rerank]
             [jsonista.core :as json]

@@ -43,3 +43,14 @@
         (assert (empty? (:errors rep)) (pr-str (:errors rep))))
       (binding [*index* conn] (t))
       (finally (d/close conn) (tmp/delete-tree! dir)))))
+
+(defn doc-groups
+  "doc path → stored :doc/effective-groups — an ACL oracle independent of
+   the Retriever code under test."
+  [conn]
+  (into {} (map (fn [m] [(:doc/path m) (set (:doc/effective-groups m))]))
+        (d/q '[:find [(pull ?d [:doc/path :doc/effective-groups]) ...] :where [?d :doc/path]]
+             (d/db conn))))
+
+(defn readable? [groups-by-doc principal path]
+  (or (:admin? principal) (boolean (some (:groups principal) (groups-by-doc path)))))
