@@ -16,7 +16,11 @@
   "POST `body` (a Clojure map) as JSON to `url` with bearer `api-key`.
    `endpoint-kw` (e.g. :embed) is only used for error reporting."
   [{:keys [url api-key body connect-timeout-ms read-timeout-ms endpoint-kw]}]
-  (let [client (hc/build-http-client {:connect-timeout connect-timeout-ms})]
+  ;; HTTP/1.1 only: the JDK client otherwise attempts an h2c upgrade on
+  ;; http:// URLs, which some OpenAI-compatible servers (LM Studio) never
+  ;; answer, so each call waits out the full read timeout.
+  (let [client (hc/build-http-client {:connect-timeout connect-timeout-ms
+                                      :version :http-1.1})]
     (try
       (let [response (hc/post url
                               {:http-client client

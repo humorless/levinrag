@@ -50,3 +50,25 @@
         (is (not (re-find #"secret-key-xyz" (pr-str (ex-data e)))))
         (is (not (re-find #"secret-key-xyz" (ex-message e)))))
       (finally (stop-fn)))))
+(deftest test-post-json-uses-plain-http-1-1
+  ;; LM Studio's server never answers the JDK client's default h2c upgrade
+  ;; attempt on http:// URLs, so every call hung until the read timeout.
+  (let [seen (atom nil)
+        server (jetty/run-jetty (fn [req]
+                                  (reset! seen (select-keys req [:protocol :headers]))
+                                  {:status 200
+                                   :headers {"Content-Type" "application/json"}
+                                   :body "{}"})
+                                {:port 0
+                                 :join? false})
+        port (.getLocalPort (aget (.getConnectors server) 0))]
+    (try
+      (http/post-json! {:url (str "http://localhost:" port "/")
+                        :api-key "k"
+                        :body {}
+                        :connect-timeout-ms 2000
+                        :read-timeout-ms 5000
+                        :endpoint-kw :embed})
+      (is (= "HTTP/1.1" (:protocol @seen)))
+      (is (not (contains? (:headers @seen) "upgrade")))
+      (finally (.stop server)))))
