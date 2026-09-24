@@ -9,7 +9,8 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.string :as str]
-            [hybridrag.ingest.acl :as acl]))
+            [hybridrag.ingest.acl :as acl]
+            [hybridrag.ingest.markdown :as md]))
 
 ;; --- Acceptable extensions ---
 
@@ -94,44 +95,6 @@
         (remove #(skipped-segment? (:rel-path %)))
         vec))))
 
-;; --- Frontmatter parsing (simple YAML, MVP version) ---
-
-(defn- parse-scalar
-  "Parse a YAML-ish value. Reads it as EDN when the whole value is one EDN
-   form (string, number, boolean, vector); bare words stay as the raw string.
-   Symbols inside vectors become strings ([hr, policy] → [\"hr\" \"policy\"])."
-  [^String v]
-  (let [rdr (java.io.PushbackReader. (java.io.StringReader. v))
-        x (try (edn/read {:eof ::eof} rdr) (catch Exception _ ::bad))]
-    (cond
-      (or (#{::bad ::eof} x) (symbol? x) (keyword? x)
-          (not (str/blank? (slurp rdr)))) v
-      (sequential? x) (mapv #(if (symbol? %) (str %) %) x)
-      :else x)))
-
-(defn parse-frontmatter
-  "Extract YAML frontmatter from Markdown string. Returns a map or nil.
-
-   Handles simple YAML:
-     key: value
-     key: [item1, item2]
-     key: \"quoted string\"
-
-   Per SPEC.md: frontmatter supports title, tags, read_groups, and
-   any other fields are stored as EDN blob in :doc/frontmatter.
-
-   Bare words stay strings; list items become strings
-   (e.g., [hr, policy] → [\"hr\" \"policy\"])."
-  [^String md]
-  (when-let [[_ body] (re-find #"(?s)^---\r?\n(.*?)\r?\n?---" md)]
-    (reduce
-      (fn [m line]
-        (if-let [[_ k v] (re-find #"^([^:]+):\s+(.*)$" line)]
-          (assoc m (keyword (str/trim k)) (parse-scalar (str/trim v)))
-          m))
-      {}
-      (str/split-lines body))))
-
 ;; --- Full ingestion walk ---
 
 (defn resolve-acl-for-file
@@ -150,7 +113,7 @@
   [rel-path fm collection-edns root-read-groups]
   (let [abs-path (:abs-path fm)
         content (try (slurp abs-path :encoding "UTF-8") (catch Exception _ ""))
-        frontmatter (parse-frontmatter content)
+        frontmatter (md/parse-frontmatter content)
         acl-result (acl/resolve-effective-groups rel-path collection-edns root-read-groups frontmatter)]
     (merge fm acl-result {:frontmatter frontmatter})))
 

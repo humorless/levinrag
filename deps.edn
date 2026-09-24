@@ -16,7 +16,13 @@
         hato/hato {:mvn/version "1.0.0"}
         metosin/jsonista {:mvn/version "0.3.13"}
         ; db (embedded, no external db server — SPEC.md D1/D2)
-        datalevin/datalevin {:mvn/version "1.1.0"}}
+        datalevin/datalevin {:mvn/version "1.1.0"}
+        ; markdown (SPEC.md §7.3) — pinned to 0.24.0, the version datalevin
+        ; 1.1.0 already pulls in via nextjournal/markdown; a newer top-level
+        ; version would silently upgrade datalevin's copy too.
+        org.commonmark/commonmark {:mvn/version "0.24.0"}
+        org.commonmark/commonmark-ext-gfm-tables {:mvn/version "0.24.0"}
+        org.commonmark/commonmark-ext-yaml-front-matter {:mvn/version "0.24.0"}}
 
  :paths ["src" "resources"]
 

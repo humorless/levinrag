@@ -4,53 +4,11 @@
    Tests:
    - collect-markdown-files: extensions, skipping dotfiles
    - find-collection-edns: discover _collection.edn from filesystem
-   - parse-frontmatter: extract frontmatter from Markdown
    - walk-corpus: full pipeline with ACL resolution"
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
             [hybridrag.ingest.walker :as walker]
             [hybridrag.ingest.acl :as acl]))
-
-;; --- Frontmatter parsing ---
-
-(deftest test-parse-frontmatter-extracts-title
-  (let [md "---
-title: \"Employee Handbook\"
-tags: [hr, policy]
----
-Content here."]
-    (let [fm (walker/parse-frontmatter md)]
-      (is (= "Employee Handbook" (:title fm)))
-      (is (= ["hr" "policy"] (:tags fm))))))
-
-(deftest test-parse-frontmatter-read-groups
-  (let [md "---
-title: Leave Policy
-read_groups: [all, hr]
----
-Leave days are calculated..."]
-    (let [fm (walker/parse-frontmatter md)]
-      (is (= ["all" "hr"] (:read_groups fm))))))
-
-(deftest test-parse-frontmatter-no-frontmatter
-  (is (nil? (walker/parse-frontmatter "No frontmatter here.")))
-  (is (nil? (walker/parse-frontmatter "# Title\n\nContent"))))
-
-(deftest test-parse-frontmatter-empty-frontmatter
-  (is (= {} (walker/parse-frontmatter "---\n---\nContent"))))
-
-(deftest test-parse-frontmatter-extra-fields
-  "Non-standard fields should be stored as-is in the frontmatter map."
-  (let [md "---
-title: API Spec
-custom_key: custom_value
-version: 2.5
----
-Content"]
-    (let [fm (walker/parse-frontmatter md)]
-      (is (= "API Spec" (:title fm)))
-      (is (= "custom_value" (:custom_key fm)))
-      (is (= 2.5 (:version fm))))))
 
 ;; --- Extension filtering ---
 
