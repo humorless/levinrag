@@ -97,3 +97,21 @@ bb vllm:check
 - 第一次使用會自動下載模型（約 2-16GB）
 - 如果 `/v1/rerank` 路徑錯誤，嘗試改為 `/rerank`
 - 如果需要更詳細的 vLLM 啟動指令，請參考 `docs/vllm.md`（如果有的話）
+## 本機替代：LM Studio（embedding 與 chat）
+
+沒有 vLLM 時，可以用 LM Studio 在本機提供 embedding 與 chat（OpenAI 相容 API，port 1234）：
+
+```bash
+lms get https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF   # 約 600 MB
+lms load text-embedding-bge-m3
+lms server start
+
+export VLLM_EMBED_BASE_URL=http://localhost:1234/v1
+export VLLM_EMBED_MODEL=text-embedding-bge-m3
+export VLLM_API_KEY=lm-studio        # LM Studio 不檢查 key，但 client 需要一個值
+```
+
+- bge-m3 GGUF 輸出 1024 維，與 `VLLM_EMBED_DIMS` 預設一致。
+- **LM Studio 沒有 rerank endpoint。** 對不存在的路徑它會回 **HTTP 200 + `{"error": ...}`**，
+  rerank client 必須檢查回應結構（SPEC §4.2），系統會降級為 RRF 排序。
+- 需要 rerank 時，可改用 llama.cpp 的 `llama-server --reranking`（提供 `/v1/rerank`）。

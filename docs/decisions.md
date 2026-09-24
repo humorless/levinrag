@@ -428,3 +428,33 @@ Spec text (SPEC.md §6.1 index-schema, §7.5 links, §7.6 incremental flow).
   environment. End-to-end ingest/rerun/reindex was verified through the
   real HTTP client against a local stub `/v1/embeddings` returning
   1024-dim vectors.
+
+
+## 2026-09-24 — T1.5 verified with LM Studio bge-m3 instead of vLLM
+
+Spec text (SPEC.md §17 T1.5 AC): the sample corpus ingests completely,
+the report shows no errors, index lag ends at 0 — with real embeddings
+(the 2026-09-22/23 entries above require a real embedding endpoint
+before ingestion counts as embedding-tested).
+
+Actual: no vLLM is reachable in this environment. LM Studio serves the
+same model family locally: `ggml-org/bge-m3-Q8_0-GGUF` (a Q8_0
+quantization of BAAI/bge-m3, 1024 dims) behind an OpenAI-compatible
+`/v1/embeddings`. `bb ingest` of `corpus-sample/` against it: 22 docs
+added, 0 errors, 0 unresolved links, 119 chunks, longest 378 estimated
+tokens, index lag 0, ~8 s; a rerun skips all 22; `bb reindex` rebuilds
+the same result; exit code 0. Real-vector `vec-neighbors` queries put
+the right doc first for the four spot-checked questions.
+
+Found on the way: the JDK HttpClient's default h2c upgrade attempt hangs
+against LM Studio (fixed in `hybridrag.llm.http`, forcing HTTP/1.1), and
+LM Studio answers unknown paths such as `/v1/rerank` with HTTP 200 +
+`{"error": ...}` — a live example of SPEC §4.2's "200 with error
+payload" case for T2.3.
+
+Decision: treat the T1.5 AC as met, with the caveat that the embedding
+model is a Q8_0 quantization served by LM Studio, not full-precision
+bge-m3 on vLLM. Retrieval quality numbers (T2.6) measured on this setup
+may differ slightly from a vLLM deployment. `bb vllm:check` against real
+vLLM remains open. LM Studio has no rerank endpoint, so rerank stays
+unverified against a real model.
