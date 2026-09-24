@@ -144,12 +144,15 @@
          (acl/nearest-collection-edn "hr/payroll/bonus.md" sample-edns)))
   (is (= {:name "全公司" :read-groups ["all"]}
          (acl/nearest-collection-edn "README.md" sample-edns)))
-  (is (nil? (acl/nearest-collection-edn "missing/file.md" sample-edns))))
+  ;; no _collection.edn in missing/ → falls back to the root one
+  (is (= {:name "全公司" :read-groups ["all"]}
+         (acl/nearest-collection-edn "missing/file.md" sample-edns)))
+  (is (nil? (acl/nearest-collection-edn "missing/file.md" (dissoc sample-edns "")))))
 
 (deftest test-parent-dir
   "parent-dir helper: compute parent directory of a path."
-  (is (= "" (acl/parent-dir "hr/leave.md")))
-  (is (= "hr" (acl/parent-dir "hr/payroll/bonus.md")))
+  (is (= "hr" (acl/parent-dir "hr/leave.md")))
+  (is (= "hr/payroll" (acl/parent-dir "hr/payroll/bonus.md")))
   (is (= "hr" (acl/parent-dir "hr/payroll")))
   (is (= "" (acl/parent-dir "README.md")))
   (is (= "" (acl/parent-dir "")))

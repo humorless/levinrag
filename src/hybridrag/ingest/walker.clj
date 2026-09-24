@@ -21,11 +21,24 @@
   "Check if a filename has an accepted extension.
   Returns false for dotfiles (files starting with .)."
   [filename]
-  (when (string? filename)
-    (if-let [ext (str/last-index-of filename \.)]
-      (and (> ext 0)  ; dotfiles start at index 0
-           (contains? accepted-extensions (subs filename (inc ext))))
-      false)))
+  (boolean
+    (when (and (string? filename) (not (str/starts-with? filename ".")))
+      (when-let [ext (str/last-index-of filename \.)]
+        (contains? accepted-extensions (subs filename (inc ext)))))))
+
+;; --- Path helpers ---
+
+(defn- rel-path-str
+  "Relative path from root to file as a \"/\"-joined string (\"\" for root)."
+  [root file]
+  (let [rel (.relativize (.toPath (io/file root)) (.toPath (io/file file)))]
+    (str/join "/" (map str rel))))
+
+(defn- skipped-segment?
+  "True if any path segment starts with \".\" or \"_\" (SPEC.md §7.1)."
+  [rel-path]
+  (some #(or (str/starts-with? % ".") (str/starts-with? % "_"))
+        (str/split rel-path #"/")))
 
 ;; --- _collection.edn discovery ---
 
@@ -34,58 +47,40 @@
    of relative directory path → parsed EDN map.
 
    _collection.edn at path \"hr/\" is keyed as \"hr\" in the map.
-   Root _collection.edn is keyed as \"\".
-
-   If collection-edns is nil, discovers them from corpus-dir."
+   Root _collection.edn is keyed as \"\". Unparseable files are skipped."
   [corpus-dir]
   (let [root (io/file corpus-dir)]
     (when (.exists root)
-      (->>
-        (file-seq root)
-        (filter #(.isFile %))
-        (filter #(= "_collection.edn" (.getName %)))
-        (reduce
-          (fn [edns file]
-            (let [file-dir (.getParent file)]
-              (if file-dir
-                (let [root-path (.toPath root)
-                      file-path (.toPath (io/file file-dir))
-                      rel (.relativize root-path file-path)]
-                  (try
-                    (let [parsed (edn/read-string (slurp file))]
-                      (assoc edns
-                             (if (str/blank? rel) "" (str/join "/" (seq rel)))
-                             (if (map? parsed) parsed {})))
-                    (catch Exception _
-                      edns)))
-                (try
-                  (let [parsed (edn/read-string (slurp file))]
-                    (assoc edns "" (if (map? parsed) parsed {})))
-                  (catch Exception _
-                    edns))))))
-          {}))))
+      (reduce
+        (fn [edns ^java.io.File file]
+          (let [dir (rel-path-str root (.getParentFile file))]
+            (if (and (not (str/blank? dir)) (skipped-segment? dir))
+              edns
+              (try
+                (let [parsed (edn/read-string (slurp file))]
+                  (assoc edns dir (if (map? parsed) parsed {})))
+                (catch Exception _
+                  edns)))))
+        {}
+        (->> (file-seq root)
+             (filter #(.isFile ^java.io.File %))
+             (filter #(= "_collection.edn" (.getName ^java.io.File %))))))))
 
 ;; --- File metadata ---
 
 (defn file-meta
   "Return metadata for a file: {:rel-path, :abs-path, :size, :mtime}."
-  [corpus-dir file]
-  (let [root-path (.toPath (io/file corpus-dir))
-        file-path (.toPath file)
-        rel (.relativize root-path file-path)
-        rel-path (if (str/blank? rel) (.getName file) (str/join "/" rel))
-        size (.length file)
-        mtime (.lastModified file)]
-    {:rel-path rel-path
-     :abs-path (.getAbsolutePath file)
-     :size size
-     :mtime mtime}))
+  [corpus-dir ^java.io.File file]
+  {:rel-path (rel-path-str corpus-dir file)
+   :abs-path (.getAbsolutePath file)
+   :size (.length file)
+   :mtime (.lastModified file)})
 
 ;; --- File collection ---
 
 (defn collect-markdown-files
   "Recursively collect .md/.markdown/.txt files under corpus-dir,
-   skipping dotfiles/dotdirs.
+   skipping files/dirs whose name starts with \".\" or \"_\".
 
    Returns: vector of file maps with {:rel-path, :abs-path, :size, :mtime}."
   [corpus-dir]
@@ -93,12 +88,26 @@
     (when (.exists root)
       (->>
         (file-seq root)
-        (filter #(.isFile %))
-        (filter (fn [f] (acceptable-extension? (.getName f))))
+        (filter #(.isFile ^java.io.File %))
+        (filter #(acceptable-extension? (.getName ^java.io.File %)))
         (map #(file-meta corpus-dir %))
+        (remove #(skipped-segment? (:rel-path %)))
         vec))))
 
 ;; --- Frontmatter parsing (simple YAML, MVP version) ---
+
+(defn- parse-scalar
+  "Parse a YAML-ish value. Reads it as EDN when the whole value is one EDN
+   form (string, number, boolean, vector); bare words stay as the raw string.
+   Symbols inside vectors become strings ([hr, policy] → [\"hr\" \"policy\"])."
+  [^String v]
+  (let [rdr (java.io.PushbackReader. (java.io.StringReader. v))
+        x (try (edn/read {:eof ::eof} rdr) (catch Exception _ ::bad))]
+    (cond
+      (or (#{::bad ::eof} x) (symbol? x) (keyword? x)
+          (not (str/blank? (slurp rdr)))) v
+      (sequential? x) (mapv #(if (symbol? %) (str %) %) x)
+      :else x)))
 
 (defn parse-frontmatter
   "Extract YAML frontmatter from Markdown string. Returns a map or nil.
@@ -111,30 +120,17 @@
    Per SPEC.md: frontmatter supports title, tags, read_groups, and
    any other fields are stored as EDN blob in :doc/frontmatter.
 
-   Note: For tags and read_groups, converts symbols to strings
+   Bare words stay strings; list items become strings
    (e.g., [hr, policy] → [\"hr\" \"policy\"])."
   [^String md]
-  (when (str/starts-with? md "---")
-    (if-let [[_ body] (re-find #"(?s)^---\n(.*?)\n?---" md)]
-      (let [lines (str/split-lines body)
-            parsed (if (empty? (remove str/blank? lines))
-                     {}
-                     (reduce
-                       (fn [m line]
-                         (if-let [[_ k v] (re-find #"^([^:]+):\s+(.*)$" line)]
-                           (let [k (str/trim k)
-                                 v (str/trim v)]
-                             (assoc m
-                               (keyword k)
-                               (try (edn/read-string v) (catch Exception _ v))))
-                           m))
-                       {}
-                       lines))]
-        ;; Convert symbols to strings for specific keys
-        (-> parsed
-            (update :tags #(when % (mapv str %)))
-            (update :read_groups #(when % (mapv str %)))))
-      nil)))
+  (when-let [[_ body] (re-find #"(?s)^---\r?\n(.*?)\r?\n?---" md)]
+    (reduce
+      (fn [m line]
+        (if-let [[_ k v] (re-find #"^([^:]+):\s+(.*)$" line)]
+          (assoc m (keyword (str/trim k)) (parse-scalar (str/trim v)))
+          m))
+      {}
+      (str/split-lines body))))
 
 ;; --- Full ingestion walk ---
 

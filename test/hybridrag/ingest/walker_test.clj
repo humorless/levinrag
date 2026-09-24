@@ -67,23 +67,18 @@ Content"]
 ;; --- File metadata ---
 
 (deftest test-file-meta
-  (with-redefs [io/file (fn [^String s]
-                          (if (.startsWith s "corpus/")
-                            (io/file (io/file "/tmp/test-corpus/") (subs s 7))
-                            (io/file s)))
-                file-seq (constantly [])]
-    ;; Test with a real temp dir
-    (let [tmp-dir (io/file (System/getProperty "java.io.tmpdir") "test-walker-meta")]
-      (.mkdirs tmp-dir)
-      (let [f (io/file tmp-dir "test.md")]
-        (.createNewFile f)
-        (let [meta (walker/file-meta tmp-dir f)]
-          (is (= "test.md" (:rel-path meta)))
-          (is (string? (:abs-path meta)))
-          (is (number? (:size meta)))
-          (is (number? (:mtime meta))))
-        (.delete f))
-      (.delete tmp-dir))))
+  (let [tmp-dir (io/file (System/getProperty "java.io.tmpdir") "test-walker-meta")]
+    (.mkdirs (io/file tmp-dir "sub"))
+    (let [f (io/file tmp-dir "sub" "test.md")]
+      (.createNewFile f)
+      (let [meta (walker/file-meta tmp-dir f)]
+        (is (= "sub/test.md" (:rel-path meta)))
+        (is (string? (:abs-path meta)))
+        (is (number? (:size meta)))
+        (is (number? (:mtime meta))))
+      (.delete f))
+    (.delete (io/file tmp-dir "sub"))
+    (.delete tmp-dir)))
 
 
 (deftest test-find-collection-edns-from-fs
