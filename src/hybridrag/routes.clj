@@ -19,6 +19,8 @@
     ["" {:middleware [web-auth/wrap-session-auth]}
      ["/" {:name ::home
            :get {:handler web-ask/page}}]
+     ["/ask" {:name ::web-ask
+              :post {:handler web-ask/ask}}]
      ["/logout" {:name ::logout
                  :post {:handler web-auth/logout!}}]
      ["/admin" {:middleware [web-auth/wrap-admin]}

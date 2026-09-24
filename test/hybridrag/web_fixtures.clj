@@ -57,4 +57,7 @@
   [user & args]
   (let [c (wc/client (apply handler args))]
     (wc/login! c user (passwords user))
+    ;; login replaces the session (and its CSRF token), as a browser
+    ;; would see on landing at /
+    (wc/request! c :get "/")
     c))

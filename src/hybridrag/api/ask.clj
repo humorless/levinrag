@@ -15,27 +15,36 @@
                                      :max 50}]]
    [:debug {:optional true} :boolean]])
 
+(defn answer-and-trace!
+  "Answer `query` as `principal` and store the trace. `context` is the
+   request context ({:app-conn :search}). Returns {:res :trace-id};
+   dependency failures throw ex-info with :llm/endpoint. Shared by the
+   API and the web page."
+  [{:keys [app-conn search]} principal query opts]
+  (let [res (answer/ask! search principal query opts)
+        trace-id (trace/write! app-conn {:username (:username principal)
+                                         :kind :ask
+                                         :query query
+                                         :stages (:stages res)
+                                         :degraded (:degraded res)
+                                         :answer (:answer res)})]
+    (log/info "[ASK]" {:trace_id trace-id
+                       :user (:username principal)
+                       :citations (count (:citations res))
+                       :no_evidence (:no-evidence? res)
+                       :degraded (:degraded res)})
+    {:res res
+     :trace-id trace-id}))
+
 (defn handler
   [{:keys [context principal parameters errors]}]
   (if errors
     (auth/error-response 400 "invalid_request" "請求格式不正確：query 必填，長度 1–1000 字元。")
     (let [{:keys [query final_k debug]} (:body parameters)
-          {:keys [app-conn search]} context
-          opts (cond-> (:opts search)
+          opts (cond-> (get-in context [:search :opts])
                  final_k (assoc :final-k final_k))]
       (try
-        (let [res (answer/ask! search principal query opts)
-              trace-id (trace/write! app-conn {:username (:username principal)
-                                               :kind :ask
-                                               :query query
-                                               :stages (:stages res)
-                                               :degraded (:degraded res)
-                                               :answer (:answer res)})]
-          (log/info "[ASK]" {:trace_id trace-id
-                             :user (:username principal)
-                             :citations (count (:citations res))
-                             :no_evidence (:no-evidence? res)
-                             :degraded (:degraded res)})
+        (let [{:keys [res trace-id]} (answer-and-trace! context principal query opts)]
           {:status 200
            :body (cond-> {:answer (:answer res)
                           :citations (mapv search/passage-json (:citations res))
