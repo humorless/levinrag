@@ -9,6 +9,9 @@
  :hybridrag.retrieval.system/search
  {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn}
 
+ :hybridrag.ingest.runner/runner
+ {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn}
+
  :hybridrag.server/server
  {:options {:port #profile {:default 8000
                             :prod 80
@@ -24,4 +27,5 @@
   :corpus-dir #or [#env CORPUS_DIR "./corpus"]
   :index-conn #ig/ref :hybridrag.db.index-conn/index-conn
   :app-conn #ig/ref :hybridrag.db.app-conn/app-conn
-  :search #ig/ref :hybridrag.retrieval.system/search}}
+  :search #ig/ref :hybridrag.retrieval.system/search
+  :ingest #ig/ref :hybridrag.ingest.runner/runner}}

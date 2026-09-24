@@ -22,3 +22,14 @@
   [db id]
   (when-let [e (d/entid db [:trace/id id])]
     (d/pull db '[*] e)))
+
+(defn recent
+  "The newest `n` traces (no stages), newest first; entity id breaks
+   ties between traces written in the same millisecond."
+  [db n]
+  (->> (d/q '[:find [(pull ?t [:db/id :trace/id :trace/username :trace/kind :trace/query :trace/at]) ...]
+              :where [?t :trace/id]]
+            db)
+       (sort-by (juxt :trace/at :db/id) #(compare %2 %1))
+       (take n)
+       (mapv #(dissoc % :db/id))))

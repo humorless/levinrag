@@ -1,7 +1,9 @@
 (ns hybridrag.routes
   (:require [hybridrag.api.ask :as ask]
             [hybridrag.api.docs :as api-docs]
+            [hybridrag.api.ingest :as api-ingest]
             [hybridrag.api.search :as search]
+            [hybridrag.api.traces :as api-traces]
             [hybridrag.auth.middleware :as auth]
             [hybridrag.handlers :as handlers]
             [hybridrag.web.admin :as web-admin]
@@ -29,7 +31,13 @@
                  :post {:handler web-auth/logout!}}]
      ["/admin" {:middleware [web-auth/wrap-admin]}
       ["" {:name ::admin
-           :get {:handler web-admin/page}}]]]]
+           :get {:handler web-admin/page}}]
+      ["/ingest" {:name ::admin-ingest
+                  :post {:handler web-admin/start-ingest}}]
+      ["/ingest/status" {:name ::admin-ingest-status
+                         :get {:handler web-admin/ingest-status}}]
+      ["/traces/:id" {:name ::admin-trace
+                      :get {:handler web-admin/trace-page}}]]]]
    ["/api/v1"
     ["/health" {:name ::health-check
                 :get {:handler handlers/health-handler}}]
@@ -41,4 +49,10 @@
               :post {:handler ask/handler
                      :parameters {:body ask/request-schema}}}]
      ["/docs/*path" {:name ::api-docs
-                     :get {:handler api-docs/handler}}]]]])
+                     :get {:handler api-docs/handler}}]
+     ["/ingest" {:name ::api-ingest
+                 :post {:handler api-ingest/start}}]
+     ["/ingest/:job_id" {:name ::api-ingest-status
+                         :get {:handler api-ingest/status}}]
+     ["/traces/:id" {:name ::api-trace
+                     :get {:handler api-traces/handler}}]]]])

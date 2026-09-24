@@ -1,8 +1,11 @@
 (ns hybridrag.web-fixtures
   "Web-route test setup: seeded users with passwords in a fresh app.dtlv
    and a Ring handler over the sample index with stub rerank and chat."
-  (:require [hybridrag.auth.users :as users]
+  (:require [datalevin.core :as d]
+            [hybridrag.auth.users :as users]
+            [hybridrag.db.index-conn :as index-conn]
             [hybridrag.fixtures :as fx]
+            [hybridrag.ingest.runner :as runner]
             [hybridrag.retrieval.datalevin :as rd]
             [hybridrag.server :as server]
             [hybridrag.tmp :as tmp]
@@ -45,6 +48,12 @@
            rerank-fn ok-rerank}}]
   (server/ring-handler (merge {:options (merge {:session-secret-key "test-secret-key"} options)
                                :corpus-dir "corpus-sample"
+                               ;; idle runner (never started unless a test does)
+                               :ingest (runner/make {:index-conn fx/*index*
+                                                     :corpus-dir "corpus-sample"
+                                                     :data-dir "target/no-ingest-reports"
+                                                     :root-read-groups []
+                                                     :embed-fn fx/hash-embed})
                                :index-conn fx/*index*
                                :app-conn *app*
                                :search {:retriever (rd/retriever fx/*index* fx/hash-embed)
@@ -62,3 +71,30 @@
     ;; would see on landing at /
     (wc/request! c :get "/")
     c))
+
+(defn with-blocking-runner
+  "Call (f runner gate) with an ingest runner over a fresh, empty index
+   whose embed-fn blocks until `gate` is delivered — so a started job is
+   guaranteed to still be running. Cleans up afterwards."
+  [f]
+  (let [idx (tmp/dir "blocking-idx")
+        data (tmp/dir "blocking-data")
+        conn (index-conn/open idx fx/dims)
+        gate (promise)
+        r (runner/make {:index-conn conn
+                        :corpus-dir "corpus-sample"
+                        :data-dir data
+                        :root-read-groups []
+                        :embed-fn (fn [t] @gate (fx/hash-embed t))})]
+    (try
+      (f r gate)
+      (finally
+        (deliver gate true)
+        ;; let a running job finish before its index closes
+        (loop [i 0]
+          (when (and (< i 300) (= :running (:status (runner/latest r))))
+            (Thread/sleep 100)
+            (recur (inc i))))
+        (d/close conn)
+        (tmp/delete-tree! idx)
+        (tmp/delete-tree! data)))))

@@ -42,7 +42,8 @@
               [:index-conn [:fn {:error/message "Missing index-conn"} some?]]
               [:app-conn [:fn {:error/message "Missing app-conn"} some?]]
               [:search [:fn {:error/message "Missing search"} some?]]
-              [:corpus-dir string?]]}))
+              [:corpus-dir string?]
+              [:ingest [:fn {:error/message "Missing ingest runner"} some?]]]}))
 
 (defn ring-handler
   "Return main application handler for server-side rendering."
