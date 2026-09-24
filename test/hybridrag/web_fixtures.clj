@@ -44,6 +44,7 @@
       :or {chat-fn (chat-reply "特休依年資計算[1]。")
            rerank-fn ok-rerank}}]
   (server/ring-handler (merge {:options (merge {:session-secret-key "test-secret-key"} options)
+                               :corpus-dir "corpus-sample"
                                :index-conn fx/*index*
                                :app-conn *app*
                                :search {:retriever (rd/retriever fx/*index* fx/hash-embed)

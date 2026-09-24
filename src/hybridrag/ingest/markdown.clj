@@ -17,7 +17,9 @@
             IndentedCodeBlock Link ListBlock Node Paragraph SoftLineBreak Text ThematicBreak]
            [org.commonmark.parser IncludeSourceSpans Parser]))
 
-(def ^:private ^Parser parser
+(def ^Parser parser
+  "commonmark parser with front matter, GFM tables and block source spans
+   (shared with the document viewer)."
   (-> (Parser/builder)
       (.extensions [(YamlFrontMatterExtension/create) (TablesExtension/create)])
       (.includeSourceSpans IncludeSourceSpans/BLOCKS)
@@ -158,6 +160,14 @@
        (filter #(or (instance? Paragraph %) (instance? Heading %) (instance? TableCell %)))
        (mapcat #(re-seq #"\[\[([^\]\[|#]+)(?:[|#][^\]\[]*)?\]\]" (plain-text % false)))
        (mapv (comp str/trim second))))
+
+(defn top-level-blocks
+  "[{:node :char-start :char-end}] for the document's top-level blocks
+   that have a source span (the document viewer's render unit)."
+  [^Node root]
+  (vec (for [n (children root)
+             :when (seq (.getSourceSpans ^Node n))]
+         (assoc (span n) :node n))))
 
 (defn parse-markdown
   "Parse Markdown into {:frontmatter <map or nil>, :sections [section ...]}.

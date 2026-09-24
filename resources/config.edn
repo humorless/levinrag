@@ -21,6 +21,7 @@
                                      :prod true}
             :secure-cookies? #profile {:default false
                                        :prod true}}
+  :corpus-dir #or [#env CORPUS_DIR "./corpus"]
   :index-conn #ig/ref :hybridrag.db.index-conn/index-conn
   :app-conn #ig/ref :hybridrag.db.app-conn/app-conn
   :search #ig/ref :hybridrag.retrieval.system/search}}
