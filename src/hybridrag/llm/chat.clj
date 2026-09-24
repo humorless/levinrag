@@ -1,6 +1,6 @@
 (ns hybridrag.llm.chat
-  "Raw chat/completions client. Extracting citations and stripping
-    <think> blocks is hybridrag.llm.answer's job — added in Phase 3."
+  "Raw chat/completions client. Stripping <think> blocks and
+   validating citations is hybridrag.llm.answer's job."
   (:require [hybridrag.config :as config]
             [hybridrag.llm.http :as http]))
 
