@@ -25,7 +25,6 @@
     (is (= ["a" "b"] (map first (fusion/rrf 60 ["a" "b"] ["b" "a"]))))
     (is (= ["b" "a"] (map first (fusion/rrf 60 ["b" "a"] ["a" "b"])))))
   (testing "an id present only in the second list loses a tie to one in the first"
-    (is (= ["lex" "sem"] (map first (fusion/rrf 60 ["lex"] ["sem"]))))
     (is (= ["lex" "sem"] (map first (fusion/rrf 60 ["lex"] ["sem"])))))
   (testing "ties within the same list position fall back to the second list, then id"
     (is (= ["a" "b"] (map first (fusion/rrf 60 [] ["a"] ["b"]))) "second list decides")

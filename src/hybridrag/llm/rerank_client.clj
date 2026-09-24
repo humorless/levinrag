@@ -3,7 +3,7 @@
             [hybridrag.llm.http :as http]))
 
 (def ^:private connect-timeout-ms 2000)
-(def ^:private read-timeout-ms 10000)
+(def ^:private default-read-timeout-ms 10000)
 
 (defn rerank!
   "Rerank `documents` against `query`. Returns a vector of
@@ -12,7 +12,8 @@
    HTTP 200 with an error payload, so that shape has to be checked
    explicitly rather than trusted from the status code alone."
   ([query documents top-n] (rerank! (config/rerank-config) query documents top-n))
-  ([{:keys [base-url path model api-key]} query documents top-n]
+  ([{:keys [base-url path model api-key read-timeout-ms]
+     :or {read-timeout-ms default-read-timeout-ms}} query documents top-n]
    (let [response (http/post-json!
                     {:url (str base-url path)
                      :api-key api-key

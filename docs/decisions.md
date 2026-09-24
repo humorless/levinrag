@@ -539,3 +539,21 @@ Spec text (SPEC.md §8, §9.2, §9.3).
   release-notes chunk. Not a correctness issue; recall@10 still finds it.
   Possible fix to evaluate in T2.6, not implemented: emit only whole ASCII
   tokens on the query side (deviates from §8.2).
+
+
+## 2026-09-24 — T2.3: rerank scores stay raw; stricter response check
+
+Spec text (SPEC.md §9.6): failures (timeout, non-2xx, 200 with a bad
+structure) keep RRF order with graph candidates last, flag
+`:rerank-failed`; `rerank-min-score` is off by default.
+
+- **Scores are used as returned, not normalized.** The earlier entry noted
+  llama.cpp returns logits while vLLM usually returns sigmoid values.
+  Ordering is unaffected either way, and `rerank-min-score` stays nil, so
+  normalizing now would be a guess. Revisit only when T2.6 calibrates a
+  threshold on the deployed backend.
+- "Structure error" is checked beyond a missing `results` key: every
+  result needs an in-range, non-repeated integer `index` and a numeric
+  score, otherwise the stage degrades.
+- The rerank client's read timeout is now taken from its config map
+  (default still 10 s, §4.3), so tests can exercise the timeout path.
