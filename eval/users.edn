@@ -1,0 +1,5 @@
+;; Seed principals for eval and the ACL security tests (SPEC.md §15.3).
+{"alice" {:groups #{"all" "hr"} :admin? false}
+ "bob" {:groups #{"all" "engineering"} :admin? false}
+ "carol" {:groups #{"all" "finance"} :admin? false}
+ "admin" {:groups #{} :admin? true}}

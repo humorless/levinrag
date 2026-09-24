@@ -4,17 +4,33 @@
    rebuildable from corpus/ at any time (SPEC.md D1)."
   (:require [clojure.tools.logging :as log]
             [datalevin.core :as d]
+            [datalevin.udf :as udf]
             [hybridrag.config :as config]
             [hybridrag.db.schema :as schema]
+            [hybridrag.search.analyzer :as analyzer]
             [integrant-extras.core :as ig-extras]
             [integrant.core :as ig]))
+
+(defonce ^:private udf-registry
+  (doto (udf/create-registry)
+    (udf/register! analyzer/udf-descriptor analyzer/analyze)))
+
+(defn- store-opts
+  "index-opts plus the CJK analyzer (SPEC.md §8) on the :chunk/index-text
+   search domain. The analyzer is runtime state: Datalevin refuses to open
+   the store without the registry, so every open goes through here.
+   Changing the analyzer requires `bb reindex`."
+  [dims]
+  (merge (schema/index-opts dims)
+         {:runtime-opts {:udf-registry udf-registry}
+          :search-domains {"chunk/index-text" {:analyzer analyzer/udf-descriptor}}}))
 
 (defn open
   "Open (creating if needed) index.dtlv at `dir` with the index schema and
    store options. Used by the component and by the ingest CLI."
   ([dir] (open dir (:dims (config/embed-config))))
   ([dir dims]
-   (d/get-conn dir schema/index-schema (schema/index-opts dims))))
+   (d/get-conn dir schema/index-schema (store-opts dims))))
 
 (defmethod ig/assert-key ::index-conn
   [_ params]

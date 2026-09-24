@@ -503,3 +503,39 @@ once, only the sha256 stored; `bb token:revoke <prefix>`.
   "unauthorized"}}`; the principal lookup re-reads the user's current
   groups on every request, so `user:groups` takes effect immediately for
   existing tokens.
+
+
+## 2026-09-24 — T2.1: bigram analyzer, Retriever shape, lexical ranking note
+
+Spec text (SPEC.md §8, §9.2, §9.3).
+
+- **Analyzer = the §8.1 algorithm, no HanLP/Jieba.** §8 names HanLP 1.x as
+  preferred, but §8.1–§8.3 specify an overlapping-bigram analyzer and its
+  test vectors are bigrams; a word segmenter would fail them. Implemented
+  §8.1 exactly (`hybridrag.search.analyzer`), registered as a Datalevin
+  UDF in `index-conn/open`. HanLP/Jieba → backlog. Datalevin 1.1.0 uses
+  the index analyzer for queries when `:query-analyzer` is omitted
+  (`search.clj:1674`), which is what §8.2 asks for. Opening index.dtlv
+  without the UDF registry is refused by Datalevin, so the analyzer
+  cannot silently fall back to the default. **Existing index.dtlv files
+  must be rebuilt: `bb reindex`.**
+- **`channel` returns a map, not a bare list**:
+  `{:candidates :extended :raw-hits :after-acl :starved?}`. §9.5 step 3
+  needs the full ACL-filtered over-fetch list and §14 needs the counts;
+  returning only candidates would force a second query.
+- **Protocol gains `chunks`** (ACL-filtered fetch by id), so rerank input
+  and context text come from the Retriever and the pipeline never reads
+  the DB directly.
+- ACL filtering is the T0.5 doc-id set checked against every raw hit, in
+  `channel-for-user`; `channel-for-admin` is a separate function with no
+  ACL step (§9.3). Non-admins without groups get empty results without a
+  DB call (tested with a retriever whose conn is not a connection).
+  `linked-docs` also filters the *source* docs, so a user cannot learn
+  the links of a doc they cannot read.
+- **Lexical ranking observation (for T2.6):** exact version strings rank
+  below the top result on the sample corpus — `v2.7.3` puts its chunk at
+  rank 7. The §8.1 fragment `v2` matches many short `api-v2.md` chunks,
+  and BM25 length normalization penalizes the long, term-dense
+  release-notes chunk. Not a correctness issue; recall@10 still finds it.
+  Possible fix to evaluate in T2.6, not implemented: emit only whole ASCII
+  tokens on the query side (deviates from §8.2).
