@@ -709,3 +709,48 @@ Spec text (SPEC.md §4.2, §10, §11, §14).
   `hr/leave.md`). LM Studio ignores `chat_template_kwargs` and puts
   thinking in `reasoning_content`, not `<think>`; `reasoning_effort:
   "none"` turns it off (29 s → 9.4 s per `/ask`). See `VLLM_SETUP.md`.
+
+
+## 2026-09-25 — Phase 4 web UI details
+
+Spec text (SPEC.md §11–§14, §17 Phase 4) + design
+`docs/superpowers/specs/2026-09-25-phase4-web-ui-design.md`.
+
+- **Pages call functions, not the API.** Web routes (session cookie +
+  CSRF) call `answer-and-trace!` / `pipeline` / `docs/lookup` directly
+  with the session principal; the browser never holds an API token.
+- **Session = username only**; the principal is re-read from app.dtlv on
+  every request (group changes, demotion and deletion apply at once).
+  Login replaces the session, so the CSRF token changes after login.
+  Cookie `HttpOnly` + `SameSite=Lax`; `Secure` only in the prod profile
+  (`:secure-cookies?`), since a Secure cookie is never sent back over
+  `http://localhost`.
+- **Logged out**: 302 `/login?next=…`; HTMX requests get
+  `HX-Redirect: /login`. `next` only for same-site paths (not `//`,
+  `/\`, schemes).
+- **Hidden = 404** for unreadable/unknown/missing documents, admin pages
+  for non-admins, other users' traces and non-admin ingest API calls.
+- **Debug panel reads the stored trace** (ranks from the channel `:top`
+  lists, rerank scores, stage ms); the trace keeps 20 per channel, so
+  lower-ranked candidates show their own channel rank. A test compares
+  the panel with the trace field by field.
+- **Model output is plain text** with `[n]` turned into links. Hiccup
+  reads a vector whose first element is a string as a tag, so answer
+  pieces are passed as a seq — the escaping test caught this.
+- **Document viewer** renders the file from `CORPUS_DIR` (server option
+  `:corpus-dir`) one top-level block at a time (commonmark
+  `escapeHtml` + `sanitizeUrls`); chunk anchors at each chunk's first
+  block; highlighting is per block (chunks follow block boundaries). A
+  file whose sha256 differs from `:doc/hash` shows a notice. Paths are
+  resolved with `java.io.File` + canonical-prefix check (`io/file`
+  throws on absolute paths).
+- **Ingest runner** (`hybridrag.ingest.runner`, Integrant): one job at a
+  time on the server's index-conn, last 20 jobs in memory, same report
+  file as `bb ingest`. It **refuses a missing `CORPUS_DIR`**: `ingest!`
+  would read it as "every document deleted" and empty the index. Reindex
+  stays CLI-only.
+- **Phase 3 bug found here**: the prompt's `[n]` headers joined the
+  stored trail string character by character (`:section/trail` is
+  stored as `"A > B"`); fixed in `b71ab2a`.
+- **Browser check** (`bb browser-check`, Playwright + local Chrome) is
+  the "no JS errors" AC; verified to fail when an asset is missing.

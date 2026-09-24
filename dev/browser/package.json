@@ -1,0 +1,9 @@
+{
+  "name": "levinrag-browser-check",
+  "private": true,
+  "type": "module",
+  "description": "bb browser-check: drive the web UI in the local Chrome and fail on any JS error (Phase 4 AC).",
+  "devDependencies": {
+    "playwright-core": "^1.55.0"
+  }
+}

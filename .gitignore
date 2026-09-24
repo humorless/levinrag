@@ -33,3 +33,6 @@ data-test/
 
 # eval run outputs
 /eval/results/
+
+# browser check (bb browser-check)
+dev/browser/node_modules/

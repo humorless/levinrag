@@ -38,6 +38,18 @@ bb clj-repl
 Once server is started, it will automatically reload on code changes in the backend and TailwindCSS classes.
 The server should be available at `http://localhost:8000`.
 
+### Browser check (no JS errors)
+
+`bb browser-check` builds the CSS, starts a throwaway server on port 8765
+(`dev/browser_server.clj`: sample corpus with a stub embedder, stub
+rerank and chat, users `alice`/`alice-pw` and `admin`/`admin-pw`) and
+drives the UI in the locally installed Google Chrome with Playwright
+(`dev/browser/check.mjs`): login, ask with Debug on, open a citation and
+its document, run an ingest from the admin page, open a trace. Any
+console error, uncaught page error or failed asset request fails the
+run. Needs Node.js; `playwright-core` is installed on first run (it uses
+the local Chrome and downloads no browser). Not part of `bb test`.
+
 ## Update assets
 
 The idea is to vendor all js-files in the project repo eliminating build step for js part.

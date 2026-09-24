@@ -91,4 +91,28 @@ vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
            :task (clojure "-M:jvm-opts -m hybridrag.ingest.cli reindex")}
 
   kamal {:doc "Deploy application using Kamal"
-         :task (apply shell "kamal" (concat *command-line-args* ["--config-file" ".kamal/deploy.yml"]))}}}
+         :task (apply shell "kamal" (concat *command-line-args* ["--config-file" ".kamal/deploy.yml"]))}
+
+  browser-check {:doc "Drive the web UI in the local Chrome (Playwright); fail on any JS error"
+                 :requires ([babashka.fs :as fs]
+                            [babashka.process :as p]
+                            [clojure.java.io :as io]
+                            [clojure.string :as str])
+                 :task (do
+                         (run 'css-build)
+                         (when-not (fs/exists? "dev/browser/node_modules")
+                           (shell {:dir "dev/browser"} "npm ci --no-audit --no-fund"))
+                         (let [srv (p/process {:err :inherit} "clojure -M:jvm-opts:test:dev -m browser-server 8765")
+                               rdr (io/reader (:out srv))]
+                           (try
+                             (loop []
+                               (let [line (.readLine rdr)]
+                                 (cond
+                                   (nil? line) (throw (ex-info "browser-server exited before READY" {}))
+                                   (str/starts-with? line "READY") nil
+                                   :else (recur))))
+                             ;; keep draining server output so it never blocks
+                             (future (while (.readLine rdr)))
+                             (shell "node dev/browser/check.mjs")
+                             (finally (p/destroy-tree srv)))))}}
+}
