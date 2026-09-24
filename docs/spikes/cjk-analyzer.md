@@ -212,7 +212,9 @@ after rerank 5 for every analyzer.
 - HanLP uses `TraditionalChineseTokenizer` with no custom dictionary;
   identifiers follow §8.1 in all candidates.
 
-### Conclusion (input for the user's decision — not decided here)
+### Conclusion
+
+**Decided 2026-09-24 by the user: keep bigram** (`docs/decisions.md`).
 
 On a corpus that does discriminate retrieval variants, the three
 analyzers remain indistinguishable, and after reranking the difference

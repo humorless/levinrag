@@ -509,7 +509,9 @@ once, only the sha256 stored; `bb token:revoke <prefix>`.
 
 Spec text (SPEC.md §8, §9.2, §9.3).
 
-- **Analyzer: bigram for now — OPEN, pending the user's decision.** §8
+- **Analyzer: bigram for now — OPEN, pending the user's decision.**
+  (Decided 2026-09-24: keep bigram — see "CJK analyzer: keep bigram"
+  below.) §8
   states HanLP 1.x > Jieba as the tokenizer priority (added deliberately in
   `4ac13e2`), while §8.1–§8.3 still specify an overlapping-bigram analyzer
   with bigram test vectors. T2.1 implemented §8.1 and moved HanLP to the
@@ -631,3 +633,36 @@ every other stage ≤ ~40 ms p50.
   `:expected-docs`; ACL-only questions count only toward leaks.
 - Eval principals come from `eval/users.edn` (the §15.3 seed users), so
   `bb eval` does not depend on app.dtlv.
+
+
+## 2026-09-24 — CJK analyzer: keep bigram (closes the T2.1 OPEN item)
+
+Spec text (SPEC.md §8): "HanLP 1.x（首选）＞ Jieba（備援）"; §8.1–§8.3
+specify overlapping bigrams.
+Decision (user, 2026-09-24): **keep the §8.1 bigram analyzer.** HanLP and
+bigram+HanLP are not adopted; the `:spike-hanlp` alias stays spike-only
+and nothing in `src/` depends on HanLP. §8's priority line is superseded
+by this entry; §8.1–§8.3 stand as written. No reindex needed (bigram is
+what index.dtlv already uses).
+
+Evidence (`docs/spikes/cjk-analyzer.md`):
+
+- Sample corpus, lexical channel: the three analyzers tie (MRR@10
+  0.978 / 0.984 / 0.978); on 20 domain terms HanLP has lower precision
+  (0.84 vs 0.87 P@10) because words missing from its dictionary fall
+  back to single characters.
+- Local book corpus, 38 questions, real bge-m3 + reranker: the retrieval
+  variants separate clearly (lexical MRR@10 0.28 → hybrid+rerank 0.58),
+  but the analyzers do not — every difference ≤ 0.035, per-question
+  wins/losses balanced (HanLP vs bigram lexical 11 : 11), and within
+  0.009 after rerank.
+- So HanLP buys no measurable quality for its costs: an 8 MB jar, a
+  dictionary to maintain per corpus, and silent single-character
+  degradation on unlisted domain words. The quality levers are the
+  semantic channel and the reranker, not the tokenizer.
+
+Known bigram limitation, not addressed here: a single CJK character
+queried alone only matches single-character runs in documents (§8.1
+emits unigrams only for runs of length 1), so e.g. a one-character
+query misses every occurrence inside longer runs. Revisit if real
+queries show it matters (fix would be indexing unigrams too, + reindex).
