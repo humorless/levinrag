@@ -458,3 +458,29 @@ bge-m3 on vLLM. Retrieval quality numbers (T2.6) measured on this setup
 may differ slightly from a vLLM deployment. `bb vllm:check` against real
 vLLM remains open. LM Studio has no rerank endpoint, so rerank stays
 unverified against a real model.
+
+
+## 2026-09-24 — Local rerank via llama.cpp; scores are raw logits
+
+Spec text (SPEC.md §4.1/§4.2): rerank is `BAAI/bge-reranker-v2-m3` on
+vLLM, response `results[i] = {index, relevance_score}`;
+`:retrieve/rerank-min-score` stays nil until eval calibrates it (§5).
+
+Actual (no vLLM here): llama.cpp `llama-server --reranking` with
+`gpustack/bge-reranker-v2-m3-GGUF:Q8_0` on port 8002. The existing
+`hybridrag.llm.rerank-client/rerank!` works against it unchanged:
+same response shape, best-first. Measured on an M1 16 GB: 40 real
+sample-corpus chunks (~6–7k estimated tokens) in ~2.1 s, 20 in ~0.9–1.0 s;
+~1.1 GB RSS. The same client pointed at LM Studio (HTTP 200 +
+`{"error": ...}`) correctly throws "missing :results".
+
+Two consequences for Phase 2:
+- **`relevance_score` is a raw logit here** (e.g. 4.6 / −6.5 / −11.0),
+  whereas vLLM's cross-encoder scoring normally returns sigmoid-scaled
+  0–1 values. Any `rerank-min-score` threshold is backend-specific; T2.6
+  must calibrate it on the backend actually deployed, or T2.3 should
+  normalize scores (e.g. apply a sigmoid when values fall outside
+  [0, 1]). Not decided yet — noted for T2.3.
+- Local latency (~2 s for 40 docs) is fine for development and eval but
+  says nothing about the §1.2 p50 < 800 ms target, which assumes a GPU
+  vLLM deployment.

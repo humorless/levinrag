@@ -114,4 +114,21 @@ export VLLM_API_KEY=lm-studio        # LM Studio 不檢查 key，但 client 需�
 - bge-m3 GGUF 輸出 1024 維，與 `VLLM_EMBED_DIMS` 預設一致。
 - **LM Studio 沒有 rerank endpoint。** 對不存在的路徑它會回 **HTTP 200 + `{"error": ...}`**，
   rerank client 必須檢查回應結構（SPEC §4.2），系統會降級為 RRF 排序。
-- 需要 rerank 時，可改用 llama.cpp 的 `llama-server --reranking`（提供 `/v1/rerank`）。
+
+### Rerank：llama.cpp `llama-server`
+
+LM Studio 沒有 rerank，改用 llama.cpp（`brew install llama.cpp`，不需要 sudo）：
+
+```bash
+llama-server -hf gpustack/bge-reranker-v2-m3-GGUF:Q8_0 --reranking \
+  --port 8002 --host 127.0.0.1 -ub 8192 -b 8192 -c 8192 -np 1
+
+export VLLM_RERANK_BASE_URL=http://localhost:8002
+export VLLM_RERANK_PATH=/v1/rerank
+export VLLM_RERANK_MODEL=bge-reranker-v2-m3
+```
+
+- 模型約 636 MB，首次啟動時下載到 `~/.cache/huggingface`；執行時約佔 1.1 GB 記憶體。
+- 回應格式與 SPEC §4.2 相同（`results[i] = {index, relevance_score}`，依分數排序）。
+- **分數是未經 sigmoid 的 logit**（例如 4.6、−6.5），不是 0–1。設定 `:retrieve/rerank-min-score` 時要以實際後端校準。
+- M1 16 GB 實測：40 個 chunk（約 6–7k 估算 tokens）約 2.1 秒；20 個約 0.9–1.0 秒。
