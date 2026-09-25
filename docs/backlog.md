@@ -166,11 +166,12 @@ from the handoff:
   (visible to the trace owner) grows with the number of hits before the
   ACL filter. Hard to exploit with over-fetch capped at 200; hide or
   bucket stage timings for non-admins if it ever matters.
-- **Rebuild the index without downtime**: `bb reindex` deletes the
-  `index.dtlv` the server has open, so it needs the server stopped.
-  Build the new index in a fresh directory (same corpus, possibly a new
-  embedding model or analyzer), then have the server switch its
-  index-conn to it (e.g. an admin action) and drop the old one. Rebuild
+- **Rebuild the index without downtime**: already possible with one
+  restart — `DATA_DIR=<other dir> bb reindex` while the server serves,
+  then stop, swap `index.dtlv`, start (verified 2026-09-25: 19/19 health
+  checks OK during the rebuild, ~14 s restart; steps in ops.md). Goal: a
+  hot switch without the restart — have the server swap its index-conn to
+  the new directory (e.g. an admin action) and drop the old one. Rebuild
   cost is dominated by re-embedding every chunk (SPEC §21.1 scale).
 - **Web UI localization**: labels, messages and the prompt's default
   answer language are Traditional Chinese. Add an English UI (message

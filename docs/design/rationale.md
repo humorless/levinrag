@@ -49,7 +49,7 @@ Chunks, the full-text index, vectors, permissions and the link graph are all der
 
 **Why an embedded database fits here**: the usual concerns about embedded databases (backups, high availability, operational maturity) mostly apply when the database holds the single source of truth. In LevinRAG, `index.dtlv` is only derived data and can be discarded as a whole and rebuilt at any time: the index needs no backup; changing the embedding model, the tokenizer or the schema means one rebuild; tests build a fresh index in a temporary directory and delete it afterwards; the same corpus can be built into indexes with different settings and compared side by side. This also lowers the risk of choosing a relatively niche database: the data cannot get trapped in it.
 
-There are three limits: accounts, tokens and traces (`app.dtlv`) are not derived data and still need backups; the cost of a rebuild lies mainly in recomputing embeddings, which may take hours for a large corpus (not yet measured); the server has to be stopped during a rebuild.
+There are three limits: accounts, tokens and traces (`app.dtlv`) are not derived data and still need backups; the cost of a rebuild lies mainly in recomputing embeddings, which may take hours for a large corpus (not yet measured); the rebuild can run in another directory while the server keeps serving, and switching to the new index currently takes one restart (about a dozen seconds measured locally); switching without a restart is on the to-do list.
 
 ## Three invariants
 

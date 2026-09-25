@@ -132,11 +132,22 @@ Restore: stop the server, replace `DATA_DIR/app.dtlv` with the backup directory,
 
 ## Rebuilding the index
 
-You need `bb reindex` (deletes `index.dtlv`, then runs a full ingest; accounts are not affected) in these cases. **Stop the server first**: the server holds the old index files open, and will not see the new index during or after the rebuild until it is restarted.
+You need `bb reindex` (deletes `index.dtlv`, then runs a full ingest; accounts are not affected) in these cases. When you run it on the `DATA_DIR` the server is using, **stop the server first**: the server holds the old index files open, and will not see the new index during or after the rebuild until it is restarted.
 
 - changing the embedding model or dimensions;
 - changing the tokenizer (analyzer);
 - suspected index corruption.
+
+**With almost no downtime**: build the new index in another directory while the server keeps serving; only one restart is needed at the end (about 14 s of downtime measured locally; the rebuild time itself goes mostly into computing embeddings and does not affect the server).
+
+```bash
+# 1. The server keeps running; build a new index in another directory with the same corpus and model settings
+DATA_DIR=/path/to/rebuild bb reindex
+# 2. Stop the server and put the new index in place (keep the old one for now)
+mv "$DATA_DIR/index.dtlv" "$DATA_DIR/index.dtlv.old"
+mv /path/to/rebuild/index.dtlv "$DATA_DIR/index.dtlv"
+# 3. Start the server; delete index.dtlv.old once queries look right
+```
 
 For everyday additions or edits to the corpus, an incremental ingest is enough: while the server is running, use the button in `/admin` or `POST /api/v1/ingest`; use `bb ingest` only when the server is stopped.
 

@@ -133,11 +133,22 @@ bb kamal app exec "java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=j
 
 ## 重建索引
 
-以下情況需要 `bb reindex`（刪除 `index.dtlv` 後完整重新匯入；帳號不受影響）。**先停止 server**：server 開著舊的索引檔，重建期間與之後都不會看到新索引，直到重新啟動為止。
+以下情況需要 `bb reindex`（刪除 `index.dtlv` 後完整重新匯入；帳號不受影響）。直接對 server 正在用的 `DATA_DIR` 執行時，**要先停止 server**：server 開著舊的索引檔，重建期間與之後都不會看到新索引，直到重新啟動為止。
 
 - 更換 embedding 模型或維度；
 - 更換斷詞 analyzer；
 - 懷疑索引損壞。
+
+**幾乎不停機的做法**：新索引建在另一個目錄，server 照常服務，最後只需要重啟一次（本機實測停機約 14 秒；重建本身的時間主要花在計算 embedding，期間 server 不受影響）。
+
+```bash
+# 1. server 照常執行；用同一份語料與模型設定，在另一個目錄建新索引
+DATA_DIR=/path/to/rebuild bb reindex
+# 2. 停止 server，換上新索引（舊的先保留）
+mv "$DATA_DIR/index.dtlv" "$DATA_DIR/index.dtlv.old"
+mv /path/to/rebuild/index.dtlv "$DATA_DIR/index.dtlv"
+# 3. 啟動 server；確認查詢正常後再刪除 index.dtlv.old
+```
 
 平常新增或修改語料，用增量匯入即可：server 執行中用 `/admin` 的按鈕或 `POST /api/v1/ingest`；server 停止時才用 `bb ingest`。
 

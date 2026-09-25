@@ -751,7 +751,7 @@ Grouped by nature. Before starting any of these, confirm the scope first (large 
 | `/login` rate limiting or lockout | The user decided not to include it in Phase 5 |
 | Citation ranges `[1-3]` | Currently not supported by §10.2 |
 | Locking for concurrent ingest from multiple processes | Currently relies on a documented rule: do not run CLI ingest while the server is running |
-| Rebuilding the index without downtime | `bb reindex` deletes the `index.dtlv` the server is using, so it needs downtime. Building the index in a new directory and then switching the server over to it (e.g. triggered by an admin action) would avoid downtime; this also applies to changing the embedding model or tokenizer |
+| Rebuilding the index without downtime | A new index can already be built in another `DATA_DIR` while the server keeps serving, then switched to with one restart (steps in `docs/howto/ops.md`; about 14 s of downtime measured locally). The goal is a hot switch: the server moves to the new directory directly (e.g. triggered by an admin action), with no restart at all; this also applies to changing the embedding model or tokenizer |
 | Single-Chinese-character queries | The §8.1 limitation; the fix is to also index unigrams and run `bb reindex` |
 
 ### 21.3 The user decides first whether to do these (larger features)

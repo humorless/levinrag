@@ -753,7 +753,7 @@ analyzer 測試向量、chunker、token 估算、ACL 解析、RRF（含平手）
 | `/login` 限速或鎖定 | 使用者決定不放進 Phase 5 |
 | 引用範圍 `[1-3]` | §10.2 目前不支援 |
 | 多 process 同時 ingest 的鎖定 | 目前靠文件規定：server 執行中不跑 CLI ingest |
-| 不停機重建索引 | `bb reindex` 會刪除 server 正在用的 `index.dtlv`，所以必須停機。改為在新目錄建好索引，再讓 server 切換過去（例如以 admin 操作觸發），就可以不停機；也適用於換 embedding 模型或斷詞器 |
+| 不停機重建索引 | 現在可以在另一個 `DATA_DIR` 建好新索引，server 照常服務，再重啟一次切換過去（步驟見 `docs/howto/ops.zh-TW.md`，本機實測停機約 14 秒）。目標是熱切換：讓 server 直接換用新目錄（例如以 admin 操作觸發），連重啟都不用；也適用於換 embedding 模型或斷詞器 |
 | 單一中文字的查詢 | §8.1 的限制；修法是額外索引 unigram，並執行 `bb reindex` |
 
 ### 21.3 要先由使用者決定做不做（較大的功能）
