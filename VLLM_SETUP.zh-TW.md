@@ -8,35 +8,35 @@
 
 ## 環境變數設定
 
-在啟動應用程式前，設定以下環境變數：
+把設定寫在專案目錄的 `.env`（從 `.env.example` 複製）；每個會執行應用程式的 `bb` 指令都會讀它，而 shell 裡 export 的變數優先：
 
 ### 方式一：個別設定（推薦）
 
 ```bash
 # Embedding service
-export VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
-export VLLM_EMBED_MODEL="your-embedding-model"
-export VLLM_EMBED_API_KEY="your-api-key-here"
+VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
+VLLM_EMBED_MODEL="your-embedding-model"
+VLLM_EMBED_API_KEY="your-api-key-here"
 
 # Rerank service
-export VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
-export VLLM_RERANK_PATH="/v1/rerank"  # 或 "/rerank"，取決於 vLLM 部署
-export VLLM_RERANK_MODEL="your-reranker-model"
-export VLLM_RERANK_API_KEY="your-api-key-here"
+VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
+VLLM_RERANK_PATH="/v1/rerank"  # 或 "/rerank"，取決於 vLLM 部署
+VLLM_RERANK_MODEL="your-reranker-model"
+VLLM_RERANK_API_KEY="your-api-key-here"
 
 # Chat service（必填）
-export VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
-export VLLM_CHAT_MODEL="your-chat-model"
-export VLLM_CHAT_API_KEY="your-api-key-here"
+VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
+VLLM_CHAT_MODEL="your-chat-model"
+VLLM_CHAT_API_KEY="your-api-key-here"
 ```
 
 ### 方式二：使用單一 API key（fallback）
 
 ```bash
-export VLLM_API_KEY="your-api-key-here"
-export VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
-export VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
-export VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
+VLLM_API_KEY="your-api-key-here"
+VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
+VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
+VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
 ```
 
 ## 預設模型對應
@@ -80,7 +80,7 @@ curl -X POST http://localhost:8003/v1/chat/completions \
 
 ## 驗證設定
 
-設定好環境變數後，執行：
+填好 `.env` 後，執行（或 `bb doctor`，它會先檢查其他項目再執行這一步）：
 
 ```bash
 bb vllm:check
@@ -108,14 +108,19 @@ bb vllm:check
 
 沒有 vLLM 時，可以用 LM Studio 在本機提供 embedding 與 chat（OpenAI 相容 API，port 1234）：
 
+照下面填好 `.env` 之後，`bb dev:models` 會啟動整個本機方案（LM Studio server、兩個模型，以及下一節的 reranker），已在執行的部分會跳過；見[開發者指南](docs/howto/dev.zh-TW.md)。手動的做法：
+
 ```bash
-lms get https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF   # 約 600 MB
+lms get https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF   # 約 600 MB，只需一次
 lms load text-embedding-bge-m3
 lms server start
+```
 
-export VLLM_EMBED_BASE_URL=http://localhost:1234/v1
-export VLLM_EMBED_MODEL=text-embedding-bge-m3
-export VLLM_API_KEY=lm-studio        # LM Studio 不檢查 key，但 client 需要一個值
+```bash
+# .env
+VLLM_EMBED_BASE_URL=http://localhost:1234/v1
+VLLM_EMBED_MODEL=text-embedding-bge-m3
+VLLM_API_KEY=lm-studio        # LM Studio 不檢查 key，但 client 需要一個值
 ```
 
 - bge-m3 GGUF 輸出 1024 維，與 `VLLM_EMBED_DIMS` 預設一致。
@@ -126,10 +131,13 @@ export VLLM_API_KEY=lm-studio        # LM Studio 不檢查 key，但 client 需�
 
 ```bash
 lms load qwen/qwen3-8b --context-length 8192   # 約 4.6 GB；context 需容納約 6000 token 的資料 + 1024 輸出
+```
 
-export VLLM_CHAT_BASE_URL=http://localhost:1234/v1
-export VLLM_CHAT_MODEL=qwen/qwen3-8b
-export VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # 關閉 Qwen3 的思考模式
+```bash
+# .env
+VLLM_CHAT_BASE_URL=http://localhost:1234/v1
+VLLM_CHAT_MODEL=qwen/qwen3-8b
+VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # 關閉 Qwen3 的思考模式
 ```
 
 - `VLLM_CHAT_EXTRA_BODY` 是 JSON 物件，原樣合併進 chat request body（SPEC §4.2 的 `:chat/extra-body`）。
@@ -153,10 +161,13 @@ LM Studio 沒有 rerank，改用 llama.cpp（`brew install llama.cpp`，不需�
 ```bash
 llama-server -hf gpustack/bge-reranker-v2-m3-GGUF:Q8_0 --reranking \
   --port 8002 --host 127.0.0.1 -ub 8192 -b 8192 -c 8192 -np 1
+```
 
-export VLLM_RERANK_BASE_URL=http://localhost:8002
-export VLLM_RERANK_PATH=/v1/rerank
-export VLLM_RERANK_MODEL=bge-reranker-v2-m3
+```bash
+# .env
+VLLM_RERANK_BASE_URL=http://localhost:8002
+VLLM_RERANK_PATH=/v1/rerank
+VLLM_RERANK_MODEL=bge-reranker-v2-m3
 ```
 
 - 模型約 636 MB，首次啟動時下載到 `~/.cache/huggingface`；執行時約佔 1.1 GB 記憶體。

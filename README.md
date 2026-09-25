@@ -43,6 +43,7 @@ The full argument (comparison with the frameworks, why Datalevin, scope of appli
 ## Guides
 
 - [Quick start: evaluate LevinRAG on your own corpus](docs/howto/quick-start.md): from `git clone` to checking the ACL, rebuildability, explainability and retrieval-quality claims, without knowing Clojure. **Start here if you are evaluating LevinRAG.**
+- [Developer guide](docs/howto/dev.md): first-time setup on a Mac, starting everything with `bb dev:models` and `bb dev:up` (also after a reboot), daily commands.
 - [Operations guide](docs/howto/ops.md): deployment, environment variables, health, backups, evaluation.
 - [Administrator guide](docs/howto/admin.md): users and groups, document permissions, ingest, trace.
 - [User guide](docs/howto/user.md): login, asking questions, citations, document viewer, Debug panel.

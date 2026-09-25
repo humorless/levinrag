@@ -1362,3 +1362,18 @@ Removed. `bb check` depended on `fmt` (rewrites files); it now depends on
 `css-watch` (the only way to rebuild CSS while editing Tailwind classes;
 `bb serve` builds it only when missing), `outdated` (manual upgrade;
 commonmark excluded), `fetch-assets`, the `:enter` banner.
+
+## 2026-09-26 — Developer guide; VLLM_SETUP in the `.env` style
+
+`docs/howto/dev.md` (+ zh-TW, in `bb docs:check`) is the developer-facing
+counterpart of the quick-start: what runs where, first-time setup on a
+Mac, the two-command start (also after a reboot), stopping, where settings
+live, daily commands, troubleshooting. VLLM_SETUP's `export` lines became
+`.env` lines (the commands and the settings are now separate blocks) and
+point to `bb dev:models`. `.env.example` now lists every variable the
+code or a bb task reads (24): the three per-endpoint API keys, a note that
+`SESSION_SECRET_KEY` is production-only, and the `LOCAL_*` variables.
+The project CLAUDE.md tells agents to use `bb dev:models` / `bb dev:up`
+instead of assembling `lms` / `llama-server` / tmux commands (user asked
+for that line; a machine-local instruction file was judged unnecessary
+because the machine-specific part is `.env`).

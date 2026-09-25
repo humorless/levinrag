@@ -6,35 +6,35 @@ This project needs three vLLM endpoints to run:
 
 ## Environment variables
 
-Set the following environment variables before starting the application:
+Put the settings in `.env` in the project directory (copy `.env.example`); every `bb` task that runs the app reads it, and a variable exported in the shell takes precedence:
 
 ### Option 1: set each one separately (recommended)
 
 ```bash
 # Embedding service
-export VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
-export VLLM_EMBED_MODEL="your-embedding-model"
-export VLLM_EMBED_API_KEY="your-api-key-here"
+VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
+VLLM_EMBED_MODEL="your-embedding-model"
+VLLM_EMBED_API_KEY="your-api-key-here"
 
 # Rerank service
-export VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
-export VLLM_RERANK_PATH="/v1/rerank"  # or "/rerank", depending on the vLLM deployment
-export VLLM_RERANK_MODEL="your-reranker-model"
-export VLLM_RERANK_API_KEY="your-api-key-here"
+VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
+VLLM_RERANK_PATH="/v1/rerank"  # or "/rerank", depending on the vLLM deployment
+VLLM_RERANK_MODEL="your-reranker-model"
+VLLM_RERANK_API_KEY="your-api-key-here"
 
 # Chat service (required)
-export VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
-export VLLM_CHAT_MODEL="your-chat-model"
-export VLLM_CHAT_API_KEY="your-api-key-here"
+VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
+VLLM_CHAT_MODEL="your-chat-model"
+VLLM_CHAT_API_KEY="your-api-key-here"
 ```
 
 ### Option 2: a single API key (fallback)
 
 ```bash
-export VLLM_API_KEY="your-api-key-here"
-export VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
-export VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
-export VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
+VLLM_API_KEY="your-api-key-here"
+VLLM_EMBED_BASE_URL="http://your-vllm-host/v1"
+VLLM_RERANK_BASE_URL="http://your-vllm-host/v1"
+VLLM_CHAT_BASE_URL="http://your-vllm-host/v1"
 ```
 
 ## Default models
@@ -78,7 +78,7 @@ curl -X POST http://localhost:8003/v1/chat/completions \
 
 ## Verifying the setup
 
-After setting the environment variables, run:
+After filling in `.env`, run (or `bb doctor`, which runs it after checking everything else):
 
 ```bash
 bb vllm:check
@@ -106,14 +106,19 @@ You should see:
 
 Without vLLM, you can use LM Studio to serve embedding and chat locally (OpenAI-compatible API, port 1234):
 
+Once `.env` is filled in as below, `bb dev:models` starts this whole local recipe (the LM Studio server, both models, and the reranker in the next section) and skips whatever is already running; see the [Developer guide](docs/howto/dev.md). By hand:
+
 ```bash
-lms get https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF   # about 600 MB
+lms get https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF   # about 600 MB, once
 lms load text-embedding-bge-m3
 lms server start
+```
 
-export VLLM_EMBED_BASE_URL=http://localhost:1234/v1
-export VLLM_EMBED_MODEL=text-embedding-bge-m3
-export VLLM_API_KEY=lm-studio        # LM Studio does not check the key, but the client needs a value
+```bash
+# .env
+VLLM_EMBED_BASE_URL=http://localhost:1234/v1
+VLLM_EMBED_MODEL=text-embedding-bge-m3
+VLLM_API_KEY=lm-studio        # LM Studio does not check the key, but the client needs a value
 ```
 
 - bge-m3 GGUF outputs 1024 dimensions, matching the `VLLM_EMBED_DIMS` default.
@@ -124,10 +129,13 @@ export VLLM_API_KEY=lm-studio        # LM Studio does not check the key, but the
 
 ```bash
 lms load qwen/qwen3-8b --context-length 8192   # about 4.6 GB; the context must hold about 6000 tokens of data + 1024 output
+```
 
-export VLLM_CHAT_BASE_URL=http://localhost:1234/v1
-export VLLM_CHAT_MODEL=qwen/qwen3-8b
-export VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # turn off Qwen3 thinking mode
+```bash
+# .env
+VLLM_CHAT_BASE_URL=http://localhost:1234/v1
+VLLM_CHAT_MODEL=qwen/qwen3-8b
+VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # turn off Qwen3 thinking mode
 ```
 
 - `VLLM_CHAT_EXTRA_BODY` is a JSON object merged as is into the chat request body (`:chat/extra-body` in SPEC §4.2).
@@ -151,10 +159,13 @@ LM Studio has no rerank, so use llama.cpp instead (`brew install llama.cpp`, no 
 ```bash
 llama-server -hf gpustack/bge-reranker-v2-m3-GGUF:Q8_0 --reranking \
   --port 8002 --host 127.0.0.1 -ub 8192 -b 8192 -c 8192 -np 1
+```
 
-export VLLM_RERANK_BASE_URL=http://localhost:8002
-export VLLM_RERANK_PATH=/v1/rerank
-export VLLM_RERANK_MODEL=bge-reranker-v2-m3
+```bash
+# .env
+VLLM_RERANK_BASE_URL=http://localhost:8002
+VLLM_RERANK_PATH=/v1/rerank
+VLLM_RERANK_MODEL=bge-reranker-v2-m3
 ```
 
 - The model is about 636 MB, downloaded to `~/.cache/huggingface` on first start; at runtime it uses about 1.1 GB of memory.

@@ -2,6 +2,10 @@
 
 > **Evaluating LevinRAG (running it on a corpus, checking its claims), not developing it?** Follow `docs/howto/quick-start.md` (Traditional Chinese: `docs/howto/quick-start.zh-TW.md`) and use only the `bb` commands it lists; nothing below is needed.
 
+## Starting the environment
+
+Models and servers down (e.g. after a reboot)? Run `bb dev:models` (the local LM Studio + llama.cpp model servers) and then `bb dev:up` (`bb serve` in tmux `levinrag`, the nREPL below in tmux `nrepl`, then `bb doctor`). Both start only what is not running. Do not assemble `lms` / `llama-server` / tmux commands by hand; settings come from `.env`. See `docs/howto/dev.md`.
+
 ## nREPL
 
 Start with (overrides the generic command in `~/.claude/CLAUDE.md`):
