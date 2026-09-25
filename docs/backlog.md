@@ -192,7 +192,7 @@ called unusable.
 | 2 | Phrase search (`{:phrase ..}`, `:index-position? true`) through Datalog | Failed, cause unknown. The spike queried `(fulltext $ ?q ..)` with no attribute, which reads the default `datalevin` domain; the attribute form (`fulltext $ :chunk/index-text ..`, what the code uses now) was not tried | `spikes/fulltext.md` §4, Known Issues 1 |
 | 3 | `:db.fulltext/indexPosition?` on the attribute | Failed, tied to #2 | `spikes/fulltext.md` §8 |
 | 4 | `:db.vec/domains` on a schema attribute | Confirmed 1.1.0 bug, root-caused (init and write paths disagree on domains); workaround in use | decisions 2026-09-22, debug notes §4 |
-| 5 | `retractEntity` and re-adding the same unique id in one tx | Fails with fulltext "Document does not exist."; observed, not root-caused; worked around by in-place upserts | decisions T1.4 |
+| 5 | `retractEntity` and re-adding the same unique id in one tx | **Root-caused 2026-09-25: Datalevin 1.1.0 bug.** Upserts resolve against the pre-tx db, so the old datom is retracted twice (fulltext raises) and, without fulltext, the entity silently loses its unique id. `replace-tx` must stay | `spikes/retract-readd.md` |
 | 6 | Built-in embedding (`:db/embedding`, Path A) | Never tested end to end: rejected because it needs the embedding server at connect and transact time; async behaviour and batching untested | `spikes/embedding.md` Path A, decisions Path B |
 | 7 | Vector `:vec-filter` in `vec-neighbors` | **Tested 2026-09-25: works**, filters after the HNSW top-k, so it is no pre-filter | `spikes/doc-filter.md` |
 
@@ -216,5 +216,7 @@ neither about core retrieval:
   per-file error isolation and model-free tests, and async mode would
   break "a document's vectors and permissions change together". Needs a
   spike before any decision.
-- **#5 would simplify code**: `replace-tx` in `ingest/writer.clj` exists
-  only to work around it.
+- ~~#5 would simplify code~~: checked the same day, it would not. The
+  retract-then-re-add form is broken beyond the fulltext error (it can
+  commit an entity without its unique id), so `replace-tx` stays
+  (`spikes/retract-readd.md`).

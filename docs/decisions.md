@@ -973,3 +973,22 @@ Decision: no code change. The T0.5 over-fetch + doc-id-set check stays;
 `:doc-filter` would give the same results and the same ACL starvation, at the same latency (within ~1 ms at 100k chunks; a precomputed readable-chunk set is much slower).
 The rationale's "the full-text and vector engines cannot filter by
 document before ranking" stands.
+
+## 2026-09-25 — Root cause: retract + re-add of one unique id in one tx
+
+Spec text: n/a — adds the cause to the T1.4 entry ("`retractEntity` +
+re-adding the same unique `:chunk/id` in one tx fails ... with fulltext
+\"Document does not exist.\"").
+
+Actual (`docs/spikes/retract-readd.md`, reproducible with
+`dev/spikes/retract_readd.clj`): Datalevin 1.1.0 resolves the upsert
+against the pre-transaction db, so the old value is retracted twice. The
+fulltext index rejects the second delete, which rolls the transaction
+back cleanly. Without a fulltext attribute the same transaction commits
+an entity that has lost its unique id. DataScript 1.7.5 applies the ops
+in order and gets it right. Judged a Datalevin bug; not checked against
+its issue tracker.
+
+Decision: `replace-tx` stays; it never retracts a datom twice. The
+backlog idea that fixing this would let the writer drop `replace-tx` is
+withdrawn.
