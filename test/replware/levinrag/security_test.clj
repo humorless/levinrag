@@ -355,3 +355,23 @@
                                                  :embed-fn fx/hash-embed})))
         (is (= before (fx/doc-groups conn))))
       (finally (d/close conn) (tmp/delete-tree! idx)))))
+
+(deftest test-broken-directory-collection-record-holds-no-groups
+  ;; review 2026-09-25 L7: the collections table showed the parent's wider
+  ;; groups for a directory whose own settings are broken
+  (let [dir (tmp/dir "acl-broken-coll")
+        idx (tmp/dir "acl-broken-coll-index")
+        conn (index-conn/open idx fx/dims)
+        groups #(set (:collection/effective-groups
+                       (d/pull (d/db conn) [:collection/effective-groups] [:collection/path %])))]
+    (try
+      (spit (io/file dir "_collection.edn") "{:read-groups [\"all\"]}")
+      (io/make-parents (io/file dir "hr/sub/a.md"))
+      (spit (io/file dir "hr/_collection.edn") "{:read-group [\"hr\"]}")
+      (spit (io/file dir "hr/sub/a.md") "# a\n\nx")
+      (job/ingest! conn {:corpus-dir dir
+                         :embed-fn fx/hash-embed})
+      (is (= #{"all"} (groups "")))
+      (is (= #{} (groups "hr")))
+      (is (= #{} (groups "hr/sub")) "below the broken file too")
+      (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))

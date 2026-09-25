@@ -1263,3 +1263,16 @@ became a group named `# admins only`. A bare value that starts with `#` is
 now just a comment (empty value); `a#b` is kept; quoted values are
 unchanged. A leading BOM (Windows editors) is ignored instead of making
 line 1 an error with an invisible character in the message.
+
+## 2026-09-25 — Review L6 / L7: no fail-open by omission
+
+- L6: `walk-corpus` given valid edns but no `broken` map (e.g. the result
+  of the public `find-collection-edns`) did not re-scan, so broken files
+  were invisible and the old fail-open came back. It now scans unless both
+  are given.
+- L7: `upsert-collections!` stored the parent's wider groups as
+  `:collection/effective-groups` for a directory governed by a broken
+  `_collection.edn`. No ACL path reads it, but it was misleading; such a
+  directory now gets none. The "which broken file governs this directory"
+  walk is one function, `acl/governing-broken-dir`, used by the walker and
+  the writer.

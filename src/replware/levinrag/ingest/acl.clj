@@ -20,6 +20,18 @@
   (let [idx (.lastIndexOf p "/")]
     (if (pos? idx) (subs p 0 idx) "")))
 
+(defn governing-broken-dir
+  "The directory whose broken _collection.edn decides `dir`'s groups, or
+   nil. Walks up like rule 1: the first directory with a broken file or
+   with :read-groups decides (SPEC.md §7.2 rule 5). `broken` is
+   dir → reason, as walker/scan-collection-edns returns it."
+  [dir collection-edns broken]
+  (loop [d dir]
+    (cond
+      (contains? broken d) d
+      (or (:read-groups (get collection-edns d)) (= "" d)) nil
+      :else (recur (parent-dir d)))))
+
 (defn- find-nearest-read-groups
   "Walk up from dir-path to root, returning :read-groups from the nearest
    _collection.edn (as a vector of strings). Returns nil if none found."

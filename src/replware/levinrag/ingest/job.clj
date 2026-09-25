@@ -86,7 +86,7 @@
         {:keys [edns broken]} (walker/scan-collection-edns corpus-dir)
         files (walker/walk-corpus corpus-dir edns root-read-groups broken)
         on-disk (set (map :rel-path files))
-        _ (writer/upsert-collections! conn (writer/collection-dirs on-disk edns) edns root-read-groups)
+        _ (writer/upsert-collections! conn (writer/collection-dirs on-disk edns) edns root-read-groups broken)
         indexed (indexed-docs (d/db conn))
         opts (assoc opts :chunk-config chunk-config)
         results (mapv (fn [{:keys [rel-path acl-error]

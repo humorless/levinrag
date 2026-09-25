@@ -252,3 +252,14 @@
           (let [[f] (walker/walk-corpus dir nil ["all"] nil)]
             (is (nil? (:acl-error f)) (pr-str d))
             (is (= ["hr"] (:effective-groups f)) (pr-str d))))))))
+
+(deftest test-walk-corpus-always-knows-about-broken-files
+  ;; review 2026-09-25 L6: passing only the valid edns (as
+  ;; find-collection-edns returns them) must not bring back fail-open
+  (with-tree {"_collection.edn" "{:read-groups [\"all\"]}"
+              "hr/_collection.edn" "{:read-group [\"hr\"]}"
+              "hr/a.md" "# a"}
+    (fn [dir]
+      (doseq [files [(walker/walk-corpus dir (walker/find-collection-edns dir))
+                     (walker/walk-corpus dir (walker/find-collection-edns dir) ["all"])]]
+        (is (:acl-error (first files)))))))

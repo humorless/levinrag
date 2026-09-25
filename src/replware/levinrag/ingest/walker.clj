@@ -120,14 +120,9 @@
    message, or nil. Walks up like ACL resolution: the first directory with
    a broken file or with :read-groups decides."
   [rel-path edns broken]
-  (loop [dir (acl/parent-dir rel-path)]
-    (cond
-      (contains? broken dir)
-      (str (if (= "" dir) "" (str dir "/")) "_collection.edn：" (get broken dir)
-           "；修正前這個目錄下的文件不匯入")
-
-      (or (:read-groups (get edns dir)) (= "" dir)) nil
-      :else (recur (acl/parent-dir dir)))))
+  (when-let [dir (acl/governing-broken-dir (acl/parent-dir rel-path) edns broken)]
+    (str (if (= "" dir) "" (str dir "/")) "_collection.edn：" (get broken dir)
+         "；修正前這個目錄下的文件不匯入")))
 
 ;; --- File metadata ---
 
@@ -205,8 +200,10 @@
   ([corpus-dir collection-edns root-read-groups]
    (walk-corpus corpus-dir collection-edns root-read-groups nil))
   ([corpus-dir collection-edns root-read-groups broken]
-   (let [scan (when-not collection-edns (scan-collection-edns corpus-dir))
+   ;; without `broken` the corpus is scanned for it: valid edns alone (as
+   ;; find-collection-edns returns them) would bring back fail-open
+   (let [scan (when-not (and collection-edns broken) (scan-collection-edns corpus-dir))
          cedns (or collection-edns (:edns scan))
-         broken (or broken (:broken scan) {})
+         broken (or broken (:broken scan))
          files (collect-markdown-files corpus-dir)]
      (mapv #(resolve-acl-for-file (:rel-path %) % cedns root-read-groups broken) files))))

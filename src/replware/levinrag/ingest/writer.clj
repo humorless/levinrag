@@ -68,8 +68,10 @@
 
 (defn upsert-collections!
   "Upsert one entity per directory (materialized effective groups, §7.2)
-   and retract collections whose directory is gone."
-  [conn dirs collection-edns root-read-groups]
+   and retract collections whose directory is gone. A directory governed
+   by a broken _collection.edn (`broken`, dir → reason) gets no groups,
+   not its parent's (§7.2 rule 5)."
+  [conn dirs collection-edns root-read-groups broken]
   (let [db (d/db conn)
         stale (remove (set dirs) (d/q '[:find [?p ...] :where [_ :collection/path ?p]] db))
         tempid #(str "coll:" %)]
@@ -81,7 +83,8 @@
           (mapcat
             (fn [dir]
               (let [edn (get collection-edns dir)
-                    effective (acl/resolve-collection-effective-groups dir collection-edns root-read-groups)]
+                    effective (when-not (acl/governing-broken-dir dir collection-edns broken)
+                                (acl/resolve-collection-effective-groups dir collection-edns root-read-groups))]
                 (replace-tx db :collection/path
                             (cond-> {:db/id (tempid dir)
                                      :collection/path dir
