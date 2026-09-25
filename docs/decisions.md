@@ -754,3 +754,25 @@ Spec text (SPEC.md §11–§14, §17 Phase 4) + design
   stored as `"A > B"`); fixed in `b71ab2a`.
 - **Browser check** (`bb browser-check`, Playwright + local Chrome) is
   the "no JS errors" AC; verified to fail when an asset is missing.
+
+
+## 2026-09-25 — frontmatter ACL edits no longer re-embed
+
+Spec text (SPEC.md §7.2 rule 3, T1.4 AC): an ACL change in
+`_collection.edn` **or frontmatter** needs no re-chunking or
+re-embedding. Found by an external spec review: a `read_groups` edit
+changes the file bytes, so the hash check sent it down the full
+re-index path and every chunk of that document was re-embedded.
+
+- `index-doc!` now reuses a chunk's stored vector when the same chunk
+  id already holds the same index-text, and calls `embed-fn` only for
+  the rest (in one call). An ACL-only frontmatter edit embeds nothing;
+  a body edit embeds only the chunks whose text changed.
+- The document is still re-parsed, because the frontmatter line length
+  shifts every chunk's char offsets (the viewer's highlights depend on
+  them), and `:doc/hash`, `:doc/declared-groups`, `:doc/frontmatter`
+  must follow the file.
+- `:doc/content-hash` (sha256 without the frontmatter `read_groups:`
+  line) lets the report count such a file as `acl-updated`. Indexes
+  built before this have no content hash; their first frontmatter edit
+  reports `updated` (still without re-embedding unchanged chunks).

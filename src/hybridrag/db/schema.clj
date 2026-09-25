@@ -53,6 +53,9 @@
    :doc/title {:db/valueType :db.type/string}
    :doc/collection {:db/valueType :db.type/ref}
    :doc/hash {:db/valueType :db.type/string}
+   ; sha256 of the file without its frontmatter read_groups line: equal
+   ; content hashes mean only the ACL changed (SPEC §7.2 rule 3)
+   :doc/content-hash {:db/valueType :db.type/string}
    :doc/tags {:db/valueType :db.type/string
               :db/cardinality :db.cardinality/many}
    :doc/declared-groups {:db/valueType :db.type/string

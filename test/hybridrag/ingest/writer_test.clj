@@ -240,3 +240,36 @@
   (is (nil? (writer/resolve-path-link "a.md" "https://x.y/z.md")))
   (is (nil? (writer/resolve-path-link "a.md" "/abs.md")))
   (is (nil? (writer/resolve-path-link "a.md" "image.png"))))
+
+(deftest test-frontmatter-acl-change-does-not-reembed
+  ;; SPEC §7.2 rule 3: a frontmatter read_groups change is ACL-only too,
+  ;; although it changes the file bytes
+  (seed!)
+  (ingest!)
+  (let [chunks-before (chunk-state "finance/budget.md::0")
+        budget "---\ntitle: 預算\nread_groups: [finance-lead, cfo]\ntags: [money, plan]\n---\n# Budget\n\nbudget numbers. See [[年終獎金]] and [[Missing Page]].\n"]
+    (reset! *embedded* [])
+    (put! "finance/budget.md" budget)
+    (let [rep (ingest!)]
+      (is (= 1 (:acl-updated rep)))
+      (is (= 0 (:updated rep)))
+      (is (empty? @*embedded*))
+      (is (= #{"finance-lead" "cfo"} (groups "finance/budget.md")))
+      (let [after (chunk-state "finance/budget.md::0")]
+        (is (= (:chunk/vec chunks-before) (:chunk/vec after)) "vector reused")
+        (is (= (:chunk/text chunks-before) (:chunk/text after)))
+        (is (= (:chunk/text after) (subs budget (:chunk/char-start after) (:chunk/char-end after)))
+            "offsets follow the longer frontmatter line"))
+      (is (= (writer/sha256-hex (.getBytes budget "UTF-8"))
+             (:doc/hash (d/pull (db) [:doc/hash] [:doc/path "finance/budget.md"])))
+          ":doc/hash follows the file, so the viewer's changed-file notice stays right")
+      (is (= 0 (:acl-updated (ingest!))) "and the next run skips it")))
+  (testing "other frontmatter or body changes still re-index"
+    (reset! *embedded* [])
+    (put! "finance/budget.md" "---\ntitle: 新預算\nread_groups: [finance-lead, cfo]\ntags: [money, plan]\n---\n# Budget\n\nbudget numbers. See [[年終獎金]] and [[Missing Page]].\n")
+    (is (= 1 (:updated (ingest!))))
+    (is (seq @*embedded*))
+    (reset! *embedded* [])
+    (put! "finance/budget.md" "---\ntitle: 新預算\nread_groups: [finance-lead, cfo]\ntags: [money, plan]\n---\n# Budget\n\nnew numbers.\n")
+    (is (= 1 (:updated (ingest!))))
+    (is (seq @*embedded*))))

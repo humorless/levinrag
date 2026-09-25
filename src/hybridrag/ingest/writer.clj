@@ -21,6 +21,16 @@
 (defn sha256-hex [^bytes bs]
   (format "%064x" (BigInteger. 1 (.digest (MessageDigest/getInstance "SHA-256") bs))))
 
+(defn content-hash
+  "sha256 of `text` with the frontmatter `read_groups:` line removed, so a
+   file whose only change is its ACL keeps the same content hash."
+  [^String text]
+  (let [fm (re-find #"(?s)^---\r?\n.*?\r?\n?---" text)
+        stripped (if fm
+                   (str (str/replace fm #"(?m)^read_groups:[^\n]*\n?" "") (subs text (count fm)))
+                   text)]
+    (sha256-hex (.getBytes ^String stripped "UTF-8"))))
+
 (defn- many? [attr]
   (= :db.cardinality/many (get-in schema/index-schema [attr :db/cardinality])))
 
@@ -115,6 +125,7 @@
     {:path rel-path
      :title title
      :hash (:hash file)
+     :content-hash (:content-hash file)
      :collection collection
      :tags (as-strings (:tags frontmatter))
      :declared-groups (as-strings (:read_groups frontmatter))
@@ -161,25 +172,48 @@
            :doc/collection [:collection/path collection]
            :doc/raw-links raw-links
            :doc/ingested-at (java.util.Date.)}
+    (:content-hash doc) (assoc :doc/content-hash (:content-hash doc))
     (seq tags) (assoc :doc/tags tags)
     (seq declared-groups) (assoc :doc/declared-groups declared-groups)
     (seq effective-groups) (assoc :doc/effective-groups effective-groups)
     frontmatter (assoc :doc/frontmatter frontmatter)))
 
+(defn- stored-vecs
+  "chunk id → [index-text vector] for the doc's chunks already indexed."
+  [db doc-path]
+  (into {} (map (fn [[id t v]] [id [t v]]))
+        (d/q (quote [:find ?id ?t ?v :in $ ?p
+                     :where [?d :doc/path ?p] [?c :chunk/doc ?d] [?c :chunk/id ?id]
+                     [?c :chunk/index-text ?t] [?c :chunk/vec ?v]])
+             db doc-path)))
+
+(defn- chunk-vecs
+  "One vector per chunk: reused when the chunk id already holds the same
+   index-text (e.g. an ACL-only frontmatter edit), otherwise embedded —
+   in one embed-fn call for all the new texts."
+  [db path chunks embed-fn]
+  (let [stored (stored-vecs db path)
+        reuse (fn [c] (let [[t v] (stored (:id c))] (when (= t (:index-text c)) v)))
+        todo (vec (remove reuse chunks))
+        fresh (if (seq todo) (embed-fn (mapv :index-text todo)) [])
+        _ (when (not= (count fresh) (count todo))
+            (throw (ex-info "embedding count mismatch"
+                            {:doc path
+                             :chunks (count todo)
+                             :vectors (count fresh)})))
+        by-id (zipmap (map :id todo) fresh)]
+    (mapv #(or (reuse %) (by-id (:id %))) chunks)))
+
 (defn index-doc!
   "Write a built doc in one transaction: upsert the doc, update its
    sections and chunks in place, retract the ones that disappeared.
-   `embed-fn` maps a vector of strings to a vector of float vectors.
-   Returns the number of chunks written."
+   `embed-fn` maps a vector of strings to a vector of float vectors; it is
+   only called for chunks whose index-text changed. Returns the number of
+   chunks written."
   [conn {:keys [path sections chunks]
          :as doc} embed-fn]
-  (let [vecs (if (seq chunks) (embed-fn (mapv :index-text chunks)) [])
-        _ (when (not= (count vecs) (count chunks))
-            (throw (ex-info "embedding count mismatch"
-                            {:doc path
-                             :chunks (count chunks)
-                             :vectors (count vecs)})))
-        db (d/db conn)
+  (let [db (d/db conn)
+        vecs (chunk-vecs db path chunks embed-fn)
         old (children-ids db path)
         gone (concat (set/difference (:chunks old) (set (map :id chunks)))
                      (set/difference (:sections old) (set (map :id sections))))

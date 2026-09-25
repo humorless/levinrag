@@ -15,8 +15,9 @@
   (into {}
         (map (fn [d]
                [(:doc/path d) {:hash (:doc/hash d)
+                               :content-hash (:doc/content-hash d)
                                :groups (set (:doc/effective-groups d))}]))
-        (d/q '[:find [(pull ?d [:doc/path :doc/hash :doc/effective-groups]) ...]
+        (d/q '[:find [(pull ?d [:doc/path :doc/hash :doc/content-hash :doc/effective-groups]) ...]
                :where [?d :doc/path]]
              db)))
 
@@ -38,12 +39,17 @@
            :status :acl-updated})
 
       :else
-      (let [doc (writer/build-doc (assoc file :hash sha)
-                                  (String. ^bytes raw StandardCharsets/UTF_8)
-                                  chunk-config)
+      (let [text (String. ^bytes raw StandardCharsets/UTF_8)
+            chash (writer/content-hash text)
+            doc (writer/build-doc (assoc file :hash sha :content-hash chash) text chunk-config)
+            ;; unchanged chunks keep their vectors, so an edit of only the
+            ;; frontmatter read_groups re-embeds nothing (SPEC §7.2 rule 3)
             n (writer/index-doc! conn doc embed-fn)]
         {:path rel-path
-         :status (if old :updated :added)
+         :status (cond
+                   (not old) :added
+                   (= chash (:content-hash old)) :acl-updated
+                   :else :updated)
          :chunks n
          :max-chunk-tokens (reduce max 0 (map :tokens (:chunks doc)))}))))
 
