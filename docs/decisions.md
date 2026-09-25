@@ -1323,3 +1323,32 @@ User decision:
   graph; the guide now says a tiny semantic-channel difference is
   possible.
 - Not done (user agreed): L9, a guard against demoting the last admin.
+
+## 2026-09-26 — `bb dev:models` / `bb dev:up` / `bb dev:down`
+
+Starting the development environment (e.g. after a reboot) meant retyping
+`lms` / `llama-server` / tmux / export commands scattered over
+VLLM_SETUP.md, CLAUDE.md and a handoff note. User decision (developers are
+mainly on Macs; two commands after a reboot; tmux is fine):
+
+- `bb dev:models` starts the VLLM_SETUP.md Mac recipe — LM Studio for the
+  embed + chat endpoints, llama.cpp `llama-server` (tmux session `rerank`)
+  for rerank — but only for endpoints whose `.env` URL is local, and only
+  what is not already running (`lms ps --json`, HTTP checks). Model names
+  come from `.env`; `LOCAL_CHAT_CONTEXT` (8192) and `LOCAL_RERANK_HF` are
+  new optional variables (`LOCAL_` so they are not mistaken for settings
+  the app reads). Order embed → chat → rerank for a 16 GB Mac. All-remote
+  endpoints: nothing to do, says so. Embed and chat on different ports:
+  an error (one LM Studio server).
+- `bb dev:up` starts `bb serve` (tmux `levinrag`) and the nREPL (tmux
+  `nrepl`, CLAUDE.md's command) if their ports are closed, then runs
+  `bb doctor`. `bb dev:down` stops the three tmux sessions, not LM Studio.
+- Health checks use HTTP/1.1: LM Studio does not answer the default
+  HTTP/2 attempt (found when the first version reported a running LM
+  Studio as down).
+- Not in the repo: starting at login (LM Studio setting, launchd) — personal.
+- Verified on this machine by simulating a reboot (tmux sessions killed,
+  reranker killed, LM Studio models unloaded and server stopped): `bb
+  dev:models` (12.6 s) then `bb dev:up` (28 s) → doctor all OK, real
+  `/ask` answered with a citation, nREPL evaluating; a second run of each
+  starts nothing.

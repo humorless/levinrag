@@ -99,6 +99,19 @@ vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
                     (do (println "\n檢查模型端點（bb vllm:check）：")
                         (clj "-X:vllm-check"))))}
 
+  dev:models {:doc "Start the local model servers (LM Studio + llama.cpp, VLLM_SETUP.md) that are not running"
+              :requires ([replware.levinrag.bb.dev :as dev]
+                         [replware.levinrag.bb.dotenv :as dotenv])
+              :task (dev/run-task (fn [] (dev/models! (merge (dotenv/read-file ".env") (into {} (System/getenv))))))}
+
+  dev:up {:doc "Start the server (bb serve) and the nREPL in tmux if not running, then bb doctor"
+          :requires ([replware.levinrag.bb.dev :as dev])
+          :task (dev/run-task dev/up!)}
+
+  dev:down {:doc "Stop the tmux sessions started by dev:models / dev:up (LM Studio keeps running)"
+            :requires ([replware.levinrag.bb.dev :as dev])
+            :task (dev/run-task dev/down!)}
+
   ingest {:doc "Incrementally ingest CORPUS_DIR into DATA_DIR/index.dtlv"
           :task (clj "-M:jvm-opts -m replware.levinrag.ingest.cli ingest")}
 
