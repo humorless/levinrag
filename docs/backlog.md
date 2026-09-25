@@ -116,8 +116,6 @@ Deferred minors (reviewer-confirmed, not fixed):
 - **Passage text inserted verbatim into `<sources>`**: a document
   containing `</sources>` can re-frame the prompt (indirect prompt
   injection by document authors; no ACL impact). Neutralize the tags.
-- **§18.3 test checks output, not model input**: also assert restricted
-  titles/paths never appear in the `messages` handed to the chat stub.
 
 Set aside by the reviewer, for later phases:
 
