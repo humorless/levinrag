@@ -52,6 +52,8 @@ clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-ext
 
 Production: the uberjar (`bb build` → `target/standalone.jar`) runs with the `:prod` profile on port 80, with `Secure` cookies enabled.
 
+Before the first start, `bb doctor` checks the Java and Clojure versions, `.env`, the required variables, the corpus directory (and PDF / Office files that would not be ingested), every `_collection.edn` (a file ingest cannot read is skipped, and its directory silently inherits the parent's groups), the root's default groups, and finally runs `bb vllm:check`. Each problem comes with a one-line fix; any `[FAIL]` gives a non-zero exit status.
+
 Check the models before starting: `bb vllm:check`. It sends one request to each of the three endpoints, and probes rerank with a 1500-character document. If the reranker's context is set too small, the short-string test passes but the long document gives `[FAIL] rerank-long`; if you leave that unfixed, every query runs in the `rerank_failed` degraded mode.
 
 ## Health

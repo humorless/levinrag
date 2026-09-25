@@ -49,7 +49,7 @@ flowchart LR
 ## 快速開始（本機）
 
 1. 複製設定範本並填入模型端點：`cp .env.example .env`。後面每個 `bb` 指令都會讀 `.env`（shell 裡 export 的變數優先）。完整清單見[維運手冊](docs/howto/ops.zh-TW.md#環境變數)。
-2. 啟動三個模型端點，做法見 [VLLM_SETUP.zh-TW.md](VLLM_SETUP.zh-TW.md)，然後確認：`bb vllm:check`（全部 `[OK]` 才繼續）。
+2. 啟動三個模型端點，做法見 [VLLM_SETUP.zh-TW.md](VLLM_SETUP.zh-TW.md)，然後全面檢查：`bb doctor`（工具、`.env`、語料、權限檔，最後是模型端點；沒有 `[FAIL]` 才繼續）。
 3. 匯入語料：`bb ingest`。
 4. 建立使用者：`bb user:create alice --groups all,hr`，再用 `bb user:passwd alice` 設定密碼（管理者加 `--admin`）。
 5. 啟動 server：`bb serve`（細節見[維運手冊](docs/howto/ops.zh-TW.md#啟動)），開啟 http://localhost:8000 登入。

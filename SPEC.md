@@ -159,7 +159,7 @@ Every request carries `Authorization: Bearer <key>`.
 
 ## 5. Configuration
 
-Server configuration is in `resources/config.edn` (Integrant, aero reader, profiles `:default` / `:test` / `:prod`), with most values coming from environment variables. CLIs that do not start Integrant (`bb ingest`, `bb user:*`, `bb eval`) read the same environment variables directly, with the same defaults (`replware.levinrag.config`). For local runs, the `bb` tasks that run the app (including `bb serve`) also take variables from `.env` in the project directory (template `.env.example`); a variable already set in the shell wins, and a malformed line is an error. The JVM itself never reads `.env`.
+Server configuration is in `resources/config.edn` (Integrant, aero reader, profiles `:default` / `:test` / `:prod`), with most values coming from environment variables. CLIs that do not start Integrant (`bb ingest`, `bb user:*`, `bb eval`) read the same environment variables directly, with the same defaults (`replware.levinrag.config`). For local runs, the `bb` tasks that run the app (including `bb serve`) also take variables from `.env` in the project directory (template `.env.example`); a variable already set in the shell wins, and a malformed line is an error. The JVM itself never reads `.env`. `bb doctor` checks a fresh checkout (tools, settings, corpus, `_collection.edn` files) before running `bb vllm:check`.
 
 | Setting | Env | Default |
 |---|---|---|

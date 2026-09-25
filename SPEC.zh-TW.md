@@ -161,7 +161,7 @@ flowchart LR
 
 ## 5. 設定
 
-伺服器的設定在 `resources/config.edn`（Integrant，aero reader，profile：`:default`／`:test`／`:prod`），值多半來自環境變數。不啟動 Integrant 的 CLI（`bb ingest`、`bb user:*`、`bb eval`）直接讀相同的環境變數，預設值也相同（`replware.levinrag.config`）。本機執行時，會執行應用程式的 `bb` 指令（包括 `bb serve`）也會從專案目錄的 `.env` 取得變數（範本 `.env.example`）；shell 裡已設定的變數優先，格式錯誤的行會報錯。JVM 本身從不讀 `.env`。
+伺服器的設定在 `resources/config.edn`（Integrant，aero reader，profile：`:default`／`:test`／`:prod`），值多半來自環境變數。不啟動 Integrant 的 CLI（`bb ingest`、`bb user:*`、`bb eval`）直接讀相同的環境變數，預設值也相同（`replware.levinrag.config`）。本機執行時，會執行應用程式的 `bb` 指令（包括 `bb serve`）也會從專案目錄的 `.env` 取得變數（範本 `.env.example`）；shell 裡已設定的變數優先，格式錯誤的行會報錯。JVM 本身從不讀 `.env`。`bb doctor` 檢查剛 clone 下來的環境（工具、設定、語料、`_collection.edn`），再執行 `bb vllm:check`。
 
 | 設定 | Env | 預設 |
 |---|---|---|

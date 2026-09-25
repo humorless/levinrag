@@ -53,6 +53,8 @@ clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-ext
 
 正式環境：uberjar（`bb build` → `target/standalone.jar`）以 `:prod` profile 跑在 port 80，並開啟 `Secure` cookie。
 
+第一次啟動前，`bb doctor` 會檢查 Java 與 Clojure 版本、`.env`、必填變數、語料目錄（以及不會被匯入的 PDF／Office 檔）、每個 `_collection.edn`（ingest 讀不懂的檔案會被跳過，該目錄會默默沿用上層的群組）、根目錄的預設群組，最後執行 `bb vllm:check`。每個問題都附一行修正方法；有任何 `[FAIL]` 時以非零狀態碼結束。
+
 啟動前先檢查模型：`bb vllm:check`。它會對三個端點各送一個請求，並且用一份 1500 字的文件探測 rerank。reranker 的 context 設得太小時，短字串測試會通過，但長文件會 `[FAIL] rerank-long`；不處理的話，每一次查詢都會在 `rerank_failed` 的降級狀態下執行。
 
 ## Health

@@ -49,7 +49,7 @@ The full argument (comparison with the frameworks, why Datalevin, scope of appli
 ## Quick start (local)
 
 1. Copy the settings template and fill in the model endpoints: `cp .env.example .env`. Every `bb` task below reads `.env` (variables exported in the shell win). The full list is in the [Operations guide](docs/howto/ops.md#environment-variables).
-2. Start the three model endpoints as described in [VLLM_SETUP.md](VLLM_SETUP.md), then check: `bb vllm:check` (continue only when everything is `[OK]`).
+2. Start the three model endpoints as described in [VLLM_SETUP.md](VLLM_SETUP.md), then check everything: `bb doctor` (tools, `.env`, the corpus, the permissions files, then the model endpoints; continue only when there is no `[FAIL]`).
 3. Ingest the corpus: `bb ingest`.
 4. Create a user: `bb user:create alice --groups all,hr`, then set the password with `bb user:passwd alice` (add `--admin` for an administrator).
 5. Start the server: `bb serve` (details in the [Operations guide](docs/howto/ops.md#starting-the-server)), open http://localhost:8000 and log in.

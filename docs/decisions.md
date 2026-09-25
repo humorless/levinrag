@@ -1031,3 +1031,25 @@ paste a Clojure expression to start the server. Now:
   reads Chinese); `ROOT_READ_GROUPS=all` there so a corpus without
   `_collection.edn` is readable by the `all` group rather than by admins
   only — the unset default is unchanged.
+
+## 2026-09-25 — `bb doctor`
+
+Spec text: n/a (new task).
+
+Actual: `bb doctor` runs in bb (so it works before Clojure is installed)
+and checks the Java (≥ 21) and Clojure CLIs, `.env` and the required chat
+variables, the corpus directory with ingest's skip rules (and counts PDF /
+Office / HTML files that would not be ingested), every `_collection.edn`,
+the root's default groups; with no `[FAIL]` it then runs `bb vllm:check`.
+It does not re-check `VLLM_CHAT_EXTRA_BODY`: `vllm:check` already reports
+invalid JSON clearly.
+
+Found while writing it (not changed here, raised with the user): ingest
+**skips** a `_collection.edn` it cannot read, one that is not a map, or
+one whose key is misspelt (`:read-group`), and that directory inherits its
+parent's groups — fail-open (`hr/` becomes readable by `all`). Frontmatter
+has the same shape of problem: `read_group:` (typo) and an empty
+`read_groups:` fall back to the directory's groups, and `read_groups: hr`
+(no brackets) becomes the characters `h`, `r`. Doctor flags the
+`_collection.edn` cases; frontmatter needs the real parser (JVM), so it is
+left to the ingest fix.

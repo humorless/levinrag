@@ -84,6 +84,21 @@
 vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
             :task (clj "-X:vllm-check")}
 
+  doctor {:doc "Check a fresh checkout: tools, .env, corpus, permissions files, then bb vllm:check"
+          :requires ([replware.levinrag.bb.doctor :as doctor]
+                     [replware.levinrag.bb.dotenv :as dotenv])
+          :task (let [[file-env env-err] (try [(dotenv/read-file ".env")]
+                                              (catch clojure.lang.ExceptionInfo e [{} (ex-message e)]))
+                      results (concat (when env-err [{:level :fail :item ".env" :msg env-err}])
+                                      (doctor/run-checks (merge file-env (into {} (System/getenv)))
+                                                         (.isFile (java.io.File. ".env"))))]
+                  (println (doctor/report results))
+                  (if (doctor/failed? results)
+                    (do (println "\n有 [FAIL] 項目：修正後再執行 bb doctor（模型端點尚未檢查）。")
+                        (System/exit 1))
+                    (do (println "\n檢查模型端點（bb vllm:check）：")
+                        (clj "-X:vllm-check"))))}
+
   ingest {:doc "Incrementally ingest CORPUS_DIR into DATA_DIR/index.dtlv"
           :task (clj "-M:jvm-opts -m replware.levinrag.ingest.cli ingest")}
 
