@@ -1,6 +1,6 @@
 # Backlog
 
-Ideas and out-of-scope improvements noticed while building hybridrag.
+Ideas and out-of-scope improvements noticed while building levinrag.
 Nothing here should be implemented without first promoting it to a
 task in SPEC.md §17. See SPEC.md §20 for the spec author's own backlog.
 
@@ -32,12 +32,6 @@ task in SPEC.md §17. See SPEC.md §20 for the spec author's own backlog.
   This is Phase 1's `search/analyzer.clj` (SPEC §8) first job — start
   from `fulltext.md`'s confirmed registration mechanism, not from
   scratch.
-- **`/api/v1/health`'s DB liveness check is shallow.**
-  `hybridrag.handlers/conn-ok?` only calls `(d/db conn)`, which likely
-  doesn't throw on a closed-but-still-referenced store. Worth confirming
-  during T5.1 whether a damaged/closed store can still report `"ok"` —
-  if so, a trivial query or datom-count would be a real liveness probe
-  instead.
 
 ## From design review (2026-09-24)
 

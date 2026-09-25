@@ -11,17 +11,17 @@
             [clojure.string :as str]
             [datalevin.core :as d]
             [datalevin.udf :as udf]
-            [hybridrag.db.schema :as schema]
-            [hybridrag.eval.harness :as harness]
-            [hybridrag.fixtures :as fx]
-            [hybridrag.ingest.job :as job]
-            [hybridrag.ingest.markdown :as md]
-            [hybridrag.llm.embed :as embed]
-            [hybridrag.llm.rerank-client :as rerank-client]
-            [hybridrag.retrieval.datalevin :as rd]
-            [hybridrag.retrieval.protocol :as p]
-            [hybridrag.search.analyzer :as bigram]
-            [hybridrag.tmp :as tmp])
+            [replware.levinrag.db.schema :as schema]
+            [replware.levinrag.eval.harness :as harness]
+            [replware.levinrag.fixtures :as fx]
+            [replware.levinrag.ingest.job :as job]
+            [replware.levinrag.ingest.markdown :as md]
+            [replware.levinrag.llm.embed :as embed]
+            [replware.levinrag.llm.rerank-client :as rerank-client]
+            [replware.levinrag.retrieval.datalevin :as rd]
+            [replware.levinrag.retrieval.protocol :as p]
+            [replware.levinrag.search.analyzer :as bigram]
+            [replware.levinrag.tmp :as tmp])
   (:import [com.hankcs.hanlp.tokenizer TraditionalChineseTokenizer]
            [java.lang Character$UnicodeScript]))
 

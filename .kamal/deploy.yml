@@ -1,7 +1,7 @@
 <% require "dotenv"; Dotenv.load(".env") %>
 
-service: hybridrag
-image: <%= ENV['REGISTRY_USERNAME'] %>/hybridrag
+service: levinrag
+image: <%= ENV['REGISTRY_USERNAME'] %>/levinrag
 servers:
   - <%= ENV['SERVER_IP'] %>
 

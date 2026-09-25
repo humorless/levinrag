@@ -5,15 +5,15 @@
 
    clojure -M:jvm-opts:test:dev -m browser-server [port]"
   (:require [datalevin.core :as d]
-            [hybridrag.auth.users :as users]
-            [hybridrag.db.index-conn :as index-conn]
-            [hybridrag.db.schema :as schema]
-            [hybridrag.fixtures :as fx]
-            [hybridrag.ingest.job :as job]
-            [hybridrag.ingest.runner :as runner]
-            [hybridrag.retrieval.datalevin :as rd]
-            [hybridrag.server :as server]
-            [hybridrag.tmp :as tmp]
+            [replware.levinrag.auth.users :as users]
+            [replware.levinrag.db.index-conn :as index-conn]
+            [replware.levinrag.db.schema :as schema]
+            [replware.levinrag.fixtures :as fx]
+            [replware.levinrag.ingest.job :as job]
+            [replware.levinrag.ingest.runner :as runner]
+            [replware.levinrag.retrieval.datalevin :as rd]
+            [replware.levinrag.server :as server]
+            [replware.levinrag.tmp :as tmp]
             [ring.adapter.jetty :as jetty]))
 
 (defn -main [& [port]]

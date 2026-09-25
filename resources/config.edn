@@ -1,32 +1,32 @@
 {; the one place data and corpus paths come from (DATA_DIR, CORPUS_DIR,
- ; ROOT_READ_GROUPS; same defaults as hybridrag.config/corpus-config,
+ ; ROOT_READ_GROUPS; same defaults as replware.levinrag.config/corpus-config,
  ; which the CLI tools use)
- :hybridrag.config/paths
+ :replware.levinrag.config/paths
  {:data-dir #profile {:default #or [#env DATA_DIR "data"]
                       :test "data-test"}
   :corpus-dir #or [#env CORPUS_DIR "./corpus"]
   :root-read-groups #or [#env ROOT_READ_GROUPS ""]}
 
- :hybridrag.db.index-conn/index-conn
- {:dir #join [#ref [:hybridrag.config/paths :data-dir] "/index.dtlv"]}
+ :replware.levinrag.db.index-conn/index-conn
+ {:dir #join [#ref [:replware.levinrag.config/paths :data-dir] "/index.dtlv"]}
 
- :hybridrag.db.app-conn/app-conn
- {:dir #join [#ref [:hybridrag.config/paths :data-dir] "/app.dtlv"]}
+ :replware.levinrag.db.app-conn/app-conn
+ {:dir #join [#ref [:replware.levinrag.config/paths :data-dir] "/app.dtlv"]}
 
- :hybridrag.retrieval.system/search
- {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn
+ :replware.levinrag.retrieval.system/search
+ {:index-conn #ig/ref :replware.levinrag.db.index-conn/index-conn
   ; drop reranked passages below this score before the prompt
   ; (docs/spikes/rerank-threshold.md). -7.0 fits llama.cpp raw logits of
   ; bge-reranker-v2-m3; a backend returning 0-1 scores needs its own value.
   :opts {:rerank-min-score #double #or [#env VLLM_RERANK_MIN_SCORE "-7.0"]}}
 
- :hybridrag.ingest.runner/runner
- {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn
-  :data-dir #ref [:hybridrag.config/paths :data-dir]
-  :corpus-dir #ref [:hybridrag.config/paths :corpus-dir]
-  :root-read-groups #ref [:hybridrag.config/paths :root-read-groups]}
+ :replware.levinrag.ingest.runner/runner
+ {:index-conn #ig/ref :replware.levinrag.db.index-conn/index-conn
+  :data-dir #ref [:replware.levinrag.config/paths :data-dir]
+  :corpus-dir #ref [:replware.levinrag.config/paths :corpus-dir]
+  :root-read-groups #ref [:replware.levinrag.config/paths :root-read-groups]}
 
- :hybridrag.server/server
+ :replware.levinrag.server/server
  {:options {:port #profile {:default 8000
                             :prod 80
                             :test #free-port true}
@@ -39,8 +39,8 @@
             :session-max-age-hours #long #or [#env SESSION_MAX_AGE_HOURS "8"]
             :secure-cookies? #profile {:default false
                                        :prod true}}
-  :corpus-dir #ref [:hybridrag.config/paths :corpus-dir]
-  :index-conn #ig/ref :hybridrag.db.index-conn/index-conn
-  :app-conn #ig/ref :hybridrag.db.app-conn/app-conn
-  :search #ig/ref :hybridrag.retrieval.system/search
-  :ingest #ig/ref :hybridrag.ingest.runner/runner}}
+  :corpus-dir #ref [:replware.levinrag.config/paths :corpus-dir]
+  :index-conn #ig/ref :replware.levinrag.db.index-conn/index-conn
+  :app-conn #ig/ref :replware.levinrag.db.app-conn/app-conn
+  :search #ig/ref :replware.levinrag.retrieval.system/search
+  :ingest #ig/ref :replware.levinrag.ingest.runner/runner}}

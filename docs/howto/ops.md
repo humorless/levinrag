@@ -97,8 +97,8 @@ bb kamal setup      # 之後的更新用 bb kamal deploy
 
 ```bash
 J='java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -cp standalone.jar clojure.main -m'
-bb kamal app exec -i "$J hybridrag.auth.cli user:create admin --admin"
-bb kamal app exec -i "$J hybridrag.auth.cli user:passwd admin"
+bb kamal app exec -i "$J replware.levinrag.auth.cli user:create admin --admin"
+bb kamal app exec -i "$J replware.levinrag.auth.cli user:passwd admin"
 # 匯入語料：server 執行中請用 /admin 的按鈕或 POST /api/v1/ingest，不要在容器裡另外執行 ingest
 ```
 

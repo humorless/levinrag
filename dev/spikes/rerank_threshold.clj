@@ -11,13 +11,13 @@
   (:require [clojure.java.io :as io]
             [clojure.pprint :as pprint]
             [datalevin.core :as d]
-            [hybridrag.db.index-conn :as index-conn]
-            [hybridrag.ingest.job :as job]
-            [hybridrag.llm.embed :as embed]
-            [hybridrag.llm.rerank-client :as rerank-client]
-            [hybridrag.retrieval.datalevin :as rd]
-            [hybridrag.retrieval.pipeline :as pipeline]
-            [hybridrag.tmp :as tmp]))
+            [replware.levinrag.db.index-conn :as index-conn]
+            [replware.levinrag.ingest.job :as job]
+            [replware.levinrag.llm.embed :as embed]
+            [replware.levinrag.llm.rerank-client :as rerank-client]
+            [replware.levinrag.retrieval.datalevin :as rd]
+            [replware.levinrag.retrieval.pipeline :as pipeline]
+            [replware.levinrag.tmp :as tmp]))
 
 (def local-models
   {:embed {:base-url "http://localhost:1234/v1"

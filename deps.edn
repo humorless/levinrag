@@ -65,11 +65,11 @@
 
            :build {:deps {io.github.abogoyavlensky/slim {:mvn/version "0.3.2"}}
                    :ns-default slim.app
-                   :exec-args {:main-ns hybridrag.core
+                   :exec-args {:main-ns replware.levinrag.core
                                :src-dirs ["src" "resources" "resources-hashed"]}}
-           :neil {:project {:name hybridrag/hybridrag}}
+           :neil {:project {:name replware/levinrag}}
            :nrepl {:extra-deps {nrepl/nrepl {:mvn/version "1.7.0"}
                                 cider/cider-nrepl {:mvn/version "0.62.2"}
                                 refactor-nrepl/refactor-nrepl {:mvn/version "3.14.0"}}
                    :main-opts ["-m" "nrepl.cmdline" "--interactive" "--color" "--middleware" "[cider.nrepl/cider-middleware,refactor-nrepl.middleware/wrap-refactor]"]}
-                   :vllm-check {:exec-fn hybridrag.llm.check/run-check!}}}
+                   :vllm-check {:exec-fn replware.levinrag.llm.check/run-check!}}}

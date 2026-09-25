@@ -4,7 +4,7 @@
   ACL-filtered lexical query pattern from SPEC.md §9.3.
 
   THROWAWAY SCRIPT — not production code, not covered by clj-kondo/cljfmt
-  CI gates, does not touch `hybridrag.db.schema/app-schema`. Opens its own
+  CI gates, does not touch `replware.levinrag.db.schema/app-schema`. Opens its own
   disposable Datalevin dir under the OS temp dir (never `data/` or
   `data-test/`, which are the real app's dirs).
 
@@ -321,7 +321,7 @@
                              (when-not (str/ends-with?
                                          (System/getProperty "java.io.tmpdir") "/")
                                "/")
-                             "hybridrag-acl-spike-index.dtlv")]
+                             "levinrag-acl-spike-index.dtlv")]
     (println "== T0.5 ACL query perf spike ==")
     (println "env:" (pr-str (env-info)))
     (println "db-dir:" db-dir)

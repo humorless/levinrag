@@ -871,3 +871,21 @@ lifetime and revocation.
   server's DBs as well.
 - CLI tools (`bb ingest`, `bb user:*`, `bb eval`) do not boot Integrant
   and keep `config/corpus-config`, with the same env vars and defaults.
+
+
+## 2026-09-25 — Namespaces renamed `hybridrag.*` → `replware.levinrag.*`
+
+- `src/hybridrag/` → `src/replware/levinrag/`, same for `test/` (git mv,
+  history kept); every `hybridrag.` namespace, Integrant key
+  (`:replware.levinrag.db.index-conn/index-conn`, …), `-m` entry point in
+  `bb.edn`, `deps.edn` main-ns and `dev/` reference follows.
+- Kamal service and image are now `levinrag` (a server that already ran
+  the old `hybridrag` service would get a new container, not an update;
+  nothing has been deployed yet). `manifest.json` name and the Dockerfile
+  source label follow.
+- Stored data is unaffected: no namespaced keyword with the old prefix is
+  written to `index.dtlv` or `app.dtlv` (the `data/` of the walkthrough
+  keeps working without migration).
+- Historical records — this log, `docs/spikes/`, `docs/handoff/`,
+  `docs/superpowers/{plans,specs}/`, `docs/datalevin_debug_notes.md` —
+  keep the old name: they describe the code as it was.

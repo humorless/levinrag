@@ -2,8 +2,6 @@
 
 單一 JVM、嵌入式 Datalevin 的企業 RAG MVP：Markdown／純文字語料 → 詞彙＋語意＋連結圖多路召回 → RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用 `[n]` 的回答。內建 ACL、每次查詢的 trace 與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫。完整規格見 [SPEC.md](SPEC.md)，設計取捨見 [docs/decisions.md](docs/decisions.md)。
 
-> 程式的 namespace 仍沿用產生器給的 `hybridrag.*`。
-
 ## 使用手冊
 
 - [維運手冊](docs/howto/ops.md)：部署、環境變數、health、備份、評估。
