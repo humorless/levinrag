@@ -1352,3 +1352,13 @@ mainly on Macs; two commands after a reboot; tmux is fine):
   dev:models` (12.6 s) then `bb dev:up` (28 s) → doctor all OK, real
   `/ask` answered with a citation, nREPL evaluating; a second run of each
   starts nothing.
+
+## 2026-09-26 — bb.edn cleanup
+
+User question: is `clj-repl` used? No — a project-template leftover (a
+plain terminal REPL); development uses the nREPL (CLAUDE.md, `bb dev:up`).
+Removed. `bb check` depended on `fmt` (rewrites files); it now depends on
+`fmt-check`, i.e. runs what CI runs and changes nothing. Kept on purpose:
+`css-watch` (the only way to rebuild CSS while editing Tailwind classes;
+`bb serve` builds it only when missing), `outdated` (manual upgrade;
+commonmark excluded), `fetch-assets`, the `:enter` banner.
