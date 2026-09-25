@@ -26,7 +26,7 @@ builder:
 
 env:
   clear:
-    # WORKDIR is /app; config.edn opens data/index.dtlv and data/app.dtlv
+    # config.edn opens DATA_DIR/index.dtlv and DATA_DIR/app.dtlv (the volume below)
     DATA_DIR: /app/data
     CORPUS_DIR: /app/corpus
   secret:

@@ -12,10 +12,15 @@
 
 ## 快速開始（本機）
 
-1. 啟動三個模型端點，做法見 [VLLM_SETUP.md](VLLM_SETUP.md)，然後確認：`bb vllm:check`（全部 `[OK]` 才繼續）。
-2. 匯入語料：`CORPUS_DIR=corpus-sample bb ingest`。
-3. 建立使用者：`bb user:create alice --groups all,hr`，再用 `bb user:passwd alice` 設定密碼（管理者加 `--admin`）。
-4. 啟動 server（完整的環境變數見[維運手冊](docs/howto/ops.md#環境變數)），開啟 http://localhost:8000 登入。
+1. 在同一個 shell 設定環境變數，後面每一步（包括 server）都要用到。完整清單見[維運手冊](docs/howto/ops.md#環境變數)。
+   ```bash
+   export DATA_DIR=./data CORPUS_DIR=corpus-sample VLLM_API_KEY=...
+   export VLLM_EMBED_BASE_URL=... VLLM_RERANK_BASE_URL=... VLLM_CHAT_BASE_URL=... VLLM_CHAT_MODEL=...
+   ```
+2. 啟動三個模型端點，做法見 [VLLM_SETUP.md](VLLM_SETUP.md)，然後確認：`bb vllm:check`（全部 `[OK]` 才繼續）。
+3. 匯入語料：`bb ingest`。
+4. 建立使用者：`bb user:create alice --groups all,hr`，再用 `bb user:passwd alice` 設定密碼（管理者加 `--admin`）。
+5. 在同一個 shell 啟動 server（指令見[維運手冊](docs/howto/ops.md#啟動)），開啟 http://localhost:8000 登入。server 需要同一個 `CORPUS_DIR` 才能在文件檢視頁顯示原文。
 
 ## 文件權限規則（ACL）
 

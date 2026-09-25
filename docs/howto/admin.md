@@ -86,7 +86,7 @@ unresolved links: 0, index lag: 0, elapsed: 7336 ms
 
 ## Trace（查詢紀錄）
 
-每一次 `/search` 和 `/ask`，包含失敗的請求，都會寫入一筆 trace，存放在 `app.dtlv`。
+每一次 `/search` 和 `/ask` 都會寫入一筆 trace，存放在 `app.dtlv`。因模型端點失敗而回 503 的請求也會留下一筆（記錄哪個端點失敗）；輸入格式錯誤（400）或程式錯誤（500）則不會。
 
 - 網頁：「管理」頁列出最近 50 筆（時間、使用者、類型、查詢），點進去可以看各階段的內容：各通道的排名、RRF、rerank 分數、使用的 prompt 規模，以及降級與錯誤資訊。
 - API：`GET /api/v1/traces/<id>`。只有 admin 或該 trace 的擁有者看得到，其他人一律得到 404。

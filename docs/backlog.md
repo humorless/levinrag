@@ -159,19 +159,10 @@ Set aside by the reviewer:
     threshold sweep: a better semantic match should also raise answer
     rerank scores and allow a tighter `rerank-min-score`.
 
-## From Phase 5 review (2026-09-25)
+## After Phase 5 (2026-09-25)
 
-Deferred minors (reviewer findings, not fixed):
-
-- **Docs**: admin.md says every request "including failures" writes a
-  trace (only dependency failures do; 500s do not); the ops.md backup
-  one-liner hard-codes `data/app.dtlv` and has no in-container variant
-  (no `clojure` in the runtime image); the `.kamal/deploy.yml` comment
-  about `data/index.dtlv` is stale; README quick start sets
-  `CORPUS_DIR=corpus-sample` only for `bb ingest`, so a server started
-  without it cannot show source files.
-
-Still open from the handoff:
+The Phase 5 review's deferred minors were fixed afterwards. Still open
+from the handoff:
 
 - `/login` rate limiting (user decision: not in Phase 5).
 - SSE streaming for `/ask` (T5.4, deferred).

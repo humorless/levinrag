@@ -112,11 +112,19 @@ curl -s https://$APP_DOMAIN/api/v1/health | jq
 
 只需要備份 `DATA_DIR/app.dtlv`。index 可以從語料重建，語料則由你們自己的版本控制或備份負責。
 
-線上熱備份（server 不需要停機；Datalevin 允許多個 process 同時讀取。本機已驗證：備份期間服務持續回應，備份檔可以正常開啟）：
+線上熱備份：server 不需要停機，因為 Datalevin 允許多個 process 同時讀取。本機已驗證：備份期間服務持續回應，備份檔可以正常開啟。下面的指令會讀取 `DATA_DIR`，並把備份寫到 `DATA_DIR/backups/app-<日期>`。
 
 ```bash
-clojure -M:jvm-opts -e "(require '[datalevin.core :as d]) (let [c (d/get-conn \"data/app.dtlv\")] (d/copy (d/db c) \"backup/app-$(date +%F)\" true) (d/close c)) (shutdown-agents)"
+BACKUP='(require (quote [datalevin.core :as d])) (let [dir (or (System/getenv "DATA_DIR") "data") c (d/get-conn (str dir "/app.dtlv"))] (d/copy (d/db c) (str dir "/backups/app-" (java.time.LocalDate/now)) true) (d/close c)) (shutdown-agents)'
+
+# 本機（專案目錄）
+clojure -M:jvm-opts -e "$BACKUP"
+
+# 正式環境容器內（沒有 clojure，改用 uberjar；備份會落在 volume 上的 /root/levinrag/data/backups）
+bb kamal app exec "java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -cp standalone.jar clojure.main -e '$BACKUP'"
 ```
+
+備份目錄仍在同一台機器上，請再另外複製到別處。uberjar 版本的指令已在本機驗證；透過 `kamal app exec` 執行的部分，與其他 Kamal 步驟一樣尚未在實機驗證。
 
 還原：停止 server，用備份目錄取代 `DATA_DIR/app.dtlv`，再啟動 server。
 
