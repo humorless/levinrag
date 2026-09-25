@@ -1,6 +1,8 @@
 (ns hybridrag.config-test
   (:require [clojure.test :refer [deftest is]]
             [hybridrag.config :as config]
+            [hybridrag.retrieval.system]
+            [integrant.core :as ig]
             [integrant-extras.core :as ig-extras]))
 
 (defn- with-env [m f]
@@ -50,3 +52,17 @@
   (is (= [] (config/split-groups "")))
   (is (= [] (config/split-groups nil)))
   (is (= ["all" "hr"] (config/split-groups " all, hr ,"))))
+
+(deftest test-extra-body-must-be-an-object
+  (with-env {"VLLM_CHAT_EXTRA_BODY" "[1,2]"}
+    #(is (thrown-with-msg? clojure.lang.ExceptionInfo #"VLLM_CHAT_EXTRA_BODY" (config/chat-config)))))
+
+(deftest test-search-init-fails-on-bad-extra-body
+  ;; at startup, not on every /ask
+  (with-env {"VLLM_CHAT_EXTRA_BODY" "not json"}
+    #(is (thrown-with-msg? clojure.lang.ExceptionInfo #"VLLM_CHAT_EXTRA_BODY"
+                           (ig/init-key :hybridrag.retrieval.system/search {:index-conn nil
+                                                                            :opts {}}))))
+  (with-env {}
+    #(is (fn? (:chat-fn (ig/init-key :hybridrag.retrieval.system/search {:index-conn nil
+                                                                         :opts {}}))))))

@@ -106,11 +106,6 @@ Deferred minors (reviewer-confirmed, not fixed):
 
 - **Citation ranges** (`[1-3]`) are not recognized (full-width digits are,
   since Phase 5).
-- **Invalid or non-object `VLLM_CHAT_EXTRA_BODY`** → 500 on every `/ask`.
-  Validate `map?` and fail at `ig/init-key` instead.
-- **Passage text inserted verbatim into `<sources>`**: a document
-  containing `</sources>` can re-frame the prompt (indirect prompt
-  injection by document authors; no ACL impact). Neutralize the tags.
 
 Set aside by the reviewer, for later phases:
 

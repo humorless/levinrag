@@ -24,12 +24,16 @@
    :api-key (or (env "VLLM_RERANK_API_KEY") (env "VLLM_API_KEY"))})
 
 (defn- json-env
-  "Env var holding a JSON object, parsed with keyword keys; nil if unset."
+  "Env var holding a JSON object, parsed with keyword keys; nil if unset.
+   Anything else (bad JSON, an array, a string) throws."
   [k]
   (when-let [s (env k)]
-    (try (json/read-value s json/keyword-keys-object-mapper)
-         (catch Exception e
-           (throw (ex-info (str k " is not valid JSON") {:env k} e))))))
+    (let [v (try (json/read-value s json/keyword-keys-object-mapper)
+                 (catch Exception e
+                   (throw (ex-info (str k " is not valid JSON") {:env k} e))))]
+      (when-not (map? v)
+        (throw (ex-info (str k " must be a JSON object") {:env k})))
+      v)))
 
 (defn chat-config []
   {:base-url (env "VLLM_CHAT_BASE_URL")

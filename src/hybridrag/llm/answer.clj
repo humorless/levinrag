@@ -58,6 +58,13 @@
      :cited (vec (sort (distinct (filter valid? found))))
      :invalid (vec (sort (distinct (remove valid? found))))}))
 
+(defn- neutralize
+  "Document text with <sources>/</sources> turned into full-width
+   brackets, so a document cannot close the sources block and address the
+   model as the user (indirect prompt injection)."
+  [s]
+  (str/replace (str s) #"(?i)<(/?sources)>" "＜$1＞"))
+
 (defn messages
   "Chat messages: the system prompt, then <sources> (each passage headed
    `[n] 文件標題｜章節`) and the question (SPEC.md §10.1)."
@@ -67,7 +74,8 @@
    {:role "user"
     :content (str "<sources>\n"
                   (str/join "\n\n" (for [{:keys [n text] :as p} passages]
-                                     (str "[" n "] " (:doc/title p) "｜" (:section/trail p) "\n" text)))
+                                     (str "[" n "] " (neutralize (:doc/title p)) "｜" (neutralize (:section/trail p))
+                                          "\n" (neutralize text))))
                   "\n</sources>\n\n問題：" query)}])
 
 (def ^:private not-found-re #"找不到|查無|沒有相關|(?i)not found|no relevant|cannot find")

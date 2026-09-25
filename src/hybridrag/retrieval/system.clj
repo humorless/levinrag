@@ -22,6 +22,9 @@
 
 (defmethod ig/init-key ::search
   [_ {:keys [index-conn opts]}]
+  ;; fail at startup on a bad VLLM_CHAT_EXTRA_BODY instead of on every
+  ;; /ask (chat-fn still reads the config per call)
+  (config/chat-config)
   (let [embed-fn #(embed/embed-all! (config/embed-config) % 32)]
     {:retriever (rd/retriever index-conn embed-fn)
      :embed-fn embed-fn
