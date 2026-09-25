@@ -7,14 +7,18 @@
    response holds only docs the user may read (which covers context
    expansion neighbours). Each probe query is first run as admin and
    must find the doc, so a check cannot pass because the query misses."
-  (:require [clojure.string :as str]
+  (:require [clojure.java.io :as io]
+            [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
             [replware.levinrag.auth.token :as token]
             [replware.levinrag.eval.harness :as harness]
+            [replware.levinrag.db.index-conn :as index-conn]
             [replware.levinrag.fixtures :as fx]
+            [replware.levinrag.ingest.job :as job]
             [replware.levinrag.retrieval.datalevin :as rd]
             [replware.levinrag.retrieval.pipeline :as pipeline]
+            [replware.levinrag.tmp :as tmp]
             [replware.levinrag.web-client :as wc]
             [replware.levinrag.web-fixtures :as wf]
             [jsonista.core :as json]))
@@ -236,3 +240,48 @@
         (is (not-any? #{"acl-starvation"} (get-in own [:stages :flags])))
         (testing "negative control: the admin view of the same trace has the counts"
           (is (seq (pre-acl (:body (api h (tok "admin") :get (str "/api/v1/traces/" id) nil))))))))))
+
+(deftest test-broken-acl-settings-fail-closed
+  ;; SPEC.md §7.2 rule 5: a permissions setting that cannot be applied as
+  ;; written keeps the doc out of the index instead of falling back to the
+  ;; directory's (wider) groups; a doc already indexed is removed.
+  (let [dir (tmp/dir "acl-fail-closed")
+        idx (tmp/dir "acl-fail-closed-index")
+        conn (index-conn/open idx fx/dims)
+        put! (fn [p text] (io/make-parents (io/file dir p)) (spit (io/file dir p) text))
+        ingest! #(job/ingest! conn {:corpus-dir dir :embed-fn fx/hash-embed})
+        indexed #(set (keys (fx/doc-groups conn)))
+        error-paths (fn [rep] (set (map :path (:errors rep))))]
+    (try
+      (put! "_collection.edn" "{:read-groups [\"all\"]}")
+      (put! "public/a.md" "# 公告\n\n大家都能讀。")
+      (put! "hr/_collection.edn" "{:read-groups [\"hr\"]}")
+      (put! "hr/leave.md" "# 請假\n\n特休規則。")
+      (put! "hr/sub/deep.md" "# 深層\n\n人資內部。")
+      (put! "fm/ok.md" "---\nread_groups: [hr]\n---\n# ok\n\nx")
+      (put! "fm/typo.md" "---\nread_group: [hr]\n---\n# typo\n\nx")
+      (put! "fm/multiline.md" "---\nread_groups:\n  - hr\n---\n# multi\n\nx")
+      (put! "fm/bare.md" "---\nread_groups: hr\n---\n# bare\n\nx")
+      (testing "broken frontmatter: those docs are errors and are not indexed"
+        (let [rep (ingest!)]
+          (is (= #{"fm/typo.md" "fm/multiline.md" "fm/bare.md"} (error-paths rep)))
+          (is (= #{"public/a.md" "hr/leave.md" "hr/sub/deep.md" "fm/ok.md"} (indexed)))
+          (is (= #{"hr"} (get (fx/doc-groups conn) "hr/leave.md")))))
+      (testing "breaking hr/_collection.edn removes its docs instead of widening them to `all`"
+        (put! "hr/_collection.edn" "{:read-group [\"hr\"]}")
+        (let [rep (ingest!)]
+          (is (= #{"hr/leave.md" "hr/sub/deep.md" "fm/typo.md" "fm/multiline.md" "fm/bare.md"}
+                 (error-paths rep)))
+          (is (every? #(re-find #"hr/_collection\.edn" (:error %))
+                      (filter #(str/starts-with? (:path %) "hr/") (:errors rep))))
+          (is (= #{"public/a.md" "fm/ok.md"} (indexed)))
+          (is (not-any? #(str/starts-with? % "hr/")
+                        (map :doc/path (d/pull-many (d/db conn) [:doc/path]
+                                                    (vec (rd/accessible-doc-ids (d/db conn) #{"all"})))))
+              "an `all` user can reach no hr doc")))
+      (testing "fixing it brings the docs back with the declared groups"
+        (put! "hr/_collection.edn" "{:read-groups [\"hr\"]}")
+        (ingest!)
+        (is (= #{"hr"} (get (fx/doc-groups conn) "hr/leave.md")))
+        (is (= #{"hr"} (get (fx/doc-groups conn) "hr/sub/deep.md"))))
+      (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))

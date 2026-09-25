@@ -7,7 +7,8 @@
    - walk-corpus: full pipeline with ACL resolution"
   (:require [clojure.java.io :as io]
             [clojure.test :refer :all]
-            [replware.levinrag.ingest.walker :as walker]))
+            [replware.levinrag.ingest.walker :as walker]
+            [replware.levinrag.tmp :as tmp]))
 
 ;; --- Extension filtering ---
 
@@ -174,3 +175,51 @@
         (doseq [f (reverse (file-seq tmp-dir))]
           (.delete f))))))
 
+
+;; --- broken permissions files (fail closed) ---
+
+(defn- with-tree [files f]
+  (let [dir (tmp/dir "walker-acl")]
+    (try
+      (doseq [[p text] files]
+        (io/make-parents (io/file dir p))
+        (spit (io/file dir p) text))
+      (f dir)
+      (finally (tmp/delete-tree! dir)))))
+
+(deftest test-scan-collection-edns-reports-broken-files
+  (doseq [[label text] [["unreadable" "{:read-groups [\"hr]}"]
+                        ["not a map" "[\"hr\"]"]
+                        ["unknown key" "{:read-group [\"hr\"]}"]
+                        ["overrides are not applied by ingest" "{:read-groups [\"hr\"] :acl-overrides []}"]
+                        ["groups not strings" "{:read-groups [hr]}"]
+                        ["groups not a list" "{:read-groups \"hr\"}"]]]
+    (with-tree {"_collection.edn" "{:read-groups [\"all\"]}" "hr/_collection.edn" text}
+      (fn [dir]
+        (let [{:keys [edns broken]} (walker/scan-collection-edns dir)]
+          (is (= {"" {:read-groups ["all"]}} edns) label)
+          (is (= #{"hr"} (set (keys broken))) label)
+          (is (string? (get broken "hr")) label)
+          (is (= edns (walker/find-collection-edns dir)) "find-collection-edns returns only valid files"))))))
+
+(deftest test-walk-corpus-marks-docs-under-a-broken-collection
+  (with-tree {"_collection.edn" "{:read-groups [\"all\"]}"
+              "a.md" "# a"
+              "hr/_collection.edn" "{:read-group [\"hr\"]}"
+              "hr/leave.md" "# leave"
+              "hr/sub/_collection.edn" "{:name \"only a name\"}"
+              "hr/sub/deep.md" "# deep"
+              "hr/lead/_collection.edn" "{:read-groups [\"hr-lead\"]}"
+              "hr/lead/x.md" "# x"
+              "fm/typo.md" "---\nread_group: [hr]\n---\n# t"}
+    (fn [dir]
+      (let [{:keys [edns broken]} (walker/scan-collection-edns dir)
+            by-path (into {} (map (juxt :rel-path identity)) (walker/walk-corpus dir edns ["all"] broken))]
+        (is (nil? (:acl-error (by-path "a.md"))))
+        (is (re-find #"hr/_collection\.edn" (str (:acl-error (by-path "hr/leave.md")))))
+        (is (re-find #"hr/_collection\.edn" (str (:acl-error (by-path "hr/sub/deep.md"))))
+            "a nearer file without :read-groups does not hide the broken one")
+        (is (nil? (:acl-error (by-path "hr/lead/x.md")))
+            "a nearer valid :read-groups decides; the broken parent does not matter")
+        (is (= ["hr-lead"] (:effective-groups (by-path "hr/lead/x.md"))))
+        (is (re-find #"read_group" (str (:acl-error (by-path "fm/typo.md")))))))))

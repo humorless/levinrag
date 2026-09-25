@@ -66,15 +66,24 @@
               index-timeout-ms 60000}
          :as opts}]
   (let [t0 (System/nanoTime)
-        edns (or (walker/find-collection-edns corpus-dir) {})
-        files (walker/walk-corpus corpus-dir edns root-read-groups)
+        {:keys [edns broken]} (walker/scan-collection-edns corpus-dir)
+        files (walker/walk-corpus corpus-dir edns root-read-groups broken)
         on-disk (set (map :rel-path files))
         _ (writer/upsert-collections! conn (writer/collection-dirs on-disk edns) edns root-read-groups)
         indexed (indexed-docs (d/db conn))
         opts (assoc opts :chunk-config chunk-config)
-        results (mapv (fn [file]
+        results (mapv (fn [{:keys [rel-path acl-error] :as file}]
                         (try
-                          (ingest-file! conn indexed file opts)
+                          (if acl-error
+                            ;; fail closed (SPEC.md §7.2 rule 5): never index
+                            ;; it with a guess, and drop a copy indexed earlier
+                            (do (when (contains? indexed rel-path) (writer/delete-doc! conn rel-path))
+                                {:path rel-path
+                                 :status :error
+                                 :error (str "權限設定錯誤，未匯入"
+                                             (when (contains? indexed rel-path) "（已從索引移除）")
+                                             "：" acl-error)})
+                            (ingest-file! conn indexed file opts))
                           (catch Exception e
                             (log/error e "[INGEST] failed:" (:rel-path file))
                             {:path (:rel-path file)

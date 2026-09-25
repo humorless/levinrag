@@ -1053,3 +1053,32 @@ has the same shape of problem: `read_group:` (typo) and an empty
 (no brackets) becomes the characters `h`, `r`. Doctor flags the
 `_collection.edn` cases; frontmatter needs the real parser (JVM), so it is
 left to the ingest fix.
+
+## 2026-09-25 — Broken permissions settings fail closed (SPEC §7.2 rule 5)
+
+Spec text: §7.2 rules 1–4 said what a declaration means, not what happens
+when one cannot be read.
+
+Actual (verified in the REPL): ingest skipped a `_collection.edn` it could
+not parse, and read one that was not a map, or had a misspelt key, as
+"no declaration", so the directory inherited its parent's groups —
+`hr/` with `{:read-group ["hr"]}` under a root of `["all"]` became
+readable by `all`. In frontmatter, `read_group:` (typo), `read_groups:`
+with nothing after the colon, and a YAML block list were all dropped by
+the parser, so the doc took its directory's groups; `read_groups: hr`
+became the characters `h`, `r`.
+
+Decision (user, 2026-09-25): fail closed. Such a doc is not indexed, an
+earlier copy is removed, and it is listed in the report's `errors` with
+the reason. A broken `_collection.edn` affects every doc it would govern:
+walking up from the doc, the first directory with a broken file or with
+`:read-groups` decides (a nearer file with only `:name` does not hide a
+broken parent). Unknown `_collection.edn` keys are rejected, including
+`:acl-overrides`: `ingest.acl` has it but ingest never applied it, so it
+was being silently ignored. Frontmatter look-alikes of `read_groups` are
+matched after lower-casing and removing `_`, `-` and spaces
+(`readgroups`, `readgroup`); other frontmatter fields stay free-form.
+§18.3 test: `security-test/test-broken-acl-settings-fail-closed`.
+
+`bb doctor` keeps its own copy of the `_collection.edn` check (it runs in
+bb, before Clojure is installed), so a broken file is caught before ingest.

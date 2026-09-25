@@ -61,7 +61,8 @@ flowchart LR
 1. **目錄**：往上找最近一個有宣告 `:read-groups` 的 `_collection.edn`（含自己）；都沒有就用 `ROOT_READ_GROUPS`。
 2. **文件**：frontmatter 有 `read_groups` 時**只用它——覆寫，不是聯集**。例如目錄是 `["hr"]`、文件寫 `read_groups: ["all"]`，結果是只有 `all` 可讀，`hr` 不會被加回去。
 3. 群組為空 `[]` 表示除 admin 外沒有人可讀。
-4. 看不到的文件一律回 404（不回 403），不透露是否存在。
+4. 無法照字面套用的權限設定（壞掉的 `_collection.edn`、拼錯或格式不對的 `read_groups`）會讓受影響的文件不進索引，並列在匯入報告的錯誤中；絕不退回較寬的設定。
+5. 看不到的文件一律回 404（不回 403），不透露是否存在。
 
 設定方式見[管理者手冊](docs/howto/admin.zh-TW.md#文件權限)。
 

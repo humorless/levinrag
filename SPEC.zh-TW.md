@@ -258,6 +258,7 @@ corpus/
 2. 文件的 effective groups：frontmatter 有 `read_groups` 時**只用它（覆寫，不是聯集）**；否則等於所屬目錄的 effective groups。
 3. 只改 `_collection.edn` 或 frontmatter 的 `read_groups` 時，**不重新計算 embedding**：chunk 的文字沒變，就沿用已存的向量。frontmatter 的變動會改變字元位移，所以文件仍然會重新解析（2026-09-25）。報告中計為 `acl-updated`。
 4. 空集合 `[]` 表示除 admin 外沒有人可讀。
+5. **無法照字面套用的設定一律收緊**（2026-09-25）：該文件不匯入（先前已匯入的會從索引移除），並列在報告的 `errors`；絕不退回目錄的群組。涵蓋：`_collection.edn` 無法解析、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單——它所管轄的每一份文件（直到下層下一個有效宣告為止）都受影響；以及 frontmatter 的 `read_groups` 不是清單（`read_groups: hr`）、該行沒有值（包括 YAML 多行清單），或拼錯（`read_group`、`read-groups`、`Read_Groups`、`readgroups`）。
 
 ### 7.3 Markdown 解析與切塊
 

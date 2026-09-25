@@ -139,6 +139,37 @@
       {}
       (str/split-lines body))))
 
+(defn- acl-key?
+  "True for read_groups and its likely misspellings (read-groups,
+   Read_Groups, read_group, readgroups)."
+  [k]
+  (contains? #{"readgroups" "readgroup"} (str/replace (str/lower-case k) #"[\s_-]" "")))
+
+(defn frontmatter-acl-problem
+  "Why the frontmatter's read_groups would not be applied as written, or
+   nil (SPEC.md §7.2 rule 5). parse-frontmatter drops a key with nothing
+   after the colon (so a YAML block list is lost), keeps a bare word as a
+   string, and a misspelt key is just another field: each would silently
+   give the doc its directory's groups instead."
+  [^String md]
+  (when-let [[_ body] (re-find #"(?s)^---\r?\n(.*?)\r?\n?---" md)]
+    (let [v (get (parse-frontmatter md) :read_groups ::missing)]
+      (some (fn [line]
+              (when-let [[_ k raw] (re-find #"^\s*([^:#]+?)\s*:(.*)$" line)]
+                (when (acl-key? k)
+                  (cond
+                    (not= "read_groups" k)
+                    (str "frontmatter 的 `" k "` 應寫成 `read_groups`")
+
+                    (= ::missing v)
+                    (str "frontmatter 的 `read_groups` 沒有值或格式不對（冒號後要有空白，"
+                         "不支援 YAML 多行清單），請寫成 read_groups: [hr, all]")
+
+                    (not (and (sequential? v) (every? string? v)))
+                    (str "frontmatter 的 `read_groups` 必須是清單，例如 read_groups: [hr, all]；目前是 "
+                         (str/trim raw))))))
+            (str/split-lines body)))))
+
 ;; --- Links (SPEC.md §7.5) ---
 
 (defn- node-seq [^Node n]

@@ -256,6 +256,7 @@ Accepted extensions: `.md`, `.markdown`, `.txt`. Files and directories starting 
 2. A document's effective groups: when the frontmatter has `read_groups`, **use only that (override, not union)**; otherwise they equal the effective groups of its directory.
 3. When only `_collection.edn` or the frontmatter `read_groups` changes, **embeddings are not recomputed**: the chunk text has not changed, so the stored vectors are reused. A frontmatter change shifts character offsets, so the document is still re-parsed (2026-09-25). The report counts it as `acl-updated`.
 4. The empty set `[]` means no one except admins can read.
+5. **A setting that cannot be applied as written fails closed** (2026-09-25): the document is not indexed (a copy indexed earlier is removed) and appears in the report's `errors`; it never falls back to the directory's groups. This covers a `_collection.edn` that cannot be parsed, is not a map, has a key other than `:name` / `:read-groups`, or whose `:read-groups` is not a list of strings — every document it would govern (up to the next valid declaration below it) is affected — and a frontmatter `read_groups` that is not a list (`read_groups: hr`), has no value on its line (including a YAML block list), or is misspelt (`read_group`, `read-groups`, `Read_Groups`, `readgroups`).
 
 ### 7.3 Markdown parsing and chunking
 

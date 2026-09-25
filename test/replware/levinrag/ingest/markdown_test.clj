@@ -126,3 +126,22 @@ Content"
     (is (= {:paths ["../hr/leave.md#x" "https://x.y" "t.md"]
             :wiki ["請假規定" "Page" "Cell"]}
            (:links (md/parse-markdown s))))))
+
+(deftest test-frontmatter-acl-problem
+  (let [fm #(str "---\ntitle: x\n" % "\n---\n# x\nbody")]
+    (testing "valid or absent read_groups"
+      (doseq [ok ["read_groups: [hr]" "read_groups: [hr, all]" "read_groups: [\"hr\"]"
+                  "read_groups: []" "tags: [a]"]]
+        (is (nil? (md/frontmatter-acl-problem (fm ok))) ok))
+      (is (nil? (md/frontmatter-acl-problem "# no frontmatter"))))
+    (testing "anything that would not be applied as written is a problem, never a fallback
+              to the directory's groups"
+      (doseq [[bad expect] [["read_groups: hr" #"清單"]
+                            ["read_groups: [hr, 1]" #"清單"]
+                            ["read_groups:" #"沒有值"]
+                            ["read_groups:\n  - hr" #"沒有值"]
+                            ["read_group: [hr]" #"read_group"]
+                            ["read-groups: [hr]" #"read-groups"]
+                            ["Read_Groups: [hr]" #"Read_Groups"]
+                            ["readgroups: [hr]" #"readgroups"]]]
+        (is (re-find expect (str (md/frontmatter-acl-problem (fm bad)))) bad)))))

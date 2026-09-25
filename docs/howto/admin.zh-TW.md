@@ -64,7 +64,10 @@ read_groups: [all]
 
 - 這份文件放在 `hr/announcements/` 下，但只要寫了 `read_groups`，就**只用它**。這是**覆寫，不是聯集**：結果是 `all` 可讀，`hr` 群組不會因為目錄設定而被加回來（`hr` 成員本身若也在 `all` 裡，就讀得到）。
 - `read_groups: []` 表示除 admin 外沒有人可讀。
+- 清單要寫在同一行：`read_groups: [hr, all]`。YAML 多行清單（`read_groups:` 下面接 `- hr`）、單一個字（`read_groups: hr`）或拼錯的 key（`read_group`、`read-groups`）都會讓該文件在匯入時報錯。
 - 檔名或目錄名以 `.` 或 `_` 開頭的會被忽略；可以用 `_drafts/` 放尚未公開的草稿。
+
+**寫錯時一律收緊。** `_collection.edn` 無法解析、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單，以及 frontmatter 的 `read_groups` 格式不對時，受影響的文件不會進索引（先前已匯入的會被移除）。它們會連同原因列在匯入報告的 `errors`；修正檔案後再匯入一次即可。`bb doctor` 會在匯入前先檢查 `_collection.edn`。
 
 只改權限、不改內文時，重新匯入不會重新計算 embedding，速度很快；報告中這類文件計為 `acl-updated`。
 

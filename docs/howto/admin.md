@@ -63,7 +63,10 @@ read_groups: [all]
 
 - This document sits under `hr/announcements/`, but because it declares `read_groups`, **only that is used**. It is an **override, not a union**: the result is that `all` can read it, and the `hr` group is not added back by the directory setting (`hr` members who are also in `all` can read it).
 - `read_groups: []` means no one except admins can read it.
+- Write the list on one line: `read_groups: [hr, all]`. A YAML block list (`read_groups:` followed by `- hr` lines), a bare word (`read_groups: hr`) or a misspelt key (`read_group`, `read-groups`) is an ingest error for that document.
 - Files or directories whose names start with `.` or `_` are ignored; you can use `_drafts/` for drafts that are not yet public.
+
+**Mistakes fail closed.** A `_collection.edn` that cannot be parsed, is not a map, has a key other than `:name` / `:read-groups`, or whose `:read-groups` is not a list of strings, and a malformed frontmatter `read_groups`, keep the affected documents out of the index (a copy indexed earlier is removed). They are listed under `errors` in the ingest report with the reason; fix the file and ingest again. `bb doctor` checks the `_collection.edn` files before you ingest.
 
 When only permissions change and the content does not, a re-ingest does not recompute embeddings, so it is fast; the report counts such documents as `acl-updated`.
 

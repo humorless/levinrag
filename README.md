@@ -61,7 +61,8 @@ Permissions are computed at ingest time and written into the index; queries only
 1. **Directory**: walk up to the nearest `_collection.edn` (including the directory itself) that declares `:read-groups`; if there is none, use `ROOT_READ_GROUPS`.
 2. **Document**: when the frontmatter has `read_groups`, **only that is used: it overrides, it is not a union**. For example, if the directory is `["hr"]` and the document says `read_groups: ["all"]`, only `all` can read it; `hr` is not added back.
 3. An empty group list `[]` means nobody except admins can read it.
-4. A document you cannot see always returns 404 (never 403), so its existence is not revealed.
+4. A permissions setting that cannot be applied as written (a broken `_collection.edn`, a misspelt or malformed `read_groups`) keeps the affected documents out of the index and lists them in the ingest report's errors; it never falls back to a wider setting.
+5. A document you cannot see always returns 404 (never 403), so its existence is not revealed.
 
 How to set this up is in the [Administrator guide](docs/howto/admin.md#document-permissions).
 
