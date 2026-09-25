@@ -157,3 +157,34 @@ Set aside by the reviewer:
   admin button (only a missing dir is refused).
 - External images in rendered Markdown load from third-party hosts
   (privacy, not active content).
+
+## From the book-corpus eval and threshold calibration (2026-09-25)
+
+- **Abstract questions retrieve poorly; try HyDE or doc2query.** On the
+  local book corpus (reader-style questions such as "why is X worth
+  practising?", answers written as narrative or argument, little shared
+  vocabulary) the semantic channel reaches recall@10 0.53 and
+  hybrid+rerank MRR@10 0.58 (`docs/spikes/cjk-analyzer.md`); correct
+  passages get a median rerank score of about -3, which is why
+  `rerank-min-score` could only be set conservatively at -7
+  (`docs/spikes/rerank-threshold.md`). Concrete questions on the sample
+  corpus do not show this (answers score ≥ 0).
+  - **HyDE** (query side): the chat model writes a short hypothetical
+    answer; embed that (alone or with the question) for the semantic
+    channel, so the match is answer-to-answer. Cost: one extra chat call
+    per question — on the local M1 setup (prefill ~125 tok/s, decode
+    ~25 tok/s, `VLLM_SETUP.md`) roughly +5–10 s per `/ask`, and it also
+    slows `/search`. A hallucinated hypothetical answer can pull in wrong
+    passages; the reranker still judges against the real question.
+  - **doc2query** (index side): at ingest the chat model generates the
+    questions each chunk answers; index them with the chunk (extra text
+    or extra vectors), so the match is question-to-question. Cost moves
+    to ingest (one chat call per chunk, re-run when a chunk changes), no
+    query-time latency.
+  - SPEC §1.3 lists query rewriting as an MVP non-goal, so either needs
+    promoting to a task first. **Trigger:** the user's real control
+    questions (5–10) look like the book questions and score poorly in
+    eval. **Measure** with `spikes.cjk-analyzer/run-corpus-eval` plus a
+    new variant (semantic channel on the HyDE text), and re-run the
+    threshold sweep: a better semantic match should also raise answer
+    rerank scores and allow a tighter `rerank-min-score`.
