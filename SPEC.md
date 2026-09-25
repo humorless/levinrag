@@ -1,21 +1,28 @@
-# levinrag — Datalevin 企業 RAG MVP 規格書
+# levinrag — 現行規格
 
-版本 v0.1｜2026-09-22｜交付對象：Claude Code
+版本 v1.0｜2026-09-25｜Phase 0–5 完成後的系統實況
 
-一個單一 JVM process、單一資料目錄的企業 RAG MVP：Markdown／純文字語料 → 多路召回（詞彙、語意、連結圖）→ RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用的生成，並內建 ACL、查詢追蹤（trace）與評估框架。所有模型透過本地 vLLM 的 OpenAI-compatible API 提供。
+> **這是現行規格**：描述系統**目前實際**的行為，後續開發以本文件為準。
+> - 初版規格（2026-09-22，已凍結）：[`docs/design/2026-09-22-initial-spec.md`](docs/design/2026-09-22-initial-spec.md)。本文件沿用它的章節編號，所以程式與文件中的「SPEC.md §n」引用仍然有效。
+> - 每一處偏離初版的**理由與證據**記在 [`docs/decisions.md`](docs/decisions.md)，本文件只寫結論，並在括號中標出對應的決策日期。
+> - 尚未完成的工作與下一步見 [§21](#21-尚未完成與下一步)。
+
+一個單一 JVM process、單一資料目錄的企業 RAG：Markdown／純文字語料 → 多路召回（詞彙、語意、連結圖）→ RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用的生成，內建 ACL、查詢追蹤（trace）與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫，可以是 vLLM，也可以是本機的 LM Studio／llama.cpp。
+
+程式的 namespace 根為 `replware.levinrag`（2026-09-25 由 `hybridrag` 改名）。
 
 ---
 
-## 0. 給 Claude Code 的工作守則（先讀）
+## 0. 開發守則
 
-1. **依 §17 的 Phase 順序執行。** 每個 task 的驗收條件（AC）全數通過才進下一個 task。
-2. **Phase 0 的 spike 是強制的。** 本規格中標示 `⚠️ VERIFY` 的地方，是規格作者依官方文件推斷、但未實測的行為。以 pinned 版本的 Datalevin cljdoc 與原始碼為準；結論寫進 `docs/spikes/<topic>.md`。若 spike 結論與本規格衝突，依 spike 結論實作，並在 `docs/decisions.md` 記錄「原規格／實際行為／採用做法」。
-3. **不要憑記憶使用 Datalevin API。** 它的 API 在 0.9 → 1.0 間變動很大，訓練資料中的範例很可能過期。
-4. **程式碼註解一律英文**；UI 文案與錯誤訊息（面向使用者者）用繁體中文。
-5. **不擴張範圍。** 想到的改進寫進 `docs/backlog.md`，不要順手實作。
-6. **需求模糊時**，選最簡單且可逆的做法，記錄在 `docs/decisions.md`，然後繼續，不要停下來等待。
-7. 每個 task 一個 commit，訊息格式：`T1.3: chunker with sentence-level overlap`。
-8. 任何會讓 ACL 可能被繞過的改動，都必須附帶 §18.3 的安全測試。
+1. **本文件是現行規格。** 改變系統行為時，要在同一個 commit 裡更新本文件的對應章節，並在 `docs/decisions.md` 記下理由（「原規格／實際行為／採用做法」）。
+2. **不要憑記憶使用 Datalevin API。** 它在 0.9 → 1.0 → 1.1 之間變動很大；每一個用到的呼叫都要先在 nREPL 對 pinned 版本（1.1.0）驗證。本文件中已經驗證過的用法，標注了出處。
+3. **程式碼註解一律英文**；UI 文案與面向使用者的錯誤訊息用繁體中文。
+4. **不擴張範圍。** 想到的改進寫進 `docs/backlog.md`；要做時先升格到 §21 或一個新的 Phase。
+5. **需求模糊時**，選最簡單且可逆的做法，記在 `docs/decisions.md`，然後繼續。產品層面的選擇（閾值、斷詞器、權限語意）由使用者決定：量測、報告、建議。
+6. 每個 task 一個 commit，訊息以 `Co-Authored-By` 行結尾。`no-commit/` 是使用者私人的語料，永遠不 commit、不引用內文。
+7. 任何可能讓 ACL 被繞過的改動，都必須附帶 §18.3 的安全測試。
+8. 開發流程：新子系統先寫設計稿（`docs/superpowers/specs/`）→ 使用者核准 → 實作計畫（`docs/superpowers/plans/`）→ TDD 實作 → 全段 review → 一輪修正。
 
 ---
 
@@ -24,22 +31,22 @@
 ### 1.1 目標
 
 - 每一層都有「最小但真實」的實作：ingestion、詞彙召回、語意召回、圖召回、融合、rerank、脈絡擴展、生成、ACL、trace、eval。
-- 架構極簡：一個 JVM process、嵌入式 Datalevin、外加 vLLM 服務。不需要 Docker 才能開發。
+- 架構極簡：一個 JVM process、嵌入式 Datalevin，外加三個模型端點。開發不需要 Docker。
 - 可觀察：每一次查詢都能看到每個通道各自撈到什麼、排第幾、rerank 後如何變化。這是學習與調校的核心。
 
-### 1.2 成功標準（可量測）
+### 1.2 成功標準與目前狀態
 
-| 項目 | 標準 |
-|---|---|
-| ACL 洩漏 | 樣本語料 eval 與安全測試中 **= 0**（硬性，任何一次洩漏即不通過） |
-| Eval | `bb eval` 可對 5 種檢索變體輸出 doc-level recall@5、recall@10、MRR@10 |
-| 延遲 | 檢索＋rerank（不含 LLM 生成）p50 < 800 ms，語料 ≤ 100k chunks，vLLM 於同機或同網段 |
-| 可重建 | `bb reindex` 可從語料目錄完整重建 `index.dtlv`，不影響使用者帳號 |
-| 規模上限 | ≤ 5,000 份文件／≤ 100k chunks（超過不在 MVP 保證範圍） |
+| 項目 | 標準 | 狀態 |
+|---|---|---|
+| ACL 洩漏 | 樣本語料 eval 與安全測試中 **= 0** | ✅ 達成（eval、§18.3 端到端套件） |
+| Eval | `bb eval` 對 5 種檢索變體輸出 doc-level recall@5、recall@10、MRR@10 | ✅ 達成 |
+| 延遲 | 檢索＋rerank（不含生成）p50 < 800 ms，語料 ≤ 100k chunks，模型在同機或同網段 | ⚠️ **未驗證**。本機 M1 以 llama.cpp 執行 rerank 時，單是 rerank 的 p50 約 1.3–3 秒；標準假設 GPU 部署。ACL 查詢那一段在 100k chunks 量過（T0.5，約 2 ms）。見 §21 |
+| 可重建 | `bb reindex` 可從語料完整重建 `index.dtlv`，不影響帳號 | ✅ 達成 |
+| 規模上限 | ≤ 5,000 份文件／≤ 100k chunks | ⚠️ **未做端到端驗證**（樣本語料 22 份文件、119 chunks）。見 §21 |
 
-### 1.3 非目標（MVP 不做）
+### 1.3 非目標
 
-PDF／Office／OCR 解析；多租戶；SSO；query rewriting 與 agentic 多輪檢索；LLM 抽取 entity 建知識圖譜；答案層級的 LLM-as-judge 評估；水平擴展；串流輸出（列為 Phase 5 stretch）。
+PDF／Office／OCR 解析；多租戶；SSO；query rewriting 與 agentic 多輪檢索；LLM 抽取 entity 建知識圖譜；答案層級的 LLM-as-judge 評估；水平擴展；串流輸出（T5.4，已延後，見 §21）。
 
 ---
 
@@ -51,7 +58,8 @@ flowchart LR
     C[corpus/ *.md *.txt] --> W[walker + ACL resolve]
     W --> P[markdown parse → section tree]
     P --> K[chunker]
-    K --> IX[(index.dtlv)]
+    K --> E[embed via /v1/embeddings]
+    E --> IX[(index.dtlv)]
   end
   subgraph Query
     Q[query + principal] --> L[lexical channel]
@@ -68,32 +76,31 @@ flowchart LR
   IX -.-> S
   IX -.-> G
   IX -.-> X
-  subgraph vLLM
-    E[/v1/embeddings/]
+  subgraph Models[OpenAI-compatible endpoints]
+    EM[/v1/embeddings/]
     RR[/v1/rerank/]
     CH[/v1/chat/completions/]
   end
-  IX -. embed on write .-> E
-  S -. embed query .-> E
+  E --> EM
+  S -. embed query .-> EM
   R --> RR
   A --> CH
   APP[(app.dtlv: users, tokens, traces)]
 ```
 
-> 💡 若編輯器未內建 mermaid 渲染，可將上方程式碼貼到 [mermaidviewer.com](https://mermaidviewer.com/) 檢視此架構圖。
-
 ### 2.1 關鍵設計決策
 
 | ID | 決策 | 理由 |
 |---|---|---|
-| D1 | 兩個嵌入式 Datalevin DB：`index.dtlv`（語料衍生資料）與 `app.dtlv`（使用者、token、trace） | index 是語料的衍生物，隨時可丟棄重建；Datalevin 對已有資料的 embedding attribute 改 schema 會被拒絕，必須重建。分開後重建 index 不會動到帳號。 |
-| D2 | 語料目錄是 source of truth | 簡化一致性：DB 永遠可從檔案推導。 |
-| D3 | **ACL 在寫入時物化，查詢時只做一個 join** | 查詢路徑越短越不容易出錯；階層繼承的遞迴計算放在 ingestion。群組以字串表示，查詢時由 app.dtlv 取出使用者群組，作為 input 傳進 index.dtlv 查詢，不需要跨 DB join。 |
-| D4 | `Retriever` protocol 隔離儲存層 | 萬一 Datalevin 不適用，換實作不必重寫 pipeline。 |
-| D5 | 所有模型走 vLLM OpenAI-compatible API，三個 endpoint（embed／rerank／chat） | vLLM 一個 process 服務一個模型。 |
-| D6 | 全文索引與 embedding 建在同一 attribute `:chunk/index-text` | Datalevin 允許 `:db/fulltext` 與 `:db/embedding` 共存；來源只有一份，免同步問題。 |
-| D7 | Rerank 失敗時降級為 RRF 排序，不讓整個請求失敗 | 可用性優先；降級狀態記入 trace 並回傳給呼叫端。 |
-| D8 | 檢索無有效證據時不呼叫 LLM | 省成本、杜絕無依據的回答。 |
+| D1 | 兩個嵌入式 Datalevin DB：`index.dtlv`（語料衍生資料）與 `app.dtlv`（使用者、token、trace） | index 是語料的衍生物，隨時可以丟棄重建；分開之後重建 index 不會動到帳號。 |
+| D2 | 語料目錄是唯一的資料來源 | DB 永遠可以從檔案推導出來。應用程式只讀語料，不寫。 |
+| D3 | **ACL 在寫入時物化；查詢時用「可讀文件 id 集合」過濾** | 階層繼承的遞迴計算放在 ingestion。查詢時先從使用者群組算出可讀的 doc id 集合，再對每個原始命中做 `contains?`。初版的 Datalog join 寫法在 100k chunks 下太慢（2026-09-22，T0.5）。 |
+| D4 | `Retriever` protocol 隔離儲存層，**ACL 只在 Retriever 內完成** | 萬一 Datalevin 不適用，換實作不必重寫 pipeline；pipeline 層拿到的候選一定已經過濾。 |
+| D5 | 三個模型端點（embed／rerank／chat），OpenAI 相容 API | 可以是 vLLM，也可以是 LM Studio（embed、chat）加 llama.cpp（rerank）。 |
+| D6 | 全文索引建在 `:chunk/index-text`；向量存在另一個屬性 `:chunk/vec`，由應用程式計算（Path B） | Datalevin 內建的 embedding provider 在 transact 時就會呼叫模型端點，測試與建置都離不開模型；Path B 沒有這個依賴（2026-09-22）。 |
+| D7 | Rerank 失敗時降級為 RRF 排序，請求不失敗 | 可用性優先；降級狀態記入 trace，並回傳給呼叫端。 |
+| D8 | 檢索沒有有效證據時不呼叫 LLM | 省成本，也杜絕沒有依據的回答。 |
+| D9 | 身分來源與 principal 分離 | 密碼 session、API token（以及日後的 OIDC）都只產出 `{:username :groups :admin?}`；下游只看 principal（2026-09-24）。 |
 
 ---
 
@@ -101,78 +108,87 @@ flowchart LR
 
 | 範疇 | 選擇 | 備註 |
 |---|---|---|
-| 專案骨架 | [Clojure Stack Lite](https://stack.bogoyavlensky.com/) | Integrant、Reitit／Ring／Jetty、Hiccup、Malli、HTMX 2、Alpine.js、Tailwind 4、Babashka tasks、clj-kondo、cljfmt、eftest。**產生時選 SQLite、不選 `:auth`**，之後移除 SQL 相關依賴（見 T0.1）。 |
-| 資料庫 | Datalevin，pin `1.1.0`（實際最新版，見 `docs/decisions.md`） | 嵌入式模式。依官方 `doc/install.md` 設定所需 JVM options。 |
-| Markdown 解析 | `org.commonmark/commonmark` ＋ `commonmark-ext-gfm-tables` ＋ `commonmark-ext-yaml-front-matter` | 需要 source spans 取得字元位置。 |
-| YAML | `clj-commons/clj-yaml` | frontmatter 值解析（若 commonmark 擴充已足夠則可省略）。 |
-| HTTP client | `hato` | vLLM 呼叫，JDK HttpClient 包裝，支援逾時。 |
+| 專案骨架 | Clojure Stack Lite 產生 | Integrant、Reitit／Ring／Jetty、Hiccup、Malli、HTMX 2、Alpine.js、Tailwind 4、Babashka tasks、clj-kondo、cljfmt、eftest、cloverage。SQL 相關依賴已移除。 |
+| 資料庫 | Datalevin **1.1.0**（嵌入式） | 每個會開啟它的 JVM 都要帶 `--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED`，由 `deps.edn` 的 `:jvm-opts` alias 提供（2026-09-22）。 |
+| Markdown 解析 | `org.commonmark/commonmark` ＋ gfm-tables ＋ yaml-front-matter | 用 source spans 取得字元位置。 |
+| HTTP client | `hato` | 固定使用 HTTP/1.1：JDK client 預設的 h2c upgrade 在 LM Studio 上會卡住直到逾時（2026-09-24）。 |
 | JSON | `metosin/jsonista` | |
 | 密碼雜湊 | `buddy/buddy-hashers` | |
-| 測試 | Stack Lite 內建（eftest／cloverage） | |
+| 測試 | clojure.test ＋ eftest ＋ cloverage；瀏覽器檢查用 Playwright（本機 Chrome） | |
 
-平台限制：Datalevin 向量功能支援 Linux x86_64／arm64 與 macOS arm64，Windows 為實驗性。
+平台限制：Datalevin 向量功能支援 Linux x86_64／arm64 與 macOS arm64。
 
 ---
 
-## 4. 外部依賴：vLLM
+## 4. 外部依賴：模型端點
 
-### 4.1 三個 endpoint
+### 4.1 三個端點
 
-| 用途 | 預設模型 | 預設位址 |
-|---|---|---|
-| Embedding | `BAAI/bge-m3`（1024 維，多語、中文佳） | `http://localhost:8001/v1` |
-| Rerank | `BAAI/bge-reranker-v2-m3`（多語 cross-encoder） | `http://localhost:8002`，路徑 `/v1/rerank` |
-| Chat | 可設定（例如 Qwen 系列 instruct 模型） | `http://localhost:8003/v1` |
+| 用途 | 模型 | 預設位址 | 本機開發實際使用 |
+|---|---|---|---|
+| Embedding | `BAAI/bge-m3`（1024 維） | `http://localhost:8001/v1` | LM Studio `text-embedding-bge-m3`（Q8_0） |
+| Rerank | `BAAI/bge-reranker-v2-m3` | `http://localhost:8002`，路徑 `/v1/rerank` | llama.cpp `llama-server --reranking`（Q8_0） |
+| Chat | 可設定 | 無預設，必填 | LM Studio `qwen/qwen3-8b` |
 
-啟動範例寫在 `docs/vllm.md`（pooling 模型的啟動旗標依 vLLM 版本不同，以使用者環境為準，應用程式不負責啟動 vLLM）：
-
-```bash
-vllm serve BAAI/bge-m3              --port 8001 --api-key "$VLLM_API_KEY"
-vllm serve BAAI/bge-reranker-v2-m3  --port 8002 --api-key "$VLLM_API_KEY"
-vllm serve <chat-model>             --port 8003 --api-key "$VLLM_API_KEY"
-```
+啟動方式見 `VLLM_SETUP.md`。應用程式不負責啟動模型。
 
 ### 4.2 API 契約
 
 所有請求帶 `Authorization: Bearer <key>`。
 
-**Embeddings**：`POST {embed-base}/embeddings`，body `{"model": ..., "input": [str...]}`，回應 `data[i].embedding`。批次上限可設定（預設 32）。
+**Embeddings**：`POST {embed-base}/embeddings`，body `{"model", "input": [str...]}`。回應的 `data` 必須對每個輸入各有一個由數字組成的 `embedding`，否則視為 embed 端點失敗（HTTP 200 帶錯誤內容也算）。每批最多 32 筆，以文件為單位分批。
 
-**Rerank**：`POST {rerank-base}{rerank-path}`，body `{"model": ..., "query": str, "documents": [str...], "top_n": n}`，回應 `results[i] = {index, relevance_score}`。實作需：路徑可設定（有些部署是 `/rerank`）；**vLLM 可能以 HTTP 200 回傳錯誤 payload**，必須驗證回應結構，缺 `results` 即視為失敗。
+**Rerank**：`POST {rerank-base}{rerank-path}`，body `{"model", "query", "documents", "top_n"}`，回應 `results[i] = {index, relevance_score}`。缺少 `results`、index 重複或超出範圍、分數不是數字，都視為失敗。**分數依後端原樣使用**：llama.cpp 回傳原始 logit（例如 4.6／−6.5／−11.0），vLLM 通常回傳 0–1；兩者的門檻不能互換（2026-09-24）。
 
-**Chat**：`POST {chat-base}/chat/completions`，標準 OpenAI 格式。支援設定 `:chat/extra-body`（原樣合併進 request body，例如 `{"chat_template_kwargs": {"enable_thinking": false}}`）。回應若含 `<think>…</think>` 區塊須剝除。
+**Chat**：`POST {chat-base}/chat/completions`，標準 OpenAI 格式。`VLLM_CHAT_EXTRA_BODY`（JSON 物件）會原樣合併進 request body。例如 Qwen3 on LM Studio 要用 `{"reasoning_effort":"none"}`，因為 LM Studio 不理會 `chat_template_kwargs`。回應必須有 `choices[0].message`；`content` 為 null 視為空回答。
 
 ### 4.3 共通要求
 
-每個呼叫有連線逾時（2s）與讀取逾時（embed 30s／rerank 10s／chat 120s，皆可設定）；錯誤包成 `ex-info`，`ex-data` 含 `:llm/endpoint`、`:http/status`、`:llm/body-excerpt`（前 500 字元）；**API key 絕不寫入 log 或 trace**。
+- 連線逾時固定 2 秒；讀取逾時可設定（§5），預設 embed 30 秒、rerank 10 秒、chat 120 秒。
+- 以下錯誤一律包成 `ex-info`，`ex-data` 含 `:llm/endpoint`、`:http/status`、`:llm/body-excerpt`（前 500 字元），上層據此回 503：
+  - 任何 `IOException`（逾時、拒絕連線、連線中斷）；
+  - 非 2xx 回應；
+  - 2xx 但 body 不是 JSON，或結構不對。
+- **API key 絕不出現在 log、trace、health 回應或例外資料中。**
+- `bb vllm:check` 對三個端點各送一個請求，並用一份 1500 字的文件探測 rerank：reranker 的 context 太小時，短字串測試會過，但長文件會失敗（2026-09-25）。
 
 ---
 
 ## 5. 設定
 
-全部從環境變數讀取，`resources/config.edn` 提供預設值。
+伺服器的設定在 `resources/config.edn`（Integrant，aero reader，profile：`:default`／`:test`／`:prod`），值多半來自環境變數。不啟動 Integrant 的 CLI（`bb ingest`、`bb user:*`、`bb eval`）直接讀相同的環境變數，預設值也相同（`replware.levinrag.config`）。
 
-| Key | Env | 預設 |
+| 設定 | Env | 預設 |
 |---|---|---|
-| `:data/dir` | `DATA_DIR` | `./data` |
-| `:corpus/dir` | `CORPUS_DIR` | `./corpus` |
-| `:corpus/root-read-groups` | `ROOT_READ_GROUPS` | `[]`（根目錄預設無人可讀，除 admin） |
-| `:embed/base-url` `:embed/model` `:embed/dims` | `VLLM_EMBED_BASE_URL` `VLLM_EMBED_MODEL` `VLLM_EMBED_DIMS` | 見 §4.1，`1024` |
-| `:rerank/base-url` `:rerank/path` `:rerank/model` | `VLLM_RERANK_BASE_URL` `VLLM_RERANK_PATH` `VLLM_RERANK_MODEL` | 見 §4.1 |
-| `:chat/base-url` `:chat/model` | `VLLM_CHAT_BASE_URL` `VLLM_CHAT_MODEL` | — / 必填 |
-| 讀取逾時（毫秒） | `VLLM_EMBED_TIMEOUT_MS` `VLLM_RERANK_TIMEOUT_MS` `VLLM_CHAT_TIMEOUT_MS` | `30000` `10000` `120000`（連線逾時固定 2000） |
-| API keys | `VLLM_EMBED_API_KEY` `VLLM_RERANK_API_KEY` `VLLM_CHAT_API_KEY`，未設則 fallback 至 `VLLM_API_KEY` | — |
-| `:chunk/target-tokens` `:chunk/max-tokens` `:chunk/min-tokens` `:chunk/overlap-tokens` | — | `350` `500` `60` `60` |
-| `:retrieve/channel-k` | — | `50` |
-| `:retrieve/acl-overfetch` | — | `4` |
-| `:retrieve/rrf-k` | — | `60` |
-| `:retrieve/rerank-input` | — | `40` |
-| `:retrieve/graph-max` | — | `10` |
-| `:retrieve/final-k` | — | `8` |
-| `:retrieve/rerank-min-score` | `VLLM_RERANK_MIN_SCORE` | `-7.0`（llama.cpp 回傳的原始 logit 尺度；換 reranker 後端須重新校準，見 `docs/spikes/rerank-threshold.md`） |
-| `:context/max-tokens` | — | `6000` |
-| `:session/secret` | `SESSION_SECRET`（實作為 `SESSION_SECRET_KEY`，見 decisions.md） | 必填（非 dev） |
-| `:session-max-age-hours` | `SESSION_MAX_AGE_HOURS` | `8`（登入後超過即須重新登入；登出與改密碼使該使用者所有 session 失效） |
+| 資料目錄 | `DATA_DIR` | `data`（`:test` profile 為 `data-test`）。`index.dtlv`、`app.dtlv`、`ingest-reports/` 都在這裡。 |
+| 語料目錄 | `CORPUS_DIR` | `./corpus` |
+| 根目錄預設讀取群組 | `ROOT_READ_GROUPS`（逗號分隔） | 空＝只有 admin 可讀 |
+| Embedding | `VLLM_EMBED_BASE_URL` `VLLM_EMBED_MODEL` `VLLM_EMBED_DIMS` | 見 §4.1，`1024` |
+| Rerank | `VLLM_RERANK_BASE_URL` `VLLM_RERANK_PATH` `VLLM_RERANK_MODEL` | 見 §4.1 |
+| Chat | `VLLM_CHAT_BASE_URL` `VLLM_CHAT_MODEL` `VLLM_CHAT_EXTRA_BODY` | — ／ 必填 ／ — |
+| API keys | `VLLM_EMBED_API_KEY` `VLLM_RERANK_API_KEY` `VLLM_CHAT_API_KEY`，未設則用 `VLLM_API_KEY` | — |
+| 讀取逾時（毫秒） | `VLLM_EMBED_TIMEOUT_MS` `VLLM_RERANK_TIMEOUT_MS` `VLLM_CHAT_TIMEOUT_MS` | `30000` `10000` `120000` |
+| Rerank 門檻 | `VLLM_RERANK_MIN_SCORE` | `-7.0`（llama.cpp 原始 logit 尺度；換後端必須重新校準，見 `docs/spikes/rerank-threshold.md`） |
+| Session 加密金鑰 | `SESSION_SECRET_KEY` | `:prod` 必填（初版寫 `SESSION_SECRET`；實作沿用產生器給的名稱） |
+| Session 有效期 | `SESSION_MAX_AGE_HOURS` | `8` |
+
+**啟動時驗證**：`VLLM_CHAT_EXTRA_BODY` 不是 JSON 物件，或逾時值不是整數時，server **無法啟動**，錯誤訊息會指出是哪一個變數。
+
+檢索與切塊參數沒有環境變數，而是寫在程式的預設值裡，可以透過 search component 的 `:opts` 覆寫：
+
+| 參數 | 預設 |
+|---|---|
+| `:chunk/target-tokens` `max` `min` `overlap` | `350` `500` `60` `60` |
+| `:channel-k` | `50` |
+| `:overfetch` | `4` |
+| `:rrf-k` | `60` |
+| `:rerank-input` | `40` |
+| `:graph-max` | `10` |
+| `:final-k` | `8` |
+| `:max-chars`（rerank 輸入截斷） | `1500` |
+| `:max-tokens`（context 預算） | `6000` |
+| `:rerank-min-score` | 函式庫預設 `nil`；`config.edn` 設為 `-7.0` |
+| `:chat/temperature` `:chat/max-tokens` `:chat/extra-body` | `0.2` `1024` `nil` |
 
 ---
 
@@ -180,101 +196,33 @@ vllm serve <chat-model>             --port 8003 --api-key "$VLLM_API_KEY"
 
 ### 6.1 `index.dtlv` schema
 
-```clojure
-(def index-schema
-  {;; --- collection: one per directory under corpus/ ---
-   :collection/path            {:db/valueType :db.type/string
-                                :db/unique    :db.unique/identity}   ; "" for root, "hr/policies"
-   :collection/name            {:db/valueType :db.type/string}
-   :collection/parent          {:db/valueType :db.type/ref}
-   :collection/declared-groups {:db/valueType   :db.type/string
-                                :db/cardinality :db.cardinality/many} ; from _collection.edn, if any
-   :collection/effective-groups {:db/valueType   :db.type/string
-                                 :db/cardinality :db.cardinality/many} ; materialized, see §7.2
+完整定義見 `src/replware/levinrag/db/schema.clj`。與初版的差異：
 
-   ;; --- doc ---
-   :doc/path             {:db/valueType :db.type/string
-                          :db/unique    :db.unique/identity}          ; relative to corpus/
-   :doc/title            {:db/valueType :db.type/string}
-   :doc/collection       {:db/valueType :db.type/ref}
-   :doc/hash             {:db/valueType :db.type/string}              ; sha256 of raw bytes
-   :doc/tags             {:db/valueType   :db.type/string
-                          :db/cardinality :db.cardinality/many}
-   :doc/declared-groups  {:db/valueType   :db.type/string
-                          :db/cardinality :db.cardinality/many}       ; frontmatter override
-   :doc/effective-groups {:db/valueType   :db.type/string
-                          :db/cardinality :db.cardinality/many}       ; the ONLY attr used by query-time ACL
-   :doc/links-to         {:db/valueType   :db.type/ref
-                          :db/cardinality :db.cardinality/many}
-   :doc/frontmatter      {}                                           ; EDN blob
-   :doc/ingested-at      {:db/valueType :db.type/instant}
+- `:chunk/index-text`：`:db.type/string`，`:db/fulltext true`、`:db.fulltext/autoDomain true`，**沒有** `:db/embedding`（Path B）。
+- `:chunk/vec`：`{:db/valueType :db.type/vec}`。**不可以**加 `:db.vec/domains`，這會觸發 Datalevin 1.1.0 寫入路徑的 bug（2026-09-22，已查到根因）。向量的維度與距離在開啟時用 `:vector-opts {:dimensions dims :metric-type :cosine}` 給。
+- 新增 `:doc/content-hash`：去掉 frontmatter `read_groups:` 那一行之後的 sha256。與 `:doc/hash` 對照，就能判斷「只改了權限」。
+- 新增 `:doc/raw-links`：原始連結目標（EDN），讓每次匯入都能重新解析所有連結，不必重讀檔案。
+- 新增 `:chunk/hard-cut?`：標記這個 chunk 是否被強制切斷（§7.3）。
+- `:section/trail` 存成字串 `"A > B > C"`，不是向量。
 
-   ;; --- section: heading tree ---
-   :section/id      {:db/valueType :db.type/string
-                     :db/unique    :db.unique/identity}               ; "<doc-path>#<ordinal>"
-   :section/doc     {:db/valueType :db.type/ref}
-   :section/parent  {:db/valueType :db.type/ref}
-   :section/heading {:db/valueType :db.type/string}
-   :section/level   {:db/valueType :db.type/long}
-   :section/trail   {:db/valueType :db.type/string}                   ; "請假規定 > 特休 > 計算方式"
-
-   ;; --- chunk ---
-   :chunk/id          {:db/valueType :db.type/string
-                       :db/unique    :db.unique/identity}             ; "<doc-path>::<ordinal>"
-   :chunk/doc         {:db/valueType :db.type/ref}
-   :chunk/section     {:db/valueType :db.type/ref}
-   :chunk/ordinal     {:db/valueType :db.type/long}                   ; 0-based within doc
-   :chunk/text        {:db/valueType :db.type/string}                 ; display text
-   :chunk/index-text  {:db/valueType            :db.type/string       ; header + text; see §7.4
-                       :db/fulltext             true
-                       :db.fulltext/autoDomain  true
-                       :db/embedding            true
-                       :db.embedding/autoDomain true}
-   :chunk/tokens      {:db/valueType :db.type/long}
-   :chunk/char-start  {:db/valueType :db.type/long}
-   :chunk/char-end    {:db/valueType :db.type/long}})
-```
-
-Store options 草稿（`⚠️ VERIFY` 於 T0.3／T0.4）：
+`index.dtlv` 的開啟選項（每次開啟都必須相同）：
 
 ```clojure
-{:search-domains  {"chunk_index-text" {:index-position? true          ; phrase + proximity
-                                       :indexing-mode   :async
-                                       :analyzer        cjk-analyzer
-                                       :query-analyzer  cjk-query-analyzer}}
- :embedding-opts  {:provider           :openai-compatible
-                   :model              "BAAI/bge-m3"
-                   :base-url           "http://localhost:8001/v1"
-                   :api-key-env        "VLLM_EMBED_API_KEY"
-                   :request-dimensions 1024
-                   :metric-type        :cosine
-                   :indexing-mode      :async}}
+{:vector-opts    {:dimensions 1024 :metric-type :cosine}
+ :search-domains {"chunk/index-text" {:analyzer <cjk-analyzer UDF descriptor>}}}
 ```
+
+全文檢索的 domain 名稱是屬性的 `keyword->string`，**斜線保留**（`"chunk/index-text"`）；向量 domain 名稱則把斜線換成底線（`"chunk_vec"`）。兩者用不同的 helper，不要搞混（2026-09-22）。
 
 ### 6.2 `app.dtlv` schema
 
-```clojure
-(def app-schema
-  {:user/username      {:db/valueType :db.type/string :db/unique :db.unique/identity}
-   :user/display-name  {:db/valueType :db.type/string}
-   :user/password-hash {:db/valueType :db.type/string}
-   :user/groups        {:db/valueType :db.type/string :db/cardinality :db.cardinality/many}
-   :user/admin?        {:db/valueType :db.type/boolean}
+完整定義見 `schema.clj`。與初版的差異：
 
-   :token/hash         {:db/valueType :db.type/string :db/unique :db.unique/identity} ; sha256 hex
-   :token/user         {:db/valueType :db.type/ref}
-   :token/label        {:db/valueType :db.type/string}
-   :token/created-at   {:db/valueType :db.type/instant}
+- 新增 `:token/prefix`：token 明文的前 8 個字元，讓 `bb token:revoke <prefix>` 找得到它。前綴有歧義時拒絕撤銷（2026-09-24）。
+- 新增 `:user/sessions-valid-after`（instant）：這個時間點之前發出的網頁 session 一律無效（§13）。
+- `:trace/degraded` 的值包含 `:rerank-failed`、`:dependency-failed`。
 
-   :trace/id           {:db/valueType :db.type/uuid :db/unique :db.unique/identity}
-   :trace/username     {:db/valueType :db.type/string}
-   :trace/kind         {:db/valueType :db.type/keyword}  ; :search | :ask
-   :trace/query        {:db/valueType :db.type/string}
-   :trace/at           {:db/valueType :db.type/instant}
-   :trace/stages       {}                                ; EDN blob, see §14
-   :trace/answer       {:db/valueType :db.type/string}
-   :trace/degraded     {:db/valueType :db.type/keyword :db/cardinality :db.cardinality/many}})
-```
+在既有的 `app.dtlv` 加入新屬性不需要遷移：已經在一份實際 DB 的副本上驗證過（2026-09-25）。
 
 ---
 
@@ -285,110 +233,115 @@ Store options 草稿（`⚠️ VERIFY` 於 T0.3／T0.4）：
 ```
 corpus/
 ├── _collection.edn            ; {:name "全公司" :read-groups ["all"]}
-├── public/
-│   └── handbook.md
+├── public/handbook.md
 ├── hr/
 │   ├── _collection.edn        ; {:name "人資" :read-groups ["hr"]}
 │   ├── leave.md
-│   └── payroll/
-│       └── bonus.md           ; inherits ["hr"]
+│   ├── announcements/year-end-party.md   ; frontmatter read_groups: [all]
+│   └── investigations/
+│       └── _collection.edn    ; {:name "申訴調查" :read-groups ["hr-lead"]}
 └── finance/
-    ├── _collection.edn        ; {:name "財務" :read-groups ["finance"]}
-    └── budget.md              ; frontmatter read_groups: ["finance-lead"] overrides
+    ├── _collection.edn        ; {:read-groups ["finance"]}
+    └── budget-2025.md         ; frontmatter read_groups overrides
 ```
 
-接受副檔名：`.md`、`.markdown`、`.txt`。以 `.` 或 `_` 開頭的檔案與目錄一律忽略（`_collection.edn` 由 walker 特別讀取）。
-
-Frontmatter 支援欄位：`title`、`tags`（list）、`read_groups`（list）。其他欄位原樣存入 `:doc/frontmatter`。
+接受的副檔名：`.md`、`.markdown`、`.txt`。以 `.` 或 `_` 開頭的檔案與目錄一律忽略（`_collection.edn` 由 walker 另外讀取）。Frontmatter 支援 `title`、`tags`（list）、`read_groups`（list），其他欄位原樣存入 `:doc/frontmatter`。
 
 ### 7.2 ACL 解析規則（寫入時物化）
 
-1. 集合的 effective groups：**最近一個有宣告的祖先勝出**（含自身）。自身有 `_collection.edn` 且含 `:read-groups` → 使用之；否則沿用父集合的 effective groups；根目錄若無宣告 → 使用 `:corpus/root-read-groups`。
-2. 文件的 effective groups：frontmatter 有 `read_groups` → **只用它**（覆寫，不是聯集）；否則等於所屬集合的 effective groups。
-3. `_collection.edn` 或 frontmatter 的 ACL 變更時，只需重算受影響集合與文件的 `effective-groups`，不需重新切塊或重新 embedding。
-4. 空集合 `[]` 的語意是「除 admin 外無人可讀」。
-
-這個語意（覆寫而非聯集）必須寫進 README，並有對應單元測試。
+1. 目錄的 effective groups：**最近一個有宣告的祖先勝出**（含自身）。都沒有宣告時用 `ROOT_READ_GROUPS`。
+2. 文件的 effective groups：frontmatter 有 `read_groups` 時**只用它（覆寫，不是聯集）**；否則等於所屬目錄的 effective groups。
+3. 只改 `_collection.edn` 或 frontmatter 的 `read_groups` 時，**不重新計算 embedding**：chunk 的文字沒變，就沿用已存的向量。frontmatter 的變動會改變字元位移，所以文件仍然會重新解析（2026-09-25）。報告中計為 `acl-updated`。
+4. 空集合 `[]` 表示除 admin 外沒有人可讀。
 
 ### 7.3 Markdown 解析與切塊
 
-**解析**：用 commonmark-java 產生 AST，開啟 source spans。依 heading（ATX 與 Setext）建立 section 樹；第一個 heading 之前的內容歸入一個 `level 0` 的隱含 section（heading 為文件標題）。文件標題優先序：frontmatter `title` → 第一個 H1 → 檔名。
+用 commonmark 建立 section 樹（ATX 與 Setext）；第一個 heading 之前的內容歸入 level 0 的隱含 section。文件標題的優先序：frontmatter `title` → 第一個 H1 → 檔名。`.txt` 視為單一 section，以空行分段。
 
-**切塊演算法**（每個 section 獨立處理，**chunk 絕不跨 section**）：
+切塊規則（每個 section 獨立處理，**chunk 絕不跨 section**）：
 
-1. 取該 section 直屬的 block 序列（paragraph、list、fenced code、table、blockquote、thematic break 略過）。
-2. 依序累加 block，累計估算 token 達 `target` 時結束一個 chunk；若加入下一個 block 會超過 `max`，則在此處切。
-3. 單一 block 超過 `max`：依句界切（`。！？；` 與 `. ! ?` 後接空白），仍超過則硬切。**fenced code block 與 table 只在行界切，不在句界切。**
-4. 同一 section 內相鄰 chunk 之間保留重疊：前一個 chunk 的最後若干完整句子，總量 ≤ `overlap-tokens`。
-5. section 產出的最後一個 chunk 若 < `min-tokens`，併入前一個 chunk（即使超過 target，但不得超過 max；超過則保留原樣）。
-6. `.txt` 檔：視為單一 section，以空行分段當作 block。
+1. 依序累加 block，累計估算 token 達到 target 就結束一個 chunk；加入下一個 block 會超過 max 時，就在這裡切。
+2. 單一 block 超過 max 時，依序嘗試以下切點，最後才硬切（並標記 `:chunk/hard-cut?`）：
+   - 句界（`。！？；` 與 `. ! ?` 後接空白）；
+   - 行界。
+   **fenced code block 與 table 只在行界切。**
+3. 相鄰 chunk 之間的重疊，用同一組切點來取，而且重疊加上正文不會超過 max。每個 chunk（含重疊）都是原檔中一段連續的範圍，`char-start`／`char-end` 可以精確還原原文。
+4. section 的最後一個 chunk 若 < min，就併入前一個 chunk（前提是不超過 max）；判斷時只計這段自己的內容，不計繼承來的重疊。
+5. 只有 heading 沒有內容的 section 不產生 chunk，但它的 heading 仍會出現在子 section 的 trail 中。
 
-每個 chunk 記錄在原始檔中的 `char-start`／`char-end`（供文件檢視頁高亮）。
+（以上選擇見 2026-09-24「T1.3 chunker」。）
 
-### 7.4 Contextual header（便宜版 Contextual Retrieval）
+### 7.4 Contextual header
 
-`:chunk/index-text` = header ＋ 空行 ＋ `:chunk/text`，header 格式：
+`:chunk/index-text` = header ＋ 空行 ＋ `:chunk/text`。header 為：
 
 ```
 文件：{doc title}
 章節：{section trail}
 ```
 
-目的：讓脫離上下文的 chunk（例如「上述天數依年資計算」）在詞彙與語意索引中都帶有所屬脈絡。LLM 生成的 contextual summary 列入 backlog。
+level 0 的內容沒有 trail，不輸出 `章節：` 這一行。
 
 ### 7.5 連結解析
 
-從 AST 取出 link 節點：相對路徑的 `.md` 連結（忽略 `#anchor` 與 query）、以及 `[[Page Name]]` wikilink（以不分大小寫的標題或檔名比對）。解析成功者寫入 `:doc/links-to`。**連結解析在所有文件寫入後的第二輪進行**，因為目標文件可能晚於來源文件被處理。無法解析的連結記入 ingestion 報告，不報錯。
+從 AST 取出相對路徑的 `.md` 連結（忽略 `#anchor` 與 query），以及 `[[Page Name]]` wikilink（以不分大小寫的標題或檔名比對）。原始目標存在 `:doc/raw-links`。**每次匯入結束時，所有文件的連結都會重新解析**，所以晚加入的目標文件也會被連上。無法解析的連結列在報告中，不算錯誤。
 
 ### 7.6 增量流程
 
 ```
 walk corpus/ → set of (path, sha256)
-for each collection dir: upsert collection, resolve effective groups (§7.2)
+upsert collections, resolve effective groups (§7.2)
 for each file:
-  if doc exists and hash unchanged:
-      update effective-groups only if ACL inputs changed; skip
-  else:
-      parse → sections → chunks
-      in ONE transaction: retract old sections/chunks of this doc, upsert doc, add new ones
-for each doc in DB not on disk: retract doc + its sections + chunks
-second pass: resolve links for docs touched in this run (and docs linking to deleted docs)
-wait-for-secondary-index (fulltext + embedding) with timeout, report lag
+  unchanged hash            → skip (update effective-groups if ACL inputs changed)
+  only read_groups changed  → re-parse, reuse stored vectors → acl-updated
+  otherwise                 → parse → sections → chunks → embed changed chunks
+                              one transaction: upsert surviving ids in place
+                              (retracting dropped attrs), retractEntity removed ids
+for each doc in DB not on disk: delete doc + sections + chunks
+re-resolve all links (DB only)
+wait-for-secondary-index → report index lag
 ```
 
-ingestion 報告（EDN，同時寫入 `data/ingest-reports/<ts>.edn`）：新增／更新／略過／刪除文件數、chunk 數、未解析連結、耗時、index lag。
-
-`bb reindex`：刪除 `data/index.dtlv` 後完整 ingest。
+- 同一個 chunk id 在同一個交易中先 `retractEntity` 再新增會失敗（fulltext「Document does not exist」），所以改為就地更新（2026-09-24）。
+- 以文件為單位 embed：一份文件的 embed 失敗時，這份文件不寫入，其他文件照常進行。
+- 報告（EDN，寫入 `DATA_DIR/ingest-reports/<ts>.edn`）的欄位：新增／更新／acl-updated／略過／刪除的文件數、錯誤清單、本次寫入與索引中的 chunk 數、最長 chunk 的估算 token、未解析連結、index lag、耗時。
+- **匯入的兩個入口**：`bb ingest`（CLI）與 web 的 ingest runner（`/admin` 按鈕、`POST /api/v1/ingest`）。runner 同時只允許一個 job。`CORPUS_DIR` 不存在時拒絕執行，避免被誤判為「所有文件都被刪除」。**CLI 只在 server 停止時使用**：兩個 process 同時寫入沒有驗證過（§21）。
+- `bb reindex`：刪除 `index.dtlv` 後完整匯入，必須先停止 server。
 
 ### 7.7 Token 估算
 
-不在 JVM 端載入 tokenizer。估算函式：每個 CJK 字元（含假名、韓文）計 1；每個 ASCII 英數 run 計 `ceil(len / 4) + 1`；標點與空白不計。這是保守近似，所有上限都已預留空間；T2.6 的 eval 報告需附上「最長 chunk 的估算值」以便日後校正。
+不在 JVM 端載入 tokenizer。估算方式：
+- 每個 CJK 字元（含假名、韓文）計 1；
+- 每個由英數字元組成的 run 計 `ceil(len / 4) + 1`（包含全形與非 ASCII 字母數字）；
+- 標點與空白不計。
+
+實測對照：1500 個中文字約等於 bge-reranker 的 1191 tokens。
 
 ---
 
 ## 8. 中文 analyzer（斷詞）
 
-> **斷詞方式：** 重疊 bigram（§8.1–§8.3），不使用字典式斷詞。
+**重疊 bigram**，不使用字典式斷詞。已經實測比較過 bigram、HanLP 1.x 與兩者合併：在範例語料與書籍語料上，檢索品質沒有可量測的差異；HanLP 另外需要 8 MB 依賴、要逐語料維護字典，而且字典沒收的領域詞會退化成單字（2026-09-24，使用者決定；`docs/spikes/cjk-analyzer.md`）。
 
-> **理由：** 已實測比較 bigram、HanLP 1.x（`TraditionalChineseTokenizer`）與兩者合併，在範例語料與書籍語料上檢索品質無可量測差異；HanLP 另需 8 MB 依賴、逐語料維護字典，且字典未收的領域詞會退化成單字。見 `docs/spikes/cjk-analyzer.md`、`docs/decisions.md`（2026-09-24）。
+analyzer 以 Datalevin UDF 註冊（`index-conn/open`），是 runtime 狀態，每次開啟 DB 都必須提供；查詢端沿用索引端的 analyzer。**更換 analyzer 必須 `bb reindex`。**
 
-Datalevin 預設 analyzer 對中文幾乎無效，必須自訂。analyzer 以 Datalevin UDF 註冊（`index-conn/open`），是 runtime 狀態，每次開啟 DB 都必須提供；省略 `:query-analyzer` 時查詢端沿用索引端 analyzer。**更換 analyzer 必須 `bb reindex`。**
+### 8.1 索引端
 
-### 8.1 索引端 `cjk-analyzer`
+1. 逐 code point 做 NFKC 正規化並轉小寫（全形轉半形），offset 指向原字串位置。
+2. 切成 run：
+   - CJK run（漢字、假名、韓文）；
+   - ASCII run（`[a-z0-9]`，內部允許 `- _ . /` 連接，如 `sku-a123`、`v2.5`）；
+   - 其餘字元是分隔符。
+3. CJK run 輸出重疊 bigram；長度為 1 時輸出單字。
+4. ASCII run 輸出整個 token；含連接符時，另外輸出長度 ≥ 2 的子片段。
 
-輸入字串，輸出 `[term position offset]` 序列：
+已知限制：單獨查一個中文字時，只會命中文件中「單字 run」的地方（§21 backlog）。
 
-1. 逐 code point 做 NFKC 正規化與小寫化（全形轉半形），**offset 指向原字串位置**。
-2. 切成 run：CJK run（漢字、假名、韓文）；ASCII run（`[a-z0-9]`，內部允許 `- _ . /` 連接，如 `sku-a123`、`v2.5`、`hr-07`）；其餘字元為分隔符。
-3. CJK run：輸出重疊 bigram；run 長度為 1 時輸出單字。
-4. ASCII run：輸出整個 token；若含連接符，另外輸出各子片段（長度 ≥ 2）。
-5. position 依輸出順序遞增。
+### 8.2 查詢端
 
-### 8.2 查詢端 `cjk-query-analyzer`
+同 §8.1。
 
-同 8.1。T-Wand 的分層機制會優先回傳「包含所有 bigram」的文件，天然偏好完整詞組匹配，不需要額外處理。
-
-### 8.3 測試向量（必須全部通過）
+### 8.3 測試向量
 
 | 輸入 | 預期 terms（依序） |
 |---|---|
@@ -396,7 +349,7 @@ Datalevin 預設 analyzer 對中文幾乎無效，必須自訂。analyzer 以 Da
 | `SKU-A123 的庫存` | sku-a123 sku a123 的庫 庫存 |
 | `iPhone15手機` | iphone15 手機 |
 | `ＨＲ－０７表單` | hr-07 hr 07 表單 |
-| `v2.5 版本` | v2.5 v2 版本（子片段 `5` 長度 < 2，不輸出） |
+| `v2.5 版本` | v2.5 v2 版本 |
 | `請` | 請 |
 
 ---
@@ -407,231 +360,252 @@ Datalevin 預設 analyzer 對中文幾乎無效，必須自訂。analyzer 以 Da
 
 ```
 principal (username, groups, admin?) + query
- ├─ lexical  : fulltext on :chunk/index-text, top = channel-k × acl-overfetch, ACL join, take channel-k
- ├─ semantic : embedding-neighbors on :chunk/index-text, same over-fetch rule
+ ├─ lexical  : fulltext on :chunk/index-text, top = channel-k × overfetch, ACL filter, take channel-k
+ ├─ semantic : embed query, vec-neighbors on :chunk/vec, same over-fetch rule
  ├─ RRF(lexical, semantic) → top rerank-input
  ├─ graph    : 1-hop linked docs of top-5 fused docs → ≤ graph-max extra candidates
- ├─ rerank   : (fused ∪ graph) → vLLM rerank → sort by relevance_score
- ├─ select   : top final-k (optionally ≥ rerank-min-score)
- └─ context  : neighbor expansion + merge + budget packing → numbered passages
+ ├─ rerank   : (fused ∪ graph) → rerank endpoint → sort by relevance_score
+ ├─ select   : top final-k, dropping those below rerank-min-score
+ └─ context  : neighbour expansion + merge + budget packing → numbered passages
 ```
+
+Lexical 與 semantic 是兩個獨立的 DB 查詢；融合、graph 擴展、rerank、context 打包都在應用層的 pipeline（`replware.levinrag.retrieval.pipeline`）完成。
+
+全文查詢只用 BM25 加上布林條件。**不使用 phrase query**：`:index-position? true` 經由 Datalog `fulltext` 使用時無效（2026-09-22）。
 
 ### 9.2 Retriever protocol
 
 ```clojure
 (defprotocol Retriever
-  (index-doc!  [this parsed-doc] "Upsert one parsed doc with its sections and chunks.")
-  (delete-doc! [this doc-path]   "Remove a doc and all its sections and chunks.")
+  (index-doc!  [this parsed-doc])
+  (delete-doc! [this doc-path])
   (channel     [this principal channel-kw query opts]
-    "Return ACL-filtered candidates for one recall channel, ordered best-first.
-     Each candidate: {:chunk/id .. :doc/path .. :rank n :score x}")
-  (neighbors   [this principal chunk-id opts] "ACL-filtered adjacent chunks in the same section.")
-  (linked-docs [this principal doc-paths] "ACL-filtered 1-hop linked doc paths, both directions."))
+    "ACL-filtered recall for :lexical or :semantic.
+     Returns {:candidates [{:chunk/id :doc/path :rank :score} ...]  ; best-first, ≤ channel-k
+              :extended   [...]   ; the whole ACL-filtered over-fetch (for §9.5)
+              :raw-hits n :after-acl n :starved? bool}")
+  (neighbors   [this principal chunk-id opts] "ACL-filtered ±1 chunks in the same section.")
+  (linked-docs [this principal doc-paths] "ACL-filtered 1-hop linked doc paths, both directions.")
+  (chunks      [this principal chunk-ids] "ACL-filtered fetch by id (text for rerank and context)."))
 ```
 
-融合、rerank、context packing 屬於與儲存無關的 pipeline 層，不放在 protocol 內。
+pipeline 從不直接讀 DB；融合、rerank、context 打包與儲存無關。
 
 ### 9.3 ACL（硬性要求）
 
-- ACL 過濾**必須在 Retriever 內完成**，任何離開 Retriever 的候選都已經過濾。pipeline 層不得自行補做 ACL。
-- 查詢形式（lexical 為例）：
+- ACL 過濾**必須在 Retriever 內完成**。離開 Retriever 的候選、鄰居、連結與 chunk，都已經過濾。
+- 查詢形式：先算 `accessible-doc-ids`（使用者任一群組可讀的 doc entity id 集合），再多撈一些原始命中，對每個命中做 `contains?`：
 
 ```clojure
-(d/q '[:find ?cid ?score
-       :in $ ?q [?g ...]
-       :where
-       [(fulltext $ :chunk/index-text ?q {:top 200 :display :refs+scores})
-        [[?e _ _ ?score]]]
-       [?e :chunk/doc ?d]
-       [?d :doc/effective-groups ?g]
-       [?e :chunk/id ?cid]]
-     index-db query-text user-groups)
+(defn accessible-doc-ids [db groups]
+  (set (d/q '[:find [?d ...] :in $ [?g ...] :where [?d :doc/effective-groups ?g]]
+            db (vec groups))))
 ```
 
-- admin 走不含 ACL clause 的查詢，**必須是獨立函式**，不能用參數開關同一段查詢（降低誤用風險）。
-- 群組為空的非 admin 使用者：直接回傳空結果，不查 DB。
-- Over-fetch 後過濾結果少於 `channel-k`，且原始命中數等於 over-fetch 上限時，trace 標記 `:acl-starvation`。
-- `⚠️ VERIFY`（T0.4）：`fulltext` 的 `:doc-filter` 是在 top-k 之前還是之後套用；若為之前，可作為後續優化，但 MVP 以 over-fetch ＋ Datalog join 為正確性基準。
+- admin 走**獨立函式**（`channel-for-admin`、`docs/lookup-admin`），不在同一段查詢上用參數開關。
+- 沒有任何群組的非 admin 使用者：直接回傳空結果，不查 DB。
+- `linked-docs` 也會過濾**來源**文件：使用者看不到的文件，他也無從得知它連到哪裡。
+- Over-fetch 過濾後少於 `channel-k`，且原始命中數等於 over-fetch 上限時，trace 標記 `:acl-starvation`。
+- `:doc-filter` 無法經由 Datalog `fulltext` 使用，不可作為 ACL 預先過濾的機制（2026-09-22）。
 
 ### 9.4 RRF
 
-```clojure
-(defn rrf
-  "Fuse best-first lists of chunk ids by reciprocal rank. Missing = no
-   contribution. Ties go to the better rank in the first list (lexical),
-   then the next list, then the id — fully deterministic."
-  [k & ranked-lists]
-  (let [rank-maps (mapv #(into {} (map-indexed (fn [i id] [id i])) %) ranked-lists)
-        scores (reduce (fn [m [id s]] (update m id (fnil + 0.0) s))
-                       {}
-                       (mapcat (fn [ids] (map-indexed (fn [i id] [id (/ 1.0 (+ k i 1))]) ids))
-                               ranked-lists))]
-    (->> scores
-         (sort-by (fn [[id s]]
-                    (into [(- s)] (conj (mapv #(get % id Long/MAX_VALUE) rank-maps) id))))
-         vec)))
-```
+依名次的倒數融合：`score(id) = Σ 1/(k + rank + 1)`，缺席的通道不貢獻分數。平手時依序比較 lexical 名次、semantic 名次，最後比較 chunk id，排序必須完全確定（不可用 `(sort-by val >)`）。實作見 `retrieval/fusion.clj`，平手情境有測試。
 
-平手時以 lexical rank 較佳者優先，其次 semantic rank，最後 chunk id；排序必須完全確定，測試需覆蓋平手情境。**不可用 `(sort-by val >)`**：同分時順序取決於 map 的內部順序，會讓平手測試失去意義。
+### 9.5 Graph 通道
 
-### 9.5 Graph 通道（MVP 版）
-
-1. 取 RRF 結果前 5 名所屬的不重複文件。
-2. 取這些文件 1-hop 連結的文件（雙向，ACL 過濾），排除已在候選中的文件。
-3. 每個連結文件最多貢獻 2 個 chunk：優先取在 lexical 或 semantic 延伸清單（over-fetch 後、截斷前的完整結果）中出現者，依較佳 rank；都沒有則取 `ordinal 0`。
-4. 總數上限 `graph-max`，標記 channel `:graph`，**不參與 RRF，直接進 rerank**，由 reranker 決定是否有用。
-5. 設定 `:retrieve/graph-channel?`（預設 true），eval 會比較開關差異。
+1. 取 RRF 前 5 名所屬的不重複文件。
+2. 取這些文件 1-hop 連結的文件（雙向，經過 ACL 過濾），排除已經在候選中的文件。
+3. 每個連結文件最多貢獻 2 個 chunk：優先取在 lexical／semantic 的延伸清單（`:extended`）中出現、名次較佳者；都沒有就取 ordinal 0。
+4. 總數上限 `graph-max`，channel 標記為 `:graph`，**不參與 RRF，直接進入 rerank**。
+5. `:graph?`（預設 true）可以關閉；eval 會比較開關的差異。
 
 ### 9.6 Rerank
 
-- 輸入：chunk 的 `:chunk/index-text`（含 header），每筆以字元數截斷至 `:rerank/max-chars`（預設 1500）。
-- 失敗（逾時、非 2xx、200 但結構錯誤）：沿用 RRF 順序（graph 候選排在最後），trace 標記 `:rerank-failed`，API 回應 `degraded: ["rerank_failed"]`。
-- `rerank-min-score` 設定於 `resources/config.edn`（預設 `-7.0`，2026-09-25 以 eval 校準，見 `docs/spikes/rerank-threshold.md`）；pipeline 函式本身的預設仍為停用（nil）。分數分佈會記錄在 trace，供日後重新校準。
+- 輸入是 chunk 的 `:chunk/index-text`（含 header），以字元數截斷到 `:max-chars`（1500）。
+- 失敗（逾時、非 2xx、200 但結構錯誤）時：沿用 RRF 順序（graph 候選排在最後），trace 標記 `:rerank-failed`，API 回應 `degraded: ["rerank_failed"]`。
+- `rerank-min-score` 在 `config.edn` 設為 `-7.0`：這是在範例與書籍語料上不會丟掉任何答案的最高門檻（2026-09-25）。分數分布記錄在 trace，供日後重新校準。
 
 ### 9.7 Context 擴展與打包
 
-1. 對每個選中的 chunk，加入同 section 的 `ordinal ± 1` 鄰居（ACL 過濾）。
-2. 同一文件中 ordinal 連續的 chunk 合併為一個 passage（去除 overlap 重複的句子）。
-3. passage 依其中最佳 rerank 分數排序，依序放入，總估算 token ≤ `:context/max-tokens`；放不下的鄰居先捨棄，被選中的原始 chunk 最後才捨棄。
-4. 為每個 passage 編號 `[1]..[n]`。
+1. 每個選中的 chunk 加入同 section 的 `ordinal ± 1` 鄰居（ACL 過濾）。
+2. **同一個 section** 內 ordinal 連續的 chunk 合併成一個 passage，依字元位移去除重疊；passage 就等於原檔中的一段連續範圍。
+3. passage 依其中最佳的 rerank 分數排序，依序放入，總估算 token ≤ `:max-tokens`。放不下時先捨棄鄰居，被選中的原始 chunk 最後才捨棄；只剩鄰居的 passage 不輸出。
+4. passage 編號 `[1]..[n]`。
 
 ### 9.8 輸出結構
 
 ```clojure
 {:passages   [{:n 1 :doc/path "hr/leave.md" :doc/title "請假規定"
-               :section/trail "特休 > 計算方式" :chunk-ids ["hr/leave.md::3" "hr/leave.md::4"]
+               :section/trail "請假規定 > 特休 > 天數計算"
+               :chunk-ids ["hr/leave.md::3" "hr/leave.md::4"]
                :char-range [1200 2380] :text "..."}]
- :candidates [{:chunk/id "hr/leave.md::3"
+ :candidates [{:chunk/id "hr/leave.md::3" :doc/path "hr/leave.md"
                :channels {:lexical {:rank 2 :score 7.1} :semantic {:rank 5 :score 0.79}}
-               :rrf 0.0321 :rerank 0.87 :selected? true}]
- :degraded   #{}}
+               :rrf 0.0321 :rerank 4.6 :selected? true}]
+ :degraded   #{}            ; or #{:rerank-failed}
+ :flags      #{}            ; :acl-starvation, :rerank-failed
+ :stages     {...}}         ; §14
 ```
 
 ---
 
 ## 10. 生成
 
-### 10.1 Prompt（存放於 `resources/prompts/answer.md`，可不改程式調整）
+### 10.1 Prompt
 
-System 要點：
+System prompt 放在 `resources/prompts/answer.md`，每次呼叫時讀取，改了不必重啟。要點：
+- 只根據提供的來源回答；
+- 每個事實性陳述標註 `[n]`；
+- 資料不足時明說「資料中找不到」；
+- 預設以繁體中文回答，使用者用其他語言提問時用該語言回答。
 
-- 只能根據提供的資料來源回答；不使用資料來源以外的知識補充事實。
-- 每個事實性陳述後標註來源編號，格式 `[n]`，可多個 `[1][3]`。
-- 資料不足時明確說明「資料中找不到」哪一部分，不要猜測。
-- 預設以繁體中文回答；使用者以其他語言提問時用該語言回答。
+User message 的格式是 `<sources>` 區塊（每個 passage 以 `[n] 文件標題｜章節` 開頭）＋ `問題：…`。**passage 的標題、章節與內文中的 `<sources>`／`</sources>`（不分大小寫、標籤內可有空白）會先轉成全形角括號**，避免文件內容結束來源區塊並冒充使用者（間接 prompt injection）。
 
-User message：`<sources>` 區塊（每個 passage 以 `[n] 文件標題｜章節` 開頭）＋ 使用者問題。
-
-參數：`temperature 0.2`、`max_tokens 1024`，皆可設定。
+參數：`temperature 0.2`、`max_tokens 1024`。回應中的 `<think>…</think>` 會被移除；只有 `<think>` 沒有結尾時，移除其後全部內容；只有 `</think>` 沒有開頭時（模板預先填入 `<think>` 的情況），移除其前全部內容。
 
 ### 10.2 引用驗證
 
-- 解析回答中所有 `[n]`；不存在的編號移除並記入 trace `:invalid-citations`。
-- 回傳 `citations` 只包含實際被引用的 passage。
-- 回答完全沒有引用、且不是「找不到」類回覆時，trace 標記 `:uncited-answer`（不阻擋回傳，供 eval 追蹤）。
+- 接受的格式：`[n]`、`[n][m]`、`[n, m]`（也接受 `，`、`、`），以及全形的 `［n］`、`【n】`，**含全形數字**（`［１］`）。一律改寫為 `[n]`。範圍寫法 `[1-3]` 不支援。
+- 超出範圍的編號（含 `[0]`、`[2024]` 這類年份）會被移除，並記入 `:generate :invalid-citations`。Markdown 連結文字 `[x](..)` 不受影響。
+- 回傳的 `citations` 只包含實際被引用的 passage。
+- 回答沒有任何引用、又不是「找不到」類的回覆時，標記 `:uncited-answer`。「找不到」用 regex 判斷：找不到／查無／沒有相關／not found／no relevant／cannot find。
+- 移除思考內容後回答為空時，回傳固定訊息「模型沒有產生回答，請稍後再試。」，不附引用，標記 `:empty-answer`。
 
 ### 10.3 無證據路徑
 
-rerank 後沒有任何候選（或全部低於門檻）→ 不呼叫 chat，直接回傳固定訊息：「在你有權限存取的資料中找不到相關內容。」並回傳 `no_evidence: true`。
+pipeline 沒有產生任何 passage（沒有候選，或全部低於門檻）時，不呼叫 chat，直接回傳「在你有權限存取的資料中找不到相關內容。」與 `no_evidence: true`。
 
 ---
 
 ## 11. HTTP API
 
-前綴 `/api/v1`，JSON（snake_case），`Authorization: Bearer <token>`。錯誤格式：`{"error": {"code": "...", "message": "..."}}`。
+前綴 `/api/v1`，JSON（snake_case），以 `Authorization: Bearer <token>` 認證。錯誤格式：`{"error": {"code": "...", "message": "..."}}`。`query` 長度 1–1000 字元，`final_k` 1–50。
 
 | Method | Path | 權限 | 說明 |
 |---|---|---|---|
-| POST | `/search` | user | 只檢索不生成。body `{query, final_k?, graph?}`；回傳 passages ＋ candidates（含各通道 rank）＋ `trace_id` |
-| POST | `/ask` | user | 檢索＋生成。body `{query, final_k?, debug?}`；回傳 `{answer, citations, no_evidence, degraded, trace_id}`，`debug=true` 時附 candidates |
-| GET | `/docs/{path}` | user | 文件 metadata 與 chunk 清單，ACL 過濾，無權限回 404（不回 403，避免洩漏存在性） |
-| POST | `/ingest` | admin | 觸發 ingestion job，回傳 `job_id`；同時只允許一個 job，衝突回 409 |
+| POST | `/search` | user | 只檢索，不生成。body `{query, final_k?, graph?}`；回傳 `passages`、`candidates`（含各通道名次）、`degraded`、`trace_id` |
+| POST | `/ask` | user | 檢索加生成。body `{query, final_k?, debug?}`；回傳 `{answer, citations, no_evidence, degraded, trace_id}`，`debug=true` 時附上 `candidates` |
+| GET | `/docs/{path}` | user | 文件 metadata 與 chunk 清單，經過 ACL 過濾；看不到的一律 404 |
+| POST | `/ingest` | admin | 啟動匯入 job，回傳 `job_id`；已有 job 在跑時回 409 |
 | GET | `/ingest/{job_id}` | admin | job 狀態與報告 |
-| GET | `/traces/{id}` | admin 或 trace 擁有者 | trace 內容 |
-| GET | `/health` | 無 | DB 狀態、三個 vLLM endpoint 可達性、index lag；任一依賴失敗回 503 並列出 |
+| GET | `/traces/{id}` | admin 或 trace 擁有者 | trace 內容；其他人一律 404 |
+| GET | `/health/live` | 無 | 兩個 DB 各讀取一筆 datom。給負載平衡器（Kamal）使用 |
+| GET | `/health` | 無 | DB、三個模型端點、index lag。任一 DB 或模型失敗回 503，body 列出每一項 |
 
-Request 與 response 以 Malli schema 定義並驗證（Reitit coercion）。`query` 長度上限 1000 字元。
+錯誤碼：
+
+| HTTP | code | 情況 |
+|---|---|---|
+| 400 | `invalid_request` | body 不符 schema |
+| 401 | `unauthorized` | 沒有或無效的 token |
+| 404 | `not_found` | 不存在或無權限（不區分兩者） |
+| 409 | `conflict` | 已有 ingest job 在執行 |
+| 503 | `dependency_unavailable` | embed 或 chat 端點失敗。body 另外帶 `trace_id`，指向記錄失敗的那筆 trace |
+
+rerank 失敗**不會**回 503，而是回 200 並帶上 `degraded: ["rerank_failed"]`。
+
+**Health 的細節（2026-09-25）**：
+- 三個模型探測同時進行，每個最多等 5 秒，逾時即為 `down`。
+- 結果快取 30 秒，從探測**結束**時起算。
+- 探測進行中收到的請求，會等待同一輪的結果，不另外發請求。
+- index lag 只回報，不會造成 503。
+- 回應格式：`{"status": "ok"|"degraded", "checks": {...}, "index_lag": n}`。
 
 ---
 
 ## 12. Web UI
 
-HTMX ＋ Hiccup SSR，Tailwind（可用 DaisyUI）。
+HTMX 加 Hiccup 的伺服器端渲染，樣式用 Tailwind v4。沒有 DaisyUI，建置流程也不需要 npm。網頁路由用 session cookie 加 CSRF 認證，並**直接呼叫**與 API 相同的函式，瀏覽器不會持有 API token。CSRF 只套用在網頁路由；`/api/v1` 以 bearer token 認證，瀏覽器不會自動附帶，所以不需要 CSRF（2026-09-24）。
 
 | 路徑 | 內容 |
 |---|---|
-| `/login` | 帳密登入 |
-| `/` | 問答頁：輸入框、回答（`[n]` 可點擊捲動到來源）、來源面板（文件標題、章節、摘錄、「開啟文件」連結）、**Debug 開關** |
-| Debug 面板 | 表格列出所有候選：chunk id、lexical rank、semantic rank、RRF 分數、graph 標記、rerank 分數、是否選中；各階段耗時；degraded 旗標。這是本 MVP 最重要的學習介面。 |
-| `/docs/*path` | 以 commonmark 渲染文件（關閉 raw HTML），被引用的 chunk 範圍以背景色高亮並可用 anchor 直達 |
-| `/admin` | 觸發 ingest、查看最近一次報告、index lag、最近 50 筆 trace 清單 |
+| `/login`、`POST /login`、`POST /logout` | 帳密登入。失敗時只顯示「帳號或密碼錯誤」。`next` 參數只接受同站路徑 |
+| `/` | 問答頁：輸入框、Debug 開關；`POST /ask`（HTMX）回傳結果片段 |
+| 結果片段 | 回答（`[n]` 可點擊，捲動到對應來源）、來源面板（標題、章節、摘錄、「開啟文件」）；Debug 開啟時附 Debug 面板；另有無證據、降級、錯誤等提示（錯誤提示含 trace id） |
+| Debug 面板 | 所有候選：chunk id、lexical 名次、semantic 名次、RRF、graph 標記、rerank 分數、是否選中；各階段耗時、模型與 token 數、flags、degraded。**數值讀自已儲存的 trace**，有測試逐欄比對 |
+| `/docs/*path` | 以 commonmark 渲染原檔（escape HTML、過濾 URL），被引用的 chunk 以底色標出，可用 `?chunk=` 直達。檔案在建立索引後被改過時顯示提示。看不到的文件回 404 |
+| `/admin` | admin 限定：執行增量匯入（執行中每 2 秒更新狀態）、最近一次報告、index lag、最近 50 筆 trace 與明細 |
 
-HTMX 請求需帶 CSRF token（沿用 Stack Lite 的機制；若需調整記入 decisions.md）。
+未登入時，一般請求 302 導向 `/login?next=…`，HTMX 請求改回 `HX-Redirect: /login`。非 admin 存取 admin 頁面時回 404。`bb browser-check`（Playwright）是「沒有 JS 錯誤」的驗收工具。
 
 ---
 
 ## 13. 認證與使用者管理
 
-- 密碼：buddy-hashers。Session：Ring 加密 cookie，`HttpOnly`、`SameSite=Lax`、正式環境 `Secure`。
-- API token：CLI 產生 32 bytes 隨機值，**只顯示一次**，DB 只存 sha256。
-- MVP 不做註冊與使用者管理 UI，以 Babashka tasks 處理：
+- **密碼**：buddy-hashers。
+- **Session**：Ring 加密 cookie，只存 `{:username :issued-at}`；principal 每個請求都重新從 `app.dtlv` 讀取，所以群組變更、降權、刪除立即生效。
+  - Cookie 屬性：`HttpOnly`、`SameSite=Lax`；只有 `:prod` 加上 `Secure`。
+  - **時效**：登入超過 `SESSION_MAX_AGE_HOURS`（8）即失效；沒有 `:issued-at` 的舊 cookie 一律失效。
+  - **撤銷**：登出與 `bb user:passwd` 會把 `:user/sessions-valid-after` 設為現在，該使用者**所有裝置**的 session 一起失效。cookie 本身就是 session 的全部，所以只能以使用者為單位撤銷（2026-09-25，使用者決定）。
+- **API token**：CLI 產生 32 bytes 隨機值，只顯示一次；DB 存 sha256 與 8 字元前綴。token 沒有期限，不受登出或改密碼影響。
+- **身分與 principal 分離**（D9），日後加入 SSO 只需要新增一個 adapter。
+- 使用者管理用 Babashka tasks，沒有 UI：
 
 ```
-bb user:create alice --groups all,hr [--admin]
-bb user:groups alice all,hr,finance
-bb user:passwd alice
+bb user:create alice --groups all,hr [--admin]   ; 不設密碼
+bb user:groups alice all,hr,finance              ; 取代整組群組
+bb user:passwd alice                             ; 互動輸入兩次，≥ 8 字元；撤銷其網頁 session
 bb token:create alice --label "cli"
 bb token:revoke <prefix>
 ```
+
+正式環境的容器裡沒有 `bb`，改用 `java … -cp standalone.jar clojure.main -m replware.levinrag.auth.cli <command>`（見 `docs/howto/ops.md`）。
 
 ---
 
 ## 14. Trace 與可觀察性
 
-每次 `/search` 與 `/ask` 寫入一筆 trace（`app.dtlv`）。`:trace/stages` 內容：
+每一次 `/search` 與 `/ask` 都寫入一筆 trace（`app.dtlv`），包括因模型端點失敗而回 503 的請求。`:trace/stages`：
 
 ```clojure
 {:lexical  {:ms 12 :raw-hits 200 :after-acl 50 :top [["hr/leave.md::3" 7.1] ...]}
  :semantic {:ms 35 :raw-hits 200 :after-acl 50 :top [...]}
  :fusion   {:ms 1 :top [["hr/leave.md::3" 0.0321] ...]}
  :graph    {:ms 4 :added ["hr/payroll/bonus.md::0"]}
- :rerank   {:ms 180 :scores [["hr/leave.md::3" 0.87] ...] :failed? false}
- :context  {:passages 5 :tokens 3120 :dropped ["..."]}
- :generate {:ms 2400 :model "..." :prompt-tokens 3500 :completion-tokens 320}
+ :rerank   {:ms 180 :failed? false :scores [["hr/leave.md::3" 4.6] ...]}
+ :context  {:ms 2 :passages 5 :tokens 3120 :dropped [...]}
+ :generate {:ms 2400 :model "..." :prompt-tokens 3500 :completion-tokens 320
+            :finish-reason "stop" :invalid-citations []}
  :flags    #{:acl-starvation}}
+;; dependency failure:
+{:error {:endpoint :chat :message "vLLM chat timed out"}}   ; degraded #{:dependency-failed}
 ```
 
-`top` 清單只存 id 與分數，不存 chunk 內文（避免 trace 膨脹與敏感內容複製）。Log 使用結構化輸出，一行一事件，含 `trace_id`。
+- 每個 `:top` 清單最多保留 20 筆，而且只存 id 與分數，不存 chunk 內文。回答全文存在 `:trace/answer`。
+- `/admin` 列出最近的 trace 時，是沿 `:trace/at` 反向掃描、只讀取需要的筆數，不會載入全部 trace。
+- log 採結構化輸出，一行一個事件，含 `trace_id`。
 
 ---
 
 ## 15. 評估框架
 
-### 15.1 題庫格式 `eval/questions.edn`
+### 15.1 題庫 `eval/questions.edn`
 
 ```clojure
-[{:id "leave-01"
-  :user "alice"
-  :query "特休天數怎麼計算？"
-  :expected-docs ["hr/leave.md"]}
- {:id "acl-01"
-  :user "bob"                                 ; not in hr
-  :query "年終獎金的發放標準"
-  :must-not-docs ["hr/payroll/bonus.md"]}]     ; ACL negative case
+[{:id "leave-01" :user "alice" :query "特休天數怎麼計算？" :expected-docs ["hr/leave.md"]}
+ {:id "acl-01"   :user "bob"   :query "年終獎金的發放標準" :must-not-docs ["hr/payroll/bonus.md"]}
+ ;; optional section-level scoring: :expected-sections ["<path>#<n>"]
+ ]
 ```
+
+eval 的身分來自 `eval/users.edn`，所以 `bb eval` 不依賴 `app.dtlv`。目前題庫有 38 題，其中 8 題是 ACL 負向題。
 
 ### 15.2 執行
 
-`bb eval [--variants lexical,semantic,hybrid,hybrid+rerank,hybrid+rerank+graph]`，對每題以題目指定的使用者身分執行 `/search` pipeline（直接呼叫函式，不經 HTTP），輸出：
+`bb eval [--variants lexical,semantic,hybrid,hybrid+rerank,hybrid+rerank+graph]` 以各題指定的使用者身分，直接呼叫檢索 pipeline（不經 HTTP），輸出：
 
-- 每個變體的 doc-level recall@5、recall@10、MRR@10（去重後的文件排名）。
-- ACL 洩漏數（`must-not-docs` 出現在任何變體的任何位置即計 1）。**> 0 時指令以非零狀態碼結束。**
-- 最長 chunk 的估算 token、各階段 p50／p95 耗時。
-- 結果寫入 `eval/results/<ts>.edn` 並在終端機印表格。
+- 每個變體的 doc-level recall@5、recall@10、MRR@10（去重後的文件排名）；
+- ACL 洩漏數：`must-not-docs` 出現在任何變體的任何位置就計 1；**> 0 時以非零狀態碼結束**；
+- degraded 題數。有題目在降級狀態下執行時會印出警告，但狀態碼不變；
+- 最長 chunk 的估算 token、各階段 p50／p95 耗時；
+- 結果寫入 `eval/results/<ts>.edn`（gitignored），並在終端機印出表格。
+
+**已知限制**：範例語料太小，所有變體的 recall 都是 1.0，無法比較變體的優劣；變體比較要用較大的語料（§21）。
 
 ### 15.3 樣本語料
 
-Claude Code 需建立 `corpus-sample/`：約 20 份文件，繁中為主、夾雜英文；包含 §7.1 的目錄與 ACL 結構、至少一份 frontmatter 覆寫、文件間互相連結、含料號與表單編號這類精確識別碼（如 `SKU-A1234`、`HR-07`）、含一份超長 section 與一份含表格與程式碼區塊的文件。題庫至少 30 題，其中 ≥ 6 題為 ACL 負向題、≥ 5 題需精確識別碼、≥ 5 題需跨文件（連結）資訊。種子使用者：`alice`（all, hr）、`bob`（all, engineering）、`carol`（all, finance）、`admin`。
+`corpus-sample/`：22 份文件、119 chunks，以繁體中文為主、夾雜英文。內容涵蓋 §7.1 的目錄與 ACL 結構、frontmatter 覆寫、文件互相連結、精確識別碼（`SKU-A1234`、`HR-07`），以及長 section、表格與程式碼區塊。種子使用者：`alice`（all, hr）、`bob`（all, engineering）、`carol`（all, finance）、`admin`。
 
 ---
 
@@ -639,124 +613,184 @@ Claude Code 需建立 `corpus-sample/`：約 20 份文件，繁中為主、夾�
 
 ```
 levinrag/
-├── SPEC.md                      ; this file
-├── CLAUDE.md                    ; §0 rules + commands cheat sheet
-├── deps.edn  bb.edn
+├── SPEC.md                         ; this file (current spec)
+├── README.md  CLAUDE.md  VLLM_SETUP.md
+├── deps.edn  bb.edn  Dockerfile  .kamal/
 ├── resources/
-│   ├── config.edn
+│   ├── config.edn                  ; Integrant system, all profiles
 │   └── prompts/answer.md
-├── src/levinrag/
-│   ├── system.clj               ; Integrant config & init
-│   ├── config.clj
+├── src/replware/levinrag/
+│   ├── core.clj  server.clj  routes.clj  handlers.clj  health.clj  config.clj
 │   ├── db/{schema,index_conn,app_conn}.clj
-│   ├── ingest/{walker,acl,markdown,chunker,tokens,links,job,report}.clj
+│   ├── ingest/{walker,acl,markdown,chunker,tokens,writer,job,runner,report,cli}.clj
 │   ├── search/analyzer.clj
-│   ├── retrieval/{protocol,datalevin,fusion,graph,rerank,context,pipeline}.clj
-│   ├── llm/{http,embed,rerank_client,chat,answer}.clj
-│   ├── auth/{password,token,session,middleware}.clj
-│   ├── trace.clj
-│   ├── api/{routes,handlers,schemas}.clj
-│   ├── web/{routes,layout,ask,docs,admin,login}.clj
-│   └── eval/harness.clj
-├── test/levinrag/...            ; mirrors src
-├── corpus-sample/
-├── eval/{questions.edn,results/}
-└── docs/{vllm.md,decisions.md,backlog.md,spikes/}
+│   ├── retrieval/{protocol,datalevin,fusion,graph,rerank,context,pipeline,system}.clj
+│   ├── llm/{http,embed,rerank_client,chat,answer,check}.clj
+│   ├── auth/{users,token,middleware,cli}.clj
+│   ├── api/{search,ask,docs,ingest,traces}.clj
+│   ├── web/{layout,auth,ask,docs,admin}.clj
+│   ├── docs.clj  trace.clj  views.clj
+│   └── eval/{harness,cli}.clj
+├── test/replware/levinrag/...      ; mirrors src; security_test.clj = §18.3
+├── dev/                            ; REPL helpers, browser check server, spikes
+├── corpus-sample/  eval/{questions.edn,users.edn,results/}
+└── docs/
+    ├── design/2026-09-22-initial-spec.md   ; frozen initial spec
+    ├── decisions.md  backlog.md
+    ├── howto/{ops,admin,user}.md
+    ├── spikes/  handoff/
+    └── superpowers/{specs,plans}/          ; per-phase designs and plans
 ```
 
 ---
 
 ## 17. 開發階段與驗收條件
 
-### Phase 0：骨架與 spike
+Phase 0–5 已完成，每個 Phase 結束時都由一位新的 reviewer 審查整段變更，並做過一輪修正。各 Phase 的詳細 task 與驗收條件見初版規格 §17，以及 `docs/superpowers/plans/`。
 
-**T0.1 專案骨架**：以 Clojure Stack Lite 產生專案（SQLite、無 auth）；移除 next.jdbc、HoneySQL、Ragtime、SQLite driver 與 migrations；加入 Datalevin 與兩個 Integrant component（`index-conn`、`app-conn`，haltkey 時正確關閉）。
-AC：`bb test`、`bb lint` 通過；`/api/v1/health` 回報兩個 DB 已開啟。
+| Phase | 內容 | 狀態 |
+|---|---|---|
+| 0 骨架與 spike | 專案骨架、模型 client、embedding／全文／ACL 效能 spike | ✅ |
+| 1 Ingestion | walker 與 ACL、section 樹、chunker、index writer、CLI 與樣本語料 | ✅ |
+| 2 檢索與評估 | 認證、lexical／semantic 通道＋ACL、RRF＋graph、rerank 降級、context 打包、`/search`＋trace、eval | ✅ |
+| 3 生成 | answer 模組、`/ask`（以真實模型驗證） | ✅ |
+| 4 Web UI | 登入、問答頁＋來源＋Debug 面板、文件檢視、admin 頁 | ✅ |
+| 5 強化 | T5.1 health／逾時／錯誤一致化 ✅；T5.2 §18.3 端到端安全測試與 session 時效 ✅；T5.3 README 與 HowTo ✅；**T5.4 `/ask` SSE 串流：延後**（§21） | ✅（T5.4 除外） |
 
-**T0.2 vLLM clients**：embed、rerank、chat 三個 client 與 `bb vllm:check`。
-AC：三個 endpoint 皆回傳合理結果；錯誤 key 時訊息明確指出是哪個 endpoint 認證失敗；log 中搜尋不到 key 字串。
-
-**T0.3 Spike：embedding 路徑**
-- 路徑 A（優先）：`:db/embedding` ＋ `:openai-compatible` provider 指向 vLLM。
-- 路徑 B（備援）：應用程式批次呼叫 `/v1/embeddings`，存成 `:db.type/vec`，查詢時自行 embed 後用 `vec-neighbors`。
-- 驗證：認證是否正常、`:request-dimensions` 是否被送成 `dimensions` 參數而被 vLLM 拒絕、500 個 chunk 的 ingestion 吞吐、async 模式下 `wait-for-secondary-index` 行為。
-AC：`docs/spikes/embedding.md` 寫明採用 A 或 B 與數據。Retriever 實作依結論進行，protocol 不變。
-
-**T0.4 Spike：全文檢索**
-- 自訂 analyzer 在 Datalog search domain 的註冊方式；同一 attribute 同時 fulltext＋embedding；`:display :refs+scores` 的 tuple 形狀；`:doc-filter` 套用時機；phrase search 需要 `:index-position? true`。
-AC：`docs/spikes/fulltext.md`，含可執行的最小範例。
-
-**T0.5 Spike：ACL 查詢效能**：合成 10k 文件／100k chunks、50 個群組，量測 §9.3 查詢（over-fetch 200）的延遲。
-AC：p50 < 100 ms，否則在 decisions.md 提出替代方案（例如 `:doc-filter` 預先過濾）。
-
-### Phase 1：Ingestion
-
-**T1.1 walker 與 ACL 物化**：AC：§7.2 四條規則各有單元測試；覆寫語意測試通過。
-**T1.2 Markdown → section 樹**：AC：Setext／ATX 混用、無 heading、只有 frontmatter、深層巢狀等案例測試。
-**T1.3 chunker 與 token 估算**：AC：chunk 不跨 section；無 chunk 超過 max（硬切除外，需標記）；code block 與 table 不在句中切；overlap 正確；char range 可還原原文。
-**T1.4 index writer**：`index-doc!`、`delete-doc!`、hash 增量、連結第二輪。AC：修改一份文件只重寫該文件；刪檔後其 chunk 完全消失；ACL-only 變更不觸發重新 embedding。
-**T1.5 CLI 與樣本語料**：`bb ingest`、`bb reindex`、樣本語料與題庫。AC：樣本語料完整 ingest，報告無錯誤，index lag 最終為 0。
-
-### Phase 2：檢索與評估
-
-**T2.0 最小認證**：app.dtlv、`bb user:*`／`bb token:*`、bearer middleware。
-**T2.1 lexical／semantic 通道＋ACL**。AC：§18.3 安全測試（通道層）通過。
-**T2.2 RRF＋graph 通道**。AC：RRF 單元測試（含平手）；graph 候選不重複、受 ACL 約束。
-**T2.3 rerank 與降級**。AC：模擬 rerank 逾時、500、200-with-error 三種情況皆降級且標記。
-**T2.4 context 打包**。AC：預算不超出；合併後無重複句；編號連續。
-**T2.5 `POST /search`＋trace**。
-**T2.6 eval harness**。AC：五個變體報告產出；ACL 洩漏 = 0；結果檔寫入。
-
-### Phase 3：生成
-
-**T3.1 answer 模組**：prompt 載入、chat 呼叫、`<think>` 剝除、引用驗證、無證據路徑。AC：以 stub chat 回應測試各種引用格式與無效編號。
-**T3.2 `POST /ask`**。AC：真實 vLLM 下樣本題可得到帶引用的回答（`:vllm` 標籤測試）。
-
-### Phase 4：Web UI
-
-**T4.1 登入／登出／session**。**T4.2 問答頁＋來源面板＋Debug 面板**。**T4.3 文件檢視與高亮**。**T4.4 admin 頁**。
-AC：無 JS 錯誤；未登入導向 `/login`；Debug 面板數值與 trace 一致；無權限文件頁回 404。
-
-### Phase 5：強化
-
-**T5.1** health、逾時、錯誤處理一致化。**T5.2** 端到端安全測試套件（§18.3 全部）。**T5.3** README 與維運手冊（啟動、vLLM 設定、ingest、eval、備份 `data/app.dtlv`）。**T5.4（stretch）** `/ask` SSE 串流。
+之後的工作見 §21。
 
 ---
 
 ## 18. 測試策略
 
 ### 18.1 單元測試
-analyzer 測試向量、chunker、token 估算、ACL 解析、RRF、context 打包、引用解析、rerank 回應驗證。
+
+analyzer 測試向量、chunker、token 估算、ACL 解析、RRF（含平手）、context 打包、引用解析、rerank 回應驗證、session 有效性判斷、health 快取。
 
 ### 18.2 整合測試
-每個測試使用暫存目錄建立 Datalevin，結束後刪除。vLLM 以 stub HTTP server 模擬（固定向量：以文字 hash 產生 deterministic 單位向量即可）。需要真實 vLLM 的測試標上 `:vllm`，未設定 `VLLM_*` 環境變數時自動略過。
+
+每個測試都用暫存目錄建立 Datalevin，結束後刪除。模型以 stub 模擬（固定向量：用文字的 hash 產生確定的單位向量）；HTTP 層用本機 Jetty stub server。需要真實模型的測試標上 `:vllm`，沒有設定 `VLLM_*` 時自動略過。網頁測試用保存 cookie 的 client 直接呼叫 Ring handler。
+
+- 快速迴圈（nREPL）與完整執行（`clojure -X:jvm-opts:test`，含 coverage）的方式見 `CLAUDE.md`。
+- 目前共 213 個測試。
+- `bb browser-check` 另外在真瀏覽器中走過主要流程。
 
 ### 18.3 安全測試（ACL，不可省略）
-以樣本語料與種子使用者，對每個受限文件驗證無權限使用者：
-- `/search` 任何通道、任何變體都不出現該文件的 chunk；
-- `/ask` 的 citations 與 debug candidates 都不出現；
-- `/docs/{path}` 回 404；
-- graph 通道不會經由連結把受限文件帶進來；
-- context 擴展的鄰居不會越權（同 section 鄰居理論上同文件，但仍需測）；
-- 無群組的使用者任何查詢皆為空結果；
-- trace 查詢：非擁有者非 admin 回 404。
+
+`test/replware/levinrag/security_test.clj` 以樣本語料與種子使用者（外加一位沒有群組的使用者）執行。矩陣**由索引推導**，不是寫死的：每一份受限文件 × 每一位無權限的使用者。
+
+- `/search` 的每種 graph 開關，以及 eval 的每種變體，都不會出現該文件的 chunk；
+- `/ask` 的 citations 與 debug candidates 都沒有它；
+- **送給模型的 prompt**（system 與 `<sources>`）不含它的路徑、標題與開頭內文。使用者本來就能讀到的字串除外，但每一組都至少要檢查一項；
+- `/api/v1/docs/{path}` 與網頁 `/docs/{path}` 都回 404；
+- graph 通道不會經由連結把受限文件帶進來（以 `public/handbook.md` → `hr/leave.md` 驗證）；
+- 每個回應中出現的所有文件（含 context 擴展的鄰居）都是該使用者可讀的；
+- 沒有群組的使用者，任何查詢都是空結果；
+- 別人的 trace：非擁有者、非 admin 一律 404（API 與網頁）。
+
+**反向對照（negative control）**：每個探測 query 都先以 admin 身分執行，必須能找到該文件，確保上面的檢查不是空過。另外在 REPL 做過兩個實驗（未 commit）：讓 ACL 全部放行時，會出現 573 個失敗；拿掉 graph 的 ACL 時，graph 測試會失敗。
 
 ---
 
 ## 19. 風險與待驗證清單
 
-| # | 項目 | 影響 | 處理 |
-|---|---|---|---|
-| R1 | Datalevin `:openai-compatible` provider 與 vLLM 的相容性（`dimensions` 參數、認證） | 語意通道無法運作 | T0.3，備援路徑 B |
-| R2 | Clojure 端自訂 analyzer 的註冊方式 | 中文詞彙檢索失效 | T0.4 |
-| R3 | ACL over-fetch 導致權限少的使用者召回不足 | 回答品質對不同使用者不一致 | trace `:acl-starvation` 監控；T0.4／T0.5 評估預先過濾 |
-| R4 | Rerank 分數未校準 | 門檻設錯會過濾掉正確答案 | 預設不設門檻，以 eval 分佈校準 |
-| R5 | Token 估算偏差 | chunk 超過 reranker 有效長度被截斷 | 保守上限＋字元截斷＋eval 報告最長 chunk |
-| R6 | Datalevin 寫入速度慢於 Lucene | 大量 ingestion 耗時 | async indexing；報告吞吐；上限 100k chunks |
-| R7 | Datalevin 維護者集中（bus factor） | 長期維護風險 | D4 的 Retriever protocol；index 可重建 |
+| # | 項目 | 狀態 |
+|---|---|---|
+| R1 | Datalevin 內建 embedding provider 與 vLLM 的相容性 | 已迴避：改用 Path B（D6） |
+| R2 | 自訂 analyzer 的註冊方式 | 已解決：以 UDF 註冊（§8） |
+| R3 | ACL over-fetch 造成權限少的使用者召回不足 | 以 `:acl-starvation` 監控；尚未觀察到實際影響 |
+| R4 | Rerank 分數未校準 | 已校準到 -7.0（llama.cpp logit）；**換後端就要重新校準**；可能收緊，要等使用者提供真實問題（§21） |
+| R5 | Token 估算偏差 | 最長 chunk 378 估算 token；1500 字 ≈ 1191 reranker tokens；`vllm:check` 會探測 reranker 的 context |
+| R6 | Datalevin 寫入速度 | 樣本語料約 8 秒；**大語料尚未量測**（§21） |
+| R7 | Datalevin 維護者集中（bus factor） | 以 Retriever protocol 隔離；index 可重建 |
+| R8 | Datalevin 1.1.0 的已知問題：`:db.vec/domains` 寫入 bug、phrase search 與 `:doc-filter` 無法經由 Datalog 使用、同一交易中 retract 後再新增同 id 會失敗 | 都已有迴避方式（§6.1、§7.6、§9.1、§9.3）；升級 Datalevin 時要重新驗證 |
+| R9 | 正式部署 | Kamal 設定已經寫好，**但從未在實機部署過**（§21） |
 
 ---
 
 ## 20. Backlog（MVP 之後）
 
-LLM 生成的 contextual summary（完整版 Contextual Retrieval）；query rewriting 與多查詢融合；agentic 多輪檢索迴圈；LLM 抽取 entity／relation 建立知識圖譜並加入 graph 通道；答案層級 LLM-as-judge eval；使用者回饋（👍／👎）寫入 trace 並納入 eval；PDF 與 Office 解析；MCP server 介面（Datalevin 內建 MCP 可作為起點）；串流輸出；rerank 門檻自動校準。
+初版列出的方向，都還沒有排進時程：
+- LLM 生成的 contextual summary（完整版 Contextual Retrieval）；
+- query rewriting 與多查詢融合；
+- agentic 多輪檢索；
+- 用 LLM 抽 entity／relation 擴充 graph 通道；
+- 答案層級的 LLM-as-judge 評估；
+- 使用者 👍／👎 回饋；
+- PDF／Office 解析；
+- MCP server 介面；
+- 串流輸出；
+- rerank 門檻自動校準。
+
+開發過程中累積的項目與它們的背景說明，見 `docs/backlog.md`。
+
+---
+
+## 21. 尚未完成與下一步
+
+依性質分類。要開始其中任何一項，先確認範圍（大項走 §0 第 8 點的流程），完成後更新本節。
+
+### 21.1 驗證初版的成功標準（需要使用者的環境）
+
+| 項目 | 需要 | 產出 |
+|---|---|---|
+| **正式部署一次**（Kamal） | 伺服器、網域、registry 帳號、模型端點 | 修正 `docs/howto/ops.md` 的部署章節，拿掉「尚未驗證」 |
+| **延遲**（§1.2：檢索＋rerank p50 < 800 ms） | GPU 上的 vLLM（或同等的 rerank 後端） | 以 `bb eval` 的各階段 p50／p95 量測，寫入 decisions |
+| **規模**（≤ 5,000 份文件／100k chunks） | 接近上限的語料（可參考 `dev/spikes/gen_synthetic_corpus.clj` 產生合成語料） | 匯入耗時、查詢延遲、記憶體；`-Xmx` 建議值 |
+| **Rerank 門檻** | 使用者提供 5–10 題真實問題 | 決定 `rerank-min-score` 能否從 -7 收緊到接近 -4；換成 vLLM 後重新校準（R4） |
+
+### 21.2 已延後、可以獨立開發
+
+| 項目 | 說明 |
+|---|---|
+| **T5.4 `/ask` SSE 串流** | 與 §10.2 引用驗證有衝突：串流出去的文字已經送出，無法事後刪除無效引用。可選做法有三：事後補一段修正、client 端延後渲染、緩衝引用。需要設計稿 |
+| `/login` 限速或鎖定 | 使用者決定不放進 Phase 5 |
+| 引用範圍 `[1-3]` | §10.2 目前不支援 |
+| 多 process 同時 ingest 的鎖定 | 目前靠文件規定：server 執行中不跑 CLI ingest |
+| 單一中文字的查詢 | §8.1 的限制；修法是額外索引 unigram，並執行 `bb reindex` |
+
+### 21.3 要先由使用者決定做不做（較大的功能）
+
+| 項目 | 觸發條件或前提 |
+|---|---|
+| HyDE／doc2query | 真實問題若像書籍語料那種抽象問題、而且分數偏低（`docs/backlog.md` 有分析） |
+| 對話歷史與多輪追問 | 要和 query rewriting 一起做（§1.3 目前列為非目標） |
+| Keycloak SSO（OIDC） | 正式上線的需求；D9 的接口已經預留 |
+| 較大、較難的 eval 語料 | 讓變體比較與門檻校準有意義（§15.2 限制） |
+
+### 21.4 發布前（GitHub）
+
+- README 加上「為什麼做這個專案（Rationale）」。
+- 確認 `no-commit/` 的內容從未進入 git 歷史。
+
+---
+
+## 附錄 A：與初版規格的主要差異
+
+初版（`docs/design/2026-09-22-initial-spec.md`）的許多設計，在實作過程中因為 spike、實測或 review 得到的新資訊而修改。下表是索引；每一項的證據與完整理由見 `docs/decisions.md` 的對應日期。
+
+| 主題 | 初版 | 現行 | 為什麼改 | 決策日期 | 本文件 |
+|---|---|---|---|---|---|
+| Datalevin 版本 | pin 1.0.x | 1.1.0 | 使用者要求用實際最新版；API 已驗證相容 | 09-22 | §3 |
+| Embedding 儲存 | `:db/embedding` 與全文索引放在同一屬性，由 DB 呼叫模型（Path A） | 向量存在 `:chunk/vec`，由應用程式呼叫模型（Path B） | Path A 在 transact 時就要呼叫模型，測試與建置都離不開模型 | 09-22 | §2.1 D6、§6.1 |
+| 向量 domain | schema 上宣告 `:db.vec/domains` | 不宣告，改用開啟選項 | Datalevin 1.1.0 寫入路徑的 bug（已查到根因） | 09-22 | §6.1 |
+| 全文 domain 名稱 | `chunk_index-text` | `chunk/index-text` | 實測 autoDomain 保留斜線 | 09-22 | §6.1 |
+| Phrase search | `:index-position? true` 支援片語查詢 | 不使用 | 經由 Datalog `fulltext` 使用時無效 | 09-22 | §9.1 |
+| ACL 查詢 | Datalog join 使用者群組；備援方案是 `:doc-filter` | 先算可讀 doc id 集合，再用 `contains?` 過濾 | join 在 100k chunks 下 p50 約 100 ms、不穩定；集合做法快 47–59 倍；`:doc-filter` 無法經由 Datalog 使用 | 09-22 | §2.1 D3、§9.3 |
+| 中文斷詞 | HanLP 優先、Jieba 備援 | 重疊 bigram | 實測品質沒有差異，HanLP 的成本較高（使用者決定） | 09-24 | §8 |
+| Retriever protocol | `channel` 回傳候選清單 | 回傳 map（含延伸清單與計數），並新增 `chunks` | graph 通道與 trace 需要這些資訊；pipeline 不直接讀 DB | 09-24 | §9.2 |
+| 文件重新索引 | 一個交易內 retract 舊的、加入新的 | 一個交易內就地更新存在的 id，移除消失的 id | 同一交易內 retract 後再新增同一 id，會讓 fulltext 失敗 | 09-24 | §7.6 |
+| 連結解析 | 只處理本次改動的文件 | 每次匯入都重新解析全部 | 原規則漏掉「目標文件較晚才加入」的情況；成本很低 | 09-24 | §7.5 |
+| ACL-only 變更 | 不重新計算 embedding（規則已有） | 同左；第一版實作其實違反了它，已修正 | frontmatter 的變動改變檔案 hash，導致整份文件重新 embed | 09-25 | §7.2 |
+| Context 合併 | 同一文件內連續的 chunk | 同一 **section** 內連續的 chunk | 每個 passage 只有一條準確的章節路徑 | 09-24 | §9.7 |
+| Rerank 分數與門檻 | 預設不設門檻，等 eval 校準 | 使用原始分數；門檻 -7.0 | 本機 llama.cpp 回傳 logit；以兩份語料校準 | 09-24、09-25 | §4.2、§9.6 |
+| 模型端點 | vLLM | 任何 OpenAI 相容端點；本機用 LM Studio 加 llama.cpp；HTTP/1.1 | 開發環境沒有 vLLM；LM Studio 不回應 h2c upgrade | 09-24 | §4 |
+| CSRF | HTMX 請求帶 CSRF | 只套用在網頁路由 | 全域套用會擋掉所有 API POST；bearer token 不需要 CSRF | 09-24 | §12 |
+| 錯誤碼 | 只定義錯誤格式 | 400／401／404／409／503，且 503 帶 `trace_id` | 規格沒有定義；另外依 §14 補上「失敗時也寫 trace」 | 09-24、09-25 | §11、§14 |
+| Health | 單一 `/health` | `/health/live`（DB）與 `/health`（完整、平行、快取） | 模型重啟不應該讓整個服務被負載平衡器摘除 | 09-25 | §11 |
+| API token | 只存 hash | 另外存 8 字元前綴 | 否則 `bb token:revoke <prefix>` 找不到 token | 09-24 | §6.2、§13 |
+| Session | 沒有提到時效與撤銷 | 8 小時時效；以使用者為單位撤銷 | 被複製的 cookie 原本永不失效（使用者決定撤銷粒度） | 09-25 | §13 |
+| 設定來源 | `DATA_DIR` 等由環境變數提供 | 由 `config.edn` 的單一 key 提供給 server、runner 與 DB | server 原本不理會 `DATA_DIR` | 09-25 | §5 |
+| 檢索參數的 key | `:retrieve/channel-k` 等 | search component `:opts` 裡的 `:channel-k` 等 | 實作沿用 pipeline 的參數名稱 | 09-24 | §5 |
+| Session 金鑰變數 | `SESSION_SECRET` | `SESSION_SECRET_KEY` | 沿用產生器給的名稱 | 09-25 | §5 |
+| Namespace | `levinrag.*` | `replware.levinrag.*`（中間曾是 `hybridrag.*`） | 使用者要求 | 09-22、09-25 | 開頭 |

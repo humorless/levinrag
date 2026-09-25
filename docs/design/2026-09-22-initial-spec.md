@@ -1,5 +1,10 @@
 # levinrag — Datalevin 企業 RAG MVP 規格書
 
+> **這是 2026-09-22 的初版規格，已凍結，僅供歷史參考。**
+> 現行規格見根目錄的 [`SPEC.md`](../../SPEC.md)（沿用本文件的章節編號）；
+> 實作時偏離本文件之處與理由，記在 [`docs/decisions.md`](../decisions.md)。
+> 本文件中的套件名稱、預設值與做法可能已經不適用。
+
 版本 v0.1｜2026-09-22｜交付對象：Claude Code
 
 一個單一 JVM process、單一資料目錄的企業 RAG MVP：Markdown／純文字語料 → 多路召回（詞彙、語意、連結圖）→ RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用的生成，並內建 ACL、查詢追蹤（trace）與評估框架。所有模型透過本地 vLLM 的 OpenAI-compatible API 提供。

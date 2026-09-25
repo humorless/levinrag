@@ -889,3 +889,25 @@ lifetime and revocation.
 - Historical records — this log, `docs/spikes/`, `docs/handoff/`,
   `docs/superpowers/{plans,specs}/`, `docs/datalevin_debug_notes.md` —
   keep the old name: they describe the code as it was.
+
+
+## 2026-09-25 — Correction: health reads one datom; probes are parallel and single-flight
+
+The "Phase 5 health: two endpoints" entry above says DB liveness is
+`d/datoms db :eav` and probes are "cached 30 s". The whole-range review
+found both wrong in effect and they were fixed (commit 44c2680):
+`d/datoms` without components returns an eager vector of every datom, so
+it now reads one (`d/seek-datoms db :eav nil nil nil 1`); the three model
+probes run in parallel with 5 s each, the cache is stamped when the round
+finishes, and callers during a round wait for it instead of probing
+again. SPEC.md §11 describes the current behaviour.
+
+## 2026-09-25 — Current spec vs initial spec
+
+`SPEC.md` is now the current spec: rewritten to describe the system as
+built, keeping the initial section numbers so every "SPEC.md §n"
+reference in code and docs stays valid, plus §21 (remaining work) and
+Appendix A (differences from the initial spec, indexed to this log). The
+frozen initial spec moved from `levinrag-spec.md` to
+`docs/design/2026-09-22-initial-spec.md` (identical to SPEC.md's first
+commit, plus a header).
