@@ -109,7 +109,7 @@ unresolved links: 3, index lag: 0, elapsed: 95210 ms
 ```
 
 - Time is dominated by embedding every chunk. Running it again only processes changed files.
-- `errors`: each one is listed with its path and reason (a file that could not be parsed, or a permissions mistake from step 3). The other files are ingested; the exit status is 1 until the errors are fixed.
+- `errors`: each one is listed with its path and reason (a file that could not be parsed, or a permissions mistake from step 3). The other files are ingested; the exit status is 1 until the errors are fixed. A file that was indexed before and now fails (for example because a model endpoint went down) is removed from the index until an ingest succeeds.
 - `unresolved links`: Markdown links whose target is not in the corpus. Not an error.
 
 ## 6. Users

@@ -53,6 +53,18 @@
          :chunks n
          :max-chunk-tokens (reduce max 0 (map :tokens (:chunks doc)))}))))
 
+(defn- remove-stale!
+  "Delete `rel-path`'s indexed copy after it failed to (re)ingest; true when
+   there was one and it is gone. Keeping it would leave the old text
+   searchable under the old — possibly wider — groups (SPEC.md §7.2)."
+  [conn indexed rel-path]
+  (when (contains? indexed rel-path)
+    (try (writer/delete-doc! conn rel-path)
+         true
+         (catch Exception e
+           (log/error e "[INGEST] could not remove the stale copy of" rel-path)
+           false))))
+
 (defn ingest!
   "Bring index.dtlv in line with `corpus-dir`. Per-file failures are
    reported, not thrown. Returns the ingestion report (SPEC.md §7.6).
@@ -78,18 +90,20 @@
                           (if acl-error
                             ;; fail closed (SPEC.md §7.2 rule 5): never index
                             ;; it with a guess, and drop a copy indexed earlier
-                            (do (when (contains? indexed rel-path) (writer/delete-doc! conn rel-path))
-                                {:path rel-path
-                                 :status :error
-                                 :error (str "權限設定錯誤，未匯入"
-                                             (when (contains? indexed rel-path) "（已從索引移除）")
-                                             "：" acl-error)})
+                            (let [removed? (remove-stale! conn indexed rel-path)]
+                              (log/warn "[INGEST] acl fail-closed:" rel-path
+                                        (if removed? "(removed from index)" "(not indexed)") acl-error)
+                              {:path rel-path
+                               :status :error
+                               :error (str "權限設定錯誤，未匯入" (when removed? "（已從索引移除）") "：" acl-error)})
                             (ingest-file! conn indexed file opts))
                           (catch Exception e
-                            (log/error e "[INGEST] failed:" (:rel-path file))
-                            {:path (:rel-path file)
-                             :status :error
-                             :error (ex-message e)})))
+                            (log/error e "[INGEST] failed:" rel-path)
+                            (let [removed? (remove-stale! conn indexed rel-path)]
+                              (when removed? (log/warn "[INGEST] removed the stale copy of" rel-path))
+                              {:path rel-path
+                               :status :error
+                               :error (str (ex-message e) (when removed? "（已從索引移除，重新匯入成功後會加回）"))}))))
                       files)
         deleted (vec (sort (remove on-disk (keys indexed))))
         _ (doseq [p deleted] (writer/delete-doc! conn p))

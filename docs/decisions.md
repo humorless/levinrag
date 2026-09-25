@@ -1179,3 +1179,22 @@ unparsed, not a list of strings, or with `'` in an item → the doc fails
 closed. A body that mentions `read_groups` after a heading is not affected.
 Docs with valid frontmatter behind a BOM, or with `---` inside a value, now
 get their read_groups applied (before, the second silently fell back).
+
+## 2026-09-25 — Review H2(a): a failed re-ingest removes the old copy; WARN log lines
+
+Review finding: when re-ingesting an edited doc failed (e.g. embed endpoint
+down), the old copy stayed indexed under its old groups; with the new
+text on disk and narrower new groups, the viewer showed the new text to
+the old, wider audience.
+
+Decision (user approved): any per-file failure of a doc that was indexed
+deletes it (SPEC §7.2 rule 6); the next successful ingest adds it back.
+Not "apply the new groups and keep the old text": if the new groups are
+wider, the old text would leak. Cost: an endpoint outage during ingest
+makes the edited docs disappear from search until the next ingest.
+
+Logging (user question): the ACL fail-closed path wrote no server log, only
+the report. Now one `WARN` per doc — `[INGEST] acl fail-closed: <path>
+(removed from index|not indexed) <reason>` and `[INGEST] removed the stale
+copy of <path>` — path and reason only. WARN, not ERROR: a settings
+mistake, not a system fault.

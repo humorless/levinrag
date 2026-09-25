@@ -309,3 +309,34 @@
         (is (= (disj (set (keys docs)) "pub/ok.md") (set (map :path (:errors rep)))))
         (is (= {"pub/ok.md" #{"hr"}} (fx/doc-groups conn))))
       (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))
+
+(deftest test-failed-reingest-removes-the-old-copy
+  ;; review 2026-09-25 H2: when re-ingesting an edited doc fails (e.g. the
+  ;; embedding endpoint is down), the old copy must not stay searchable
+  ;; under its old — possibly wider — groups
+  (let [dir (tmp/dir "acl-failed-reingest")
+        idx (tmp/dir "acl-failed-reingest-index")
+        conn (index-conn/open idx fx/dims)
+        embed-down? (atom false)
+        embed (fn [texts] (if @embed-down? (throw (ex-info "embed endpoint down" {})) (fx/hash-embed texts)))
+        ingest! #(job/ingest! conn {:corpus-dir dir
+                                    :embed-fn embed})]
+    (try
+      (spit (io/file dir "_collection.edn") "{:read-groups [\"all\"]}")
+      (io/make-parents (io/file dir "pub/memo.md"))
+      (spit (io/file dir "pub/memo.md") "# 備忘\n\n午餐時間調整。")
+      (spit (io/file dir "pub/other.md") "# 其他\n\n不變。")
+      (ingest!)
+      (is (= #{"all"} (get (fx/doc-groups conn) "pub/memo.md")))
+      (spit (io/file dir "pub/memo.md") "---\nread_groups: [hr]\n---\n# 裁員名單\n\n機密。")
+      (reset! embed-down? true)
+      (let [rep (ingest!)
+            [err] (:errors rep)]
+        (is (= "pub/memo.md" (:path err)))
+        (is (str/includes? (:error err) "已從索引移除"))
+        (is (not (contains? (fx/doc-groups conn) "pub/memo.md")) "the old copy is gone")
+        (is (contains? (fx/doc-groups conn) "pub/other.md") "unchanged docs are untouched"))
+      (reset! embed-down? false)
+      (ingest!)
+      (is (= #{"hr"} (get (fx/doc-groups conn) "pub/memo.md")) "back, with the new groups, once ingest succeeds")
+      (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))
