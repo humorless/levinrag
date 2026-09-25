@@ -166,3 +166,9 @@ from the handoff:
   (visible to the trace owner) grows with the number of hits before the
   ACL filter. Hard to exploit with over-fetch capped at 200; hide or
   bucket stage timings for non-admins if it ever matters.
+- **Rebuild the index without downtime**: `bb reindex` deletes the
+  `index.dtlv` the server has open, so it needs the server stopped.
+  Build the new index in a fresh directory (same corpus, possibly a new
+  embedding model or analyzer), then have the server switch its
+  index-conn to it (e.g. an admin action) and drop the old one. Rebuild
+  cost is dominated by re-embedding every chunk (SPEC §21.1 scale).
