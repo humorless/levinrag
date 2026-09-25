@@ -1,42 +1,39 @@
-# hybridrag
+# levinrag
 
-_This application is generated with [clojure-stack-lite](https://github.com/abogoyavlensky/clojure-stack-lite)._
+單一 JVM、嵌入式 Datalevin 的企業 RAG MVP：Markdown／純文字語料 → 詞彙＋語意＋連結圖多路召回 → RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用 `[n]` 的回答。內建 ACL、每次查詢的 trace 與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫。完整規格見 [SPEC.md](SPEC.md)，設計取捨見 [docs/decisions.md](docs/decisions.md)。
 
-_TODO: add project description_
+> 程式的 namespace 仍沿用產生器給的 `hybridrag.*`。
 
+## 使用手冊
 
-## Development
+- [維運手冊](docs/howto/ops.md)：部署、環境變數、health、備份、評估。
+- [管理者手冊](docs/howto/admin.md)：使用者與群組、文件權限、匯入、trace。
+- [使用者手冊](docs/howto/user.md)：登入、提問、引用、文件檢視、Debug 面板。
 
-Install Java, Clojure, Babashka, TailwindCSS and other tools manually or via [mise](https://mise.jdx.dev/):
+## 快速開始（本機）
 
-```shell
-mise trust && mise install
-```
+1. 啟動三個模型端點，做法見 [VLLM_SETUP.md](VLLM_SETUP.md)，然後確認：`bb vllm:check`（全部 `[OK]` 才繼續）。
+2. 匯入語料：`CORPUS_DIR=corpus-sample bb ingest`。
+3. 建立使用者：`bb user:create alice --groups all,hr`，再用 `bb user:passwd alice` 設定密碼（管理者加 `--admin`）。
+4. 啟動 server（完整的環境變數見[維運手冊](docs/howto/ops.md#環境變數)），開啟 http://localhost:8000 登入。
 
-Check all available commands:
+## 文件權限規則（ACL）
 
-```shell
-bb tasks
-```
+權限在匯入時計算並寫入索引，查詢時只比對群組：
 
-Run lint, formatting, tests and checking outdated dependencies:
+1. **目錄**：往上找最近一個有宣告 `:read-groups` 的 `_collection.edn`（含自己）；都沒有就用 `ROOT_READ_GROUPS`。
+2. **文件**：frontmatter 有 `read_groups` 時**只用它——覆寫，不是聯集**。例如目錄是 `["hr"]`、文件寫 `read_groups: ["all"]`，結果是只有 `all` 可讀，`hr` 不會被加回去。
+3. 群組為空 `[]` 表示除 admin 外沒有人可讀。
+4. 看不到的文件一律回 404（不回 403），不透露是否存在。
 
-```shell
-bb check
-```
+設定方式見[管理者手冊](docs/howto/admin.md#文件權限)。
 
-Run server with built-in REPL from terminal:
+## 開發
 
-> [!NOTE]
-> If you're using PostgreSQL, [Docker](https://docs.docker.com/engine/install/) should be installed
-
- ```shell
-bb clj-repl 
-(reset)
-````
-
-Once server is started, it will automatically reload on code changes in the backend and TailwindCSS classes.
-The server should be available at `http://localhost:8000`.
+- nREPL、測試迴圈：見 [CLAUDE.md](CLAUDE.md)。
+- 完整測試（乾淨 JVM＋coverage）：`clojure -X:jvm-opts:test`；lint：`clj-kondo --lint src test`。
+- 需要真實模型的測試標記 `:vllm`，未設定 `VLLM_*` 時自動略過。
+- `bb tasks` 列出所有 Babashka 指令。
 
 ### Browser check (no JS errors)
 
@@ -62,9 +59,6 @@ bb fetch-assets
 
 Your assets will be updated in `resources/public` folder.
 
-## Deployment
+## 部署
 
-For detailed deployment instructions, refer to the documentation:
-
-- [Kamal](https://stack.bogoyavlensky.com/docs/lite/kamal)
-
+見[維運手冊](docs/howto/ops.md#部署kamal)。
