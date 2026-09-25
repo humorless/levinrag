@@ -101,3 +101,14 @@
           (is (thrown-with-msg? clojure.lang.ExceptionInfo #"找不到" (run ["/nonexistent.edn"])))
           (is (thrown-with-msg? clojure.lang.ExceptionInfo #"用法" (run [])))
           (finally (tmp/delete-tree! dir)))))))
+
+(deftest test-import-is-one-transaction
+  ;; review 2026-09-25 test gap: all changes land together or not at all
+  (tmp/with-app-conn
+    (fn [conn]
+      (users/create-user! conn "bob" {:groups ["all"]})
+      (let [calls (atom 0)
+            orig d/transact!]
+        (with-redefs [d/transact! (fn [& args] (swap! calls inc) (apply orig args))]
+          (ui/import! conn (ui/parse users-edn) {}))
+        (is (= 1 @calls) "two creates and one update in a single transaction")))))

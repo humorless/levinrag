@@ -12,6 +12,7 @@
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
             [jsonista.core :as json]
+            [replware.levinrag.acl-report :as acl-report]
             [replware.levinrag.auth.token :as token]
             [replware.levinrag.db.index-conn :as index-conn]
             [replware.levinrag.eval.harness :as harness]
@@ -375,3 +376,36 @@
       (is (= #{} (groups "hr")))
       (is (= #{} (groups "hr/sub")) "below the broken file too")
       (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))
+
+(deftest test-broken-root-collection-keeps-everything-it-governs-out
+  ;; review 2026-09-25 test gap: a broken root _collection.edn governs every
+  ;; doc except those under a directory with its own valid :read-groups
+  (let [dir (tmp/dir "acl-broken-root")
+        idx (tmp/dir "acl-broken-root-index")
+        conn (index-conn/open idx fx/dims)
+        put! (fn [p text] (io/make-parents (io/file dir p)) (spit (io/file dir p) text))]
+    (try
+      (put! "_collection.edn" "{:read-group [\"all\"]}")
+      (put! "a.md" "# a\n\nx")
+      (put! "pub/b.md" "# b\n\nx")
+      (put! "hr/_collection.edn" "{:read-groups [\"hr\"]}")
+      (put! "hr/c.md" "# c\n\nx")
+      (let [rep (job/ingest! conn {:corpus-dir dir
+                                   :root-read-groups ["all"]
+                                   :embed-fn fx/hash-embed})]
+        (is (= #{"a.md" "pub/b.md"} (set (map :path (:errors rep)))))
+        (is (= {"hr/c.md" #{"hr"}} (fx/doc-groups conn))
+            "ROOT_READ_GROUPS does not stand in for a broken root file"))
+      (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))
+
+(deftest test-acl-report-prints-no-document-text
+  (let [db (d/db fx/*index*)
+        out (acl-report/text (acl-report/build db principals) {:docs? true
+                                                               :ingest-errors 0})
+        texts (mapcat val (chunk-texts db))]
+    (is (seq texts))
+    (doseq [t texts
+            line (str/split-lines t)
+            :let [line (str/trim line)]
+            :when (>= (count line) 12)]
+      (is (not (str/includes? out line)) line))))
