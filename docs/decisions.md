@@ -1254,3 +1254,12 @@ setting (and `.env.example`'s `./corpus` absent in a fresh checkout) that
 was one typo from an empty index. The check moved into `job/ingest!`
 (both paths), and `bb reindex` checks before deleting `index.dtlv`. The
 CLI prints the message and exits 2.
+
+## 2026-09-25 — Review L3: `.env` edge cases
+
+`KEY=   # comment` gave the value `# comment` (the value was trimmed before
+the ` #` comment was stripped), e.g. `ROOT_READ_GROUPS=   # admins only`
+became a group named `# admins only`. A bare value that starts with `#` is
+now just a comment (empty value); `a#b` is kept; quoted values are
+unchanged. A leading BOM (Windows editors) is ignored instead of making
+line 1 an error with an invisible character in the message.

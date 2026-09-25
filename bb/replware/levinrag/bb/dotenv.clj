@@ -10,7 +10,8 @@
 
 (defn- value
   "The value after `=`: quoted (taken literally up to the closing quote,
-   which must end the value) or bare (up to a ` #` comment)."
+   which must end the value) or bare (up to a ` #` comment; a bare value
+   that starts with `#` is only a comment, so it is empty)."
   [n line s]
   (let [q (first s)]
     (if (#{\' \"} q)
@@ -18,7 +19,7 @@
         (when (or (nil? end) (not (re-matches #"\s*(#.*)?" (subs s (inc end)))))
           (bad-line n line "的引號沒有正確結束"))
         (subs s 1 end))
-      (str/trim (str/replace s #"\s+#.*$" "")))))
+      (str/trim (str/replace s #"(?:^|\s+)#.*$" "")))))
 
 (defn parse
   "Map of variable name → value from `.env` text. Blank lines and `#`
@@ -33,7 +34,7 @@
                   (when-not k (bad-line n line "不是 KEY=VALUE"))
                   (assoc m k (value n line (str/trim v)))))))
           {}
-          (map vector (iterate inc 1) (str/split-lines text))))
+          (map vector (iterate inc 1) (str/split-lines (str/replace-first text #"^\uFEFF" "")))))
 
 (defn read-file
   "parse of the file at `path`, or {} when it does not exist."

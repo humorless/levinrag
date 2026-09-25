@@ -45,3 +45,12 @@
         (spit (str dir "/.env") "A=1\n")
         (is (= {"A" "1"} (dotenv/read-file (str dir "/.env"))))
         (finally (tmp/delete-tree! dir))))))
+
+(deftest test-parse-edge-cases
+  ;; review 2026-09-25 L3
+  (is (= {"ROOT_READ_GROUPS" ""
+          "A" "a#b"
+          "B" ""}
+         (dotenv/parse "ROOT_READ_GROUPS=   # admins only\nA=a#b\nB=#\n"))
+      "a value that is only a comment is empty; # inside a word is kept")
+  (is (= {"A" "1"} (dotenv/parse "﻿A=1\n")) "a BOM (Windows editors) is ignored"))
