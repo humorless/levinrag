@@ -911,3 +911,25 @@ Appendix A (differences from the initial spec, indexed to this log). The
 frozen initial spec moved from `levinrag-spec.md` to
 `docs/design/2026-09-22-initial-spec.md` (identical to SPEC.md's first
 commit, plus a header).
+
+
+## 2026-09-25 — Non-admins see traces without pre-ACL counts
+
+Found while checking an external critique of the README rationale: a
+user's own trace (`/api/v1/traces/:id`) carried each channel's
+`:raw-hits`, the hit count *before* the ACL filter. Querying a term that
+only occurs in documents the user cannot read gave `raw-hits > 0,
+after-acl 0` — an existence side channel against SPEC §11's "don't leak
+existence". `:acl-starvation` leaks the same thing more coarsely.
+
+- Traces are still stored whole; `trace/view-for` removes `:raw-hits`
+  and `:acl-starvation` only when a non-admin reads a trace (API and the
+  Debug panel). Admins (`/admin`, API) keep every number, so "why does
+  this user get poor recall" stays diagnosable (user's requirement: do
+  not make admin/ops debugging harder).
+- `acl-starvation` is hidden from non-admins entirely rather than shown
+  as a neutral notice (user's choice).
+- Covered by the §18.3 suite (own trace vs admin view of the same trace)
+  and a Debug-panel test; both fail with the redaction disabled.
+- Not addressed: stage timings (lexical ms grows with pre-ACL hits) are a
+  theoretical timing channel; noted in the backlog.

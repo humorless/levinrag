@@ -30,3 +30,42 @@
         (d/transact! app [{:trace/id b
                            :trace/at t}])
         (is (= [b a] (map :trace/id (trace/recent (d/db app) 2))))))))
+
+(def ^:private stored
+  {:trace/id #uuid "00000000-0000-0000-0000-000000000001"
+   :trace/username "bob"
+   :trace/stages {:lexical {:ms 3
+                            :raw-hits 12
+                            :after-acl 0
+                            :top []}
+                  :semantic {:ms 5
+                             :raw-hits 200
+                             :after-acl 40
+                             :top [["public/handbook.md::0" 0.4]]}
+                  :fusion {:ms 1
+                           :top []}
+                  :flags #{:acl-starvation :uncited-answer}}})
+
+(deftest test-view-for-hides-pre-acl-counts-from-non-admins
+  (let [v (trace/view-for {:username "bob"
+                           :groups #{"all"}
+                           :admin? false} stored)]
+    (testing "no count from before the ACL filter"
+      (is (not-any? #(contains? % :raw-hits) (vals (select-keys (:trace/stages v) [:lexical :semantic])))))
+    (testing "acl-starvation reveals unreadable matches, other flags stay"
+      (is (= #{:uncited-answer} (get-in v [:trace/stages :flags]))))
+    (testing "what the user may see is kept for their own debugging"
+      (is (= 40 (get-in v [:trace/stages :semantic :after-acl])))
+      (is (= 3 (get-in v [:trace/stages :lexical :ms])))
+      (is (= [["public/handbook.md::0" 0.4]] (get-in v [:trace/stages :semantic :top]))))))
+
+(deftest test-view-for-admin-sees-everything
+  (is (= stored (trace/view-for {:username "admin"
+                                 :groups #{}
+                                 :admin? true} stored))))
+
+(deftest test-view-for-failure-trace
+  ;; dependency-failure traces have only :error in their stages
+  (let [t {:trace/stages {:error {:endpoint :embed
+                                  :message "x"}}}]
+    (is (= t (trace/view-for {:admin? false} t)))))

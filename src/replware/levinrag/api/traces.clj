@@ -6,7 +6,9 @@
             [replware.levinrag.trace :as trace]))
 
 (defn handler [{:keys [context principal path-params]}]
-  (let [t (some->> (parse-uuid (:id path-params)) (trace/fetch (d/db (:app-conn context))))]
+  (let [t (some->> (parse-uuid (:id path-params))
+                   (trace/fetch (d/db (:app-conn context)))
+                   (trace/view-for principal))]
     (if (and t (or (:admin? principal) (= (:username principal) (:trace/username t))))
       {:status 200
        :body {:id (str (:trace/id t))

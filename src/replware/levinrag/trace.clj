@@ -40,6 +40,22 @@
   (when-let [e (d/entid db [:trace/id id])]
     (d/pull db '[*] e)))
 
+(defn view-for
+  "`t` as `principal` may see it. Traces are stored whole so admins keep
+   every number for debugging; a non-admin viewing their own trace loses
+   what was counted before the ACL filter — each channel's :raw-hits and
+   the :acl-starvation flag — since those would reveal that documents
+   they cannot read match their query (SPEC.md §9.3, §14)."
+  [principal t]
+  (if (:admin? principal)
+    t
+    (update t :trace/stages
+            (fn [stages]
+              (cond-> stages
+                (:lexical stages) (update :lexical dissoc :raw-hits)
+                (:semantic stages) (update :semantic dissoc :raw-hits)
+                (:flags stages) (update :flags disj :acl-starvation))))))
+
 (defn recent
   "The newest `n` traces (no stages), newest first; entity id breaks
    ties between traces written in the same millisecond. A backwards scan

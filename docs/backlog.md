@@ -162,3 +162,7 @@ from the handoff:
 - SSE streaming for `/ask` (T5.4, deferred).
 - Multi-process ingest locking (the docs now say CLI ingest only with the
   server stopped).
+- **Timing side channel on pre-ACL hits**: the lexical stage's `ms`
+  (visible to the trace owner) grows with the number of hits before the
+  ACL filter. Hard to exploit with over-fetch capped at 200; hide or
+  bucket stage timings for non-admins if it ever matters.

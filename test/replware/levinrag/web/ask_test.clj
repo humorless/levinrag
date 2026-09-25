@@ -140,3 +140,10 @@
 
 (deftest test-layout-loads-error-handler
   (is (str/includes? (:body (wc/request! (wf/logged-in "alice") :get "/")) "/assets/js/app.js")))
+
+(deftest test-debug-panel-hides-acl-starvation-from-non-admins
+  ;; the flag says documents the user cannot read matched; admins keep it
+  (let [fetch trace/fetch]
+    (with-redefs [trace/fetch (fn [db id] (update-in (fetch db id) [:trace/stages :flags] (fnil conj #{}) :acl-starvation))]
+      (is (not (str/includes? (:body (ask! (wf/logged-in "alice") "特休" :debug? true)) "acl-starvation")))
+      (is (str/includes? (:body (ask! (wf/logged-in "admin") "特休" :debug? true)) "acl-starvation")))))

@@ -405,7 +405,7 @@ pipeline 從不直接讀 DB；融合、rerank、context 打包與儲存無關。
 - admin 走**獨立函式**（`channel-for-admin`、`docs/lookup-admin`），不在同一段查詢上用參數開關。
 - 沒有任何群組的非 admin 使用者：直接回傳空結果，不查 DB。
 - `linked-docs` 也會過濾**來源**文件：使用者看不到的文件，他也無從得知它連到哪裡。
-- Over-fetch 過濾後少於 `channel-k`，且原始命中數等於 over-fetch 上限時，trace 標記 `:acl-starvation`。
+- Over-fetch 過濾後少於 `channel-k`，且原始命中數等於 over-fetch 上限時，trace 標記 `:acl-starvation`。這個 flag 與原始命中數只有 admin 看得到（§14）。
 - `:doc-filter` 無法經由 Datalog `fulltext` 使用，不可作為 ACL 預先過濾的機制（2026-09-22）。
 
 ### 9.4 RRF
@@ -573,6 +573,7 @@ bb token:revoke <prefix>
 ```
 
 - 每個 `:top` 清單最多保留 20 筆，而且只存 id 與分數，不存 chunk 內文。回答全文存在 `:trace/answer`。
+- **非 admin 看到的 trace 會遮蔽 ACL 過濾前的資訊**：他查看自己的 trace（`/api/v1/traces/:id`、Debug 面板）時，看不到各通道的 `:raw-hits` 與 `:acl-starvation` flag，因為這些會透露「有他看不到的文件符合查詢」。trace 本身完整儲存，admin 在 `/admin` 與 API 都看得到全部數字，用來診斷權限造成的召回不足（`trace/view-for`，2026-09-25）。
 - `/admin` 列出最近的 trace 時，是沿 `:trace/at` 反向掃描、只讀取需要的筆數，不會載入全部 trace。
 - log 採結構化輸出，一行一個事件，含 `trace_id`。
 
@@ -686,7 +687,7 @@ analyzer 測試向量、chunker、token 估算、ACL 解析、RRF（含平手）
 - graph 通道不會經由連結把受限文件帶進來（以 `public/handbook.md` → `hr/leave.md` 驗證）；
 - 每個回應中出現的所有文件（含 context 擴展的鄰居）都是該使用者可讀的；
 - 沒有群組的使用者，任何查詢都是空結果；
-- 別人的 trace：非擁有者、非 admin 一律 404（API 與網頁）。
+- 別人的 trace：非擁有者、非 admin 一律 404（API 與網頁）；自己的 trace 不含 ACL 過濾前的命中數與 `acl-starvation`（admin 看同一筆 trace 則有，作為反向對照）。
 
 **反向對照（negative control）**：每個探測 query 都先以 admin 身分執行，必須能找到該文件，確保上面的檢查不是空過。另外在 REPL 做過兩個實驗（未 commit）：讓 ACL 全部放行時，會出現 573 個失敗；拿掉 graph 的 ACL 時，graph 測試會失敗。
 

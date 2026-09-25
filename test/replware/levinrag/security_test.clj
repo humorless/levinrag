@@ -220,3 +220,19 @@
     (is (= 200 (:status (api h (tok "admin") :get uri nil))) "admin")
     (is (= 404 (:status (api h (tok "bob") :get uri nil))) "another user")
     (is (= 404 (:status (wc/request! (wf/logged-in "bob") :get (str "/admin/traces/" id)))) "web, non-admin")))
+
+(deftest test-own-trace-hides-pre-acl-counts
+  ;; a count from before the ACL filter would tell a user that documents
+  ;; they cannot read contain the query terms (raw-hits > 0, after-acl 0)
+  (let [h (wf/handler)
+        tok (tokens)
+        pre-acl (fn [body] (keep #(get-in body [:stages % :raw-hits]) [:lexical :semantic]))]
+    (doseq [{:keys [path user queries]} (take-nth 5 (matrix))
+            :let [q (first queries)
+                  id (get-in (api h (tok user) :post "/api/v1/search" {:query q}) [:body :trace_id])
+                  own (:body (api h (tok user) :get (str "/api/v1/traces/" id) nil))]]
+      (testing (str user " × " path)
+        (is (empty? (pre-acl own)) "no raw-hits in the user's own trace")
+        (is (not-any? #{"acl-starvation"} (get-in own [:stages :flags])))
+        (testing "negative control: the admin view of the same trace has the counts"
+          (is (seq (pre-acl (:body (api h (tok "admin") :get (str "/api/v1/traces/" id) nil))))))))))
