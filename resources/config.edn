@@ -7,7 +7,11 @@
                  :test "data-test/app.dtlv"}}
 
  :hybridrag.retrieval.system/search
- {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn}
+ {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn
+  ; drop reranked passages below this score before the prompt
+  ; (docs/spikes/rerank-threshold.md). -7.0 fits llama.cpp raw logits of
+  ; bge-reranker-v2-m3; a backend returning 0-1 scores needs its own value.
+  :opts {:rerank-min-score #double #or [#env VLLM_RERANK_MIN_SCORE "-7.0"]}}
 
  :hybridrag.ingest.runner/runner
  {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn}

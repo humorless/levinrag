@@ -135,6 +135,8 @@ export VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # 關閉 Qwen3 的�
 - **generate 的時間主要花在讀 prompt（prefill）**：M1 16 GB 上 Qwen3-8B prefill 約 125 token/s、生成約
   25 token/s（2026-09-25 實測：1389 token 的 prompt 首次 14.5 s，同一 prompt 再送一次因前綴快取只要 3.3 s）。
   所以 `/ask` 的延遲大致與送進 prompt 的段落數成正比，`:retrieve/rerank-min-score` 濾掉不相關段落可直接縮短回答時間。
+- **`VLLM_RERANK_MIN_SCORE`**（預設 `-7.0`）是依 llama.cpp 回傳的原始 logit 校準的；若 reranker 後端回傳 0–1 的分數，
+  需重新校準（`docs/spikes/rerank-threshold.md`）。
   長時間閒置或記憶體吃緊（swap）後的第一次請求會明顯更慢。
 
 ### Rerank：llama.cpp `llama-server`

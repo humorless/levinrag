@@ -776,3 +776,21 @@ re-index path and every chunk of that document was re-embedded.
   line) lets the report count such a file as `acl-updated`. Indexes
   built before this have no content hash; their first frontmatter edit
   reports `updated` (still without re-embedding unchanged chunks).
+
+
+## 2026-09-25 — rerank-min-score = -7.0 (conservative)
+
+Spec text (SPEC.md §5: `nil`, "由 eval 校準後再設"; §10.3 no-evidence).
+Details: `docs/spikes/rerank-threshold.md`.
+
+- Calibrated on the sample eval questions and the local book corpus:
+  -7.0 is the highest threshold that loses no answer on either; it halves
+  the sample-corpus prompt and turns 5/7 ACL-negative sample questions
+  into the no-evidence reply without calling chat.
+- Set in `resources/config.edn` (search component `:opts`), overridable
+  with `VLLM_RERANK_MIN_SCORE`; the pipeline's library default stays nil.
+  `bb eval` builds its own deps and is unaffected (recall/MRR measure the
+  ranking, which the threshold does not change).
+- The value is in llama.cpp raw-logit units; recalibrate after changing
+  the reranker backend. Tighter values (≈ -4) fit concrete questions but
+  lose answers to abstract ones — revisit with real user questions.

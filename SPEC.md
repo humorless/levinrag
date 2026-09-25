@@ -168,7 +168,7 @@ vllm serve <chat-model>             --port 8003 --api-key "$VLLM_API_KEY"
 | `:retrieve/rerank-input` | — | `40` |
 | `:retrieve/graph-max` | — | `10` |
 | `:retrieve/final-k` | — | `8` |
-| `:retrieve/rerank-min-score` | — | `nil`（停用；由 eval 校準後再設） |
+| `:retrieve/rerank-min-score` | `VLLM_RERANK_MIN_SCORE` | `-7.0`（llama.cpp 回傳的原始 logit 尺度；換 reranker 後端須重新校準，見 `docs/spikes/rerank-threshold.md`） |
 | `:context/max-tokens` | — | `6000` |
 | `:session/secret` | `SESSION_SECRET` | 必填（非 dev） |
 
@@ -484,7 +484,7 @@ principal (username, groups, admin?) + query
 
 - 輸入：chunk 的 `:chunk/index-text`（含 header），每筆以字元數截斷至 `:rerank/max-chars`（預設 1500）。
 - 失敗（逾時、非 2xx、200 但結構錯誤）：沿用 RRF 順序（graph 候選排在最後），trace 標記 `:rerank-failed`，API 回應 `degraded: ["rerank_failed"]`。
-- `rerank-min-score` 預設停用。分數分佈會記錄在 trace，供日後校準。
+- `rerank-min-score` 設定於 `resources/config.edn`（預設 `-7.0`，2026-09-25 以 eval 校準，見 `docs/spikes/rerank-threshold.md`）；pipeline 函式本身的預設仍為停用（nil）。分數分佈會記錄在 trace，供日後重新校準。
 
 ### 9.7 Context 擴展與打包
 
