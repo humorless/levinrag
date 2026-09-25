@@ -794,3 +794,28 @@ Details: `docs/spikes/rerank-threshold.md`.
 - The value is in llama.cpp raw-logit units; recalibrate after changing
   the reranker backend. Tighter values (≈ -4) fit concrete questions but
   lose answers to abstract ones — revisit with real user questions.
+
+
+## 2026-09-25 — Phase 5 health: two endpoints
+
+Spec text (SPEC.md §11): `/health` checks the DBs, the three vLLM
+endpoints and index lag; any failed dependency → 503.
+
+- `GET /api/v1/health` does exactly that; model probes are one minimal
+  real request each (embed one string, rerank one doc, chat
+  `max_tokens 1`), cached 30 s per server so polling cannot load the
+  models. Index lag is reported (`index_lag`) but never makes it 503:
+  lag is normal while an ingest runs.
+- `GET /api/v1/health/live` checks only the two DBs. Kamal's proxy
+  healthcheck points here: with the full check, a chat-model restart
+  would pull the whole app (search, doc viewer) out of the proxy.
+- DB liveness is a real read (`d/datoms db :eav`) after `d/closed?`.
+  Verified in the REPL: on a closed conn Datalevin throws an
+  `AssertionError` (`(conn? conn)`), not an `Exception`, so the checks
+  catch `Throwable`. `d/wait-for-secondary-index` with `{:timeout-ms 0}`
+  returns immediately with `:unfinished-count`.
+- Kamal: volumes `/root/levinrag/data → /app/data` and
+  `/root/levinrag/corpus → /app/corpus` (read-only); `DATA_DIR`,
+  `CORPUS_DIR` and the `VLLM_*` variables are passed. The session secret
+  stays `SESSION_SECRET_KEY` (what `config.edn` reads) although SPEC §5
+  names it `SESSION_SECRET`. The deploy is not yet verified on a server.

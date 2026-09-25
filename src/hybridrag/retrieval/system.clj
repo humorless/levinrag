@@ -22,7 +22,9 @@
 
 (defmethod ig/init-key ::search
   [_ {:keys [index-conn opts]}]
-  {:retriever (rd/retriever index-conn #(embed/embed-all! (config/embed-config) % 32))
-   :rerank-fn #(rerank-client/rerank! (config/rerank-config) %1 %2 %3)
-   :chat-fn chat-fn
-   :opts (or opts {})})
+  (let [embed-fn #(embed/embed-all! (config/embed-config) % 32)]
+    {:retriever (rd/retriever index-conn embed-fn)
+     :embed-fn embed-fn
+     :rerank-fn #(rerank-client/rerank! (config/rerank-config) %1 %2 %3)
+     :chat-fn chat-fn
+     :opts (or opts {})}))

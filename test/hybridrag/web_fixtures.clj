@@ -42,7 +42,7 @@
 (defn handler
   "Ring handler over fx/*index* and *app*. opts: :chat-fn :rerank-fn
    :options (merged into the server options) :context (merged into the
-   handler context)."
+   handler context; a :search map is merged into the stub search)."
   [& {:keys [chat-fn rerank-fn options context]
       :or {chat-fn (chat-reply "特休依年資計算[1]。")
            rerank-fn ok-rerank}}]
@@ -56,11 +56,13 @@
                                                      :embed-fn fx/hash-embed})
                                :index-conn fx/*index*
                                :app-conn *app*
-                               :search {:retriever (rd/retriever fx/*index* fx/hash-embed)
-                                        :rerank-fn rerank-fn
-                                        :chat-fn chat-fn
-                                        :opts {}}}
-                              context)))
+                               :search (merge {:retriever (rd/retriever fx/*index* fx/hash-embed)
+                                               :embed-fn fx/hash-embed
+                                               :rerank-fn rerank-fn
+                                               :chat-fn chat-fn
+                                               :opts {}}
+                                              (:search context))}
+                              (dissoc context :search))))
 
 (defn logged-in
   "A web client logged in as `user` against (apply handler args)."

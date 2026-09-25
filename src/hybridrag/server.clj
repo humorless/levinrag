@@ -49,7 +49,8 @@
   "Return main application handler for server-side rendering."
   [{:keys [options]
     :as context}]
-  (let [session-store (ring-session-cookie/cookie-store
+  (let [context (assoc context :health-cache (atom nil))
+        session-store (ring-session-cookie/cookie-store
                         {:key (reitit-extras/string->16-byte-array
                                 (:session-secret-key options))})]
     (ring/ring-handler

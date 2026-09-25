@@ -41,6 +41,8 @@
    ["/api/v1"
     ["/health" {:name ::health-check
                 :get {:handler handlers/health-handler}}]
+    ["/health/live" {:name ::health-live
+                     :get {:handler handlers/live-handler}}]
     ["" {:middleware [auth/wrap-bearer-auth]}
      ["/search" {:name ::search
                  :post {:handler search/handler

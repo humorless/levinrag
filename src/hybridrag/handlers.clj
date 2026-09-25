@@ -1,5 +1,5 @@
 (ns hybridrag.handlers
-  (:require [datalevin.core :as d]
+  (:require [hybridrag.health :as health]
             [hybridrag.views :as views]
             [reitit-extras.core :as reitit-extras]
             [ring.util.response :as response]))
@@ -11,20 +11,31 @@
         (reitit-extras/render-html)
         (response/status status-code))))
 
-(defn- conn-ok?
-  "True if `conn` is a live, queryable Datalevin connection."
-  [conn]
-  (try
-    (some? (d/db conn))
-    (catch Exception _ false)))
+(defn- db-checks [{:keys [index-conn app-conn]}]
+  {:index_db (if (health/db-ok? index-conn) "ok" "down")
+   :app_db (if (health/db-ok? app-conn) "ok" "down")})
+
+(defn- health-response [checks extra]
+  (let [ok? (every? #{"ok"} (vals checks))]
+    (-> (response/response (merge {:status (if ok? "ok" "degraded")
+                                   :checks checks}
+                                  extra))
+        (response/status (if ok? 200 503)))))
+
+(defn live-handler
+  "GET /api/v1/health/live — both DBs only; the load balancer check, so
+   a model restart does not take search and the doc viewer offline."
+  [request]
+  (health-response (db-checks (:context request)) nil))
 
 (defn health-handler
-  "GET /api/v1/health — SPEC.md §11. Only checks the two Datalevin
-   connections for now; vLLM reachability and index lag are added in T5.1."
-  [request]
-  (let [{:keys [index-conn app-conn]} (:context request)
-        index-ok? (conn-ok? index-conn)
-        app-ok? (conn-ok? app-conn)]
-    (-> (response/response {:index_db (if index-ok? "ok" "down")
-                            :app_db (if app-ok? "ok" "down")})
-        (response/status (if (and index-ok? app-ok?) 200 503)))))
+  "GET /api/v1/health — SPEC.md §11: DBs, the three model endpoints
+   (probes cached for health/probe-ttl-ms) and index lag, which is
+   reported but never a failure (it is normal while ingest runs)."
+  [{:keys [context]}]
+  (let [models (health/cached-probe (:health-cache context)
+                                    (System/currentTimeMillis)
+                                    health/probe-ttl-ms
+                                    #(health/probe-models (:search context)))]
+    (health-response (merge (db-checks context) models)
+                     {:index_lag (health/index-lag (:index-conn context))})))

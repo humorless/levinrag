@@ -9,7 +9,7 @@ proxy:
   ssl: true
   host: <%= ENV['APP_DOMAIN'] %>
   healthcheck:
-    path: /health
+    path: /api/v1/health/live
 
 registry:
   server: ghcr.io
@@ -25,8 +25,22 @@ builder:
     type: gha
 
 env:
+  clear:
+    # WORKDIR is /app; config.edn opens data/index.dtlv and data/app.dtlv
+    DATA_DIR: /app/data
+    CORPUS_DIR: /app/corpus
   secret:
     - SESSION_SECRET_KEY
+    - VLLM_API_KEY
+    - VLLM_EMBED_BASE_URL
+    - VLLM_EMBED_MODEL
+    - VLLM_RERANK_BASE_URL
+    - VLLM_RERANK_MODEL
+    - VLLM_CHAT_BASE_URL
+    - VLLM_CHAT_MODEL
 
 volumes:
-  - "/root/hybridrag-db:/app/db"
+  # index.dtlv, app.dtlv (users, tokens, traces) and ingest reports
+  - "/root/levinrag/data:/app/data"
+  # the corpus is the source of truth (SPEC D2); the app only reads it
+  - "/root/levinrag/corpus:/app/corpus:ro"
