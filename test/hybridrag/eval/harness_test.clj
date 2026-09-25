@@ -87,3 +87,9 @@
     (is (= "hr/leave.md#2" (first (:docs r1))) "天數計算 is section 2 of leave.md")
     (is (= 1.0 (:mrr-10 r1)))
     (is (= 0.0 (:recall-10 r2)) "a section id that does not exist is never found")))
+
+(deftest test-degraded-warning
+  (is (nil? (harness/degraded-warning {:variants {"lexical" {:summary {:degraded 0}}}})))
+  (is (re-find #"hybrid\+rerank 3"
+               (harness/degraded-warning {:variants {"lexical" {:summary {:degraded 0}}
+                                                     "hybrid+rerank" {:summary {:degraded 3}}}}))))

@@ -140,6 +140,16 @@
                             "stage latency:"]
                            stage-lines))))
 
+(defn degraded-warning
+  "A warning line when any variant ran questions degraded (e.g. rerank
+   failed, so its numbers are not the full pipeline), else nil."
+  [report]
+  (let [bad (for [[v {:keys [summary]}] (:variants report)
+                  :when (pos? (:degraded summary 0))]
+              (str v " " (:degraded summary)))]
+    (when (seq bad)
+      (str "警告：有題目在降級狀態下執行（" (str/join "、" bad) " 題），這些數字不代表完整 pipeline。"))))
+
 (defn write-results!
   "Write the full report to <dir>/<timestamp>.edn; returns the path."
   [dir report]

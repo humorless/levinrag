@@ -34,6 +34,7 @@
                                :variant-names (variant-names args)})
                      path (harness/write-results! "eval/results" report)]
                  (println (harness/table report))
+                 (some-> (harness/degraded-warning report) println)
                  (println "results:" path)
                  (if (pos? (:acl-leaks report)) 1 0))
                (catch clojure.lang.ExceptionInfo e

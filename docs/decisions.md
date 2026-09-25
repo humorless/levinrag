@@ -819,3 +819,21 @@ endpoints and index lag; any failed dependency → 503.
   `CORPUS_DIR` and the `VLLM_*` variables are passed. The session secret
   stays `SESSION_SECRET_KEY` (what `config.edn` reads) although SPEC §5
   names it `SESSION_SECRET`. The deploy is not yet verified on a server.
+
+
+## 2026-09-25 — `bb vllm:check` probes rerank with a full-length document
+
+- The old probe (two short strings) passes on a reranker whose context is
+  too small for real chunks, so the fault would only show as every query
+  running with `rerank_failed`. `vllm:check` now also reranks a
+  1500-character relevant document (the `:rerank/max-chars` cut) against
+  a short unrelated one and fails unless the long one gets a finite,
+  higher score.
+- Tried on the local llama.cpp bge-reranker-v2-m3: with `-c 8192` the long
+  document scores 5.56 vs -11.03 (OK). A second instance with `-c 512
+  -b 512 -ub 512`: the short probe still passes (-4.71 / -5.52) while the
+  long one gets HTTP 500 "input (1191 tokens) is too large" — so the new
+  probe catches what the old one missed. 1500 Chinese characters ≈ 1191
+  tokens for this tokenizer.
+- `bb eval` prints a warning naming the variants that had degraded
+  questions; the exit code still reflects ACL leaks only.
