@@ -220,3 +220,39 @@ neither about core retrieval:
   retract-then-re-add form is broken beyond the fulltext error (it can
   commit an entity without its unique id), so `replace-tx` stays
   (`spikes/retract-readd.md`).
+
+## Dev environment: llama.cpp only, without LM Studio? (2026-09-26)
+
+User question: can llama.cpp cover everything LM Studio does here, so the
+Mac dev environment depends on one tool? Analysis:
+
+- **What LM Studio does for us today** (`lms ps --json`): the embedding
+  model is a GGUF (`ggml-org/bge-m3-Q8_0-GGUF`), i.e. llama.cpp's engine
+  inside LM Studio; the chat model `qwen/qwen3-8b` runs on **MLX**
+  (safetensors, 4-bit), not llama.cpp. Rerank is already llama.cpp.
+- **llama-server covers the API**: `/v1/embeddings` (`--embedding`,
+  `--pooling`), `/v1/chat/completions` (`--jinja` chat templates), and the
+  rerank we use. Build 11146 also has a router mode (`--models-dir`,
+  `--models-preset`, `--models-max`), so one process might serve all three
+  models on one port — not yet tried.
+- **Gains**: one `brew install`, no GUI app to launch or keep logged in,
+  models fetched with `-hf` into one cache, the same setup on Linux dev
+  machines; `bb dev:models` shrinks to starting llama-server(s).
+- **Risks to measure before deciding**:
+  1. Chat speed: MLX vs llama.cpp Metal (Qwen3-8B Q4_K_M GGUF) on an M1
+     16 GB — prefill tok/s (dominates `/ask`, VLLM_SETUP measured ~125
+     tok/s prefill, ~25 tok/s generation on MLX) and generation tok/s, and
+     `/ask` p50 end to end on the sample questions.
+  2. Prefix-cache effect (LM Studio: 14.5 s → 3.3 s for a repeated prompt);
+     llama-server's slot cache / `--cache-reuse` should be compared.
+  3. Turning Qwen3 thinking off: likely `chat_template_kwargs:
+     {"enable_thinking": false}` (the vLLM form, so `VLLM_CHAT_EXTRA_BODY`
+     would match VLLM_SETUP's vLLM line) or `--reasoning-budget 0`; verify
+     that answers contain no reasoning.
+  4. Embeddings: same GGUF file, so vectors should match LM Studio's;
+     check cosine ≈ 1 on a sample, otherwise the index needs `bb reindex`.
+  5. Memory with three models in llama.cpp vs LM Studio + llama-server.
+- **Decision rule (proposed)**: switch if `/ask` p50 is within ~20 % and
+  eval metrics are unchanged; then update VLLM_SETUP, `.env.example`,
+  `bb dev:models`, the dev guide.
+- Not urgent (user, 2026-09-26).
