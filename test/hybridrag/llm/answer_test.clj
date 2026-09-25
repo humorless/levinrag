@@ -159,3 +159,17 @@
     (is (= [1] cited))
     (is (= 1 (count invalid)))
     (is (= "帳號見[1]" text))))
+
+(deftest test-full-width-citation-digits
+  (is (= {:text "特休[1][2]。"
+          :cited [1 2]
+          :invalid []}
+         (answer/parse-citations "特休［１，２］。" 3)))
+  (is (= [1] (:cited (answer/parse-citations "見【１】" 1))))
+  (is (= [3] (:invalid (answer/parse-citations "見［３］" 1)))))
+
+(deftest test-orphan-close-think
+  ;; templates that pre-fill <think> leave only the closing tag
+  (is (= "答案[1]" (answer/strip-think "先想一想……\n</think>\n答案[1]")))
+  (is (= "答案" (answer/strip-think "<think>x</think>答案")))
+  (is (= "答案" (answer/strip-think "答案"))))

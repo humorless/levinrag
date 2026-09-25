@@ -23,24 +23,28 @@
   (slurp (io/resource "prompts/answer.md")))
 
 (defn strip-think
-  "Remove <think>…</think> blocks; an unclosed <think> drops the rest."
+  "Remove <think>…</think> blocks; an unclosed <think> drops the rest; a
+   leftover </think> with no opening tag (templates that pre-fill
+   <think>) drops everything before it."
   [s]
   (-> s
       (str/replace #"(?s)<think>.*?</think>" "")
       (str/replace #"(?s)<think>.*\z" "")
+      (str/replace #"(?s)\A.*?</think>" "")
       str/trim))
 
 (def ^:private citation-re
-  ;; [1] [1, 3] ［1］ 【1】, but not a Markdown link text [..](..)
+  ;; [1] [1, 3] ［1］ 【1】 ［１］, but not a Markdown link text [..](..)
   ;; \x28 is an open paren, spelled out so the pre-commit hook's raw
-  ;; bracket count stays even
-  #"[\[［【]\s*(\d+(?:\s*[,，、]\s*\d+)*)\s*[\]］】](?!\x28)")
+  ;; bracket count stays even; (?U) lets \d match full-width digits
+  #"(?U)[\[［【]\s*(\d+(?:\s*[,，、]\s*\d+)*)\s*[\]］】](?!\x28)")
 
 (defn- numbers
-  "Integers in a citation group; one too long for a long counts as 0
-   (invalid)."
+  "Integers in a citation group (full-width digits are NFKC-normalized);
+   one too long for a long counts as 0 (invalid)."
   [group]
-  (mapv #(or (parse-long %) 0) (re-seq #"\d+" group)))
+  (mapv #(or (parse-long (java.text.Normalizer/normalize % java.text.Normalizer$Form/NFKC)) 0)
+        (re-seq #"(?U)\d+" group)))
 
 (defn parse-citations
   "Citations in `s` given `n` passages. Returns {:text :cited :invalid}:
