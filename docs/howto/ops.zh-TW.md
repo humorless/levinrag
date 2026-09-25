@@ -13,6 +13,18 @@
 - **語料目錄 `CORPUS_DIR`**：真正的資料來源（Markdown／純文字檔）。應用程式只會讀取，不會寫入。
 - **三個模型端點（OpenAI 相容 API）**：embedding、rerank、chat。應用程式不負責啟動它們；本機的架設方式見 [VLLM_SETUP.zh-TW.md](../../VLLM_SETUP.zh-TW.md)。
 
+```mermaid
+flowchart LR
+  C[(CORPUS_DIR<br/>唯一的資料來源，唯讀)] -->|ingest| I
+  subgraph J[一個 JVM：Web UI＋/api/v1]
+    I[(index.dtlv<br/>衍生資料：可用 bb reindex 重建)]
+    P[(app.dtlv<br/>使用者、群組、token、trace：<br/>要備份)]
+  end
+  J --> M[三個模型端點<br/>embedding · rerank · chat]
+  HL["GET /api/v1/health/live"] -.-> I & P
+  H["GET /api/v1/health"] -.-> I & P & M
+```
+
 需求：JDK 21。每一個會開啟 Datalevin 的 JVM，都必須帶這兩個參數：
 `--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED`。
 `clojure -M:jvm-opts`、`bb` 指令和 Docker 映像檔都已經加上了。

@@ -56,6 +56,26 @@ token 以 `Authorization: Bearer <token>` 呼叫 `/api/v1/*`，權限與該使�
 
 權限寫在語料目錄的檔案裡，**匯入時計算並寫入索引**。改完權限檔後，必須重新匯入才會生效。
 
+一份文件的讀者怎麼決定（細節見下面各小節）：
+
+```mermaid
+flowchart TD
+  D[一份文件] --> F{frontmatter read_groups<br/>格式錯誤或拼錯？}
+  F -->|是| X[不匯入<br/>列在 errors]
+  F -->|否| W[從文件所在目錄往上找<br/>第一個壞掉或宣告了 :read-groups<br/>的 _collection.edn]
+  W -->|壞掉| X
+  W -->|宣告了 :read-groups| C[目錄群組 = 該清單]
+  W -->|一路到根目錄都沒有| R[目錄群組 = ROOT_READ_GROUPS]
+  C --> O{frontmatter 有 read_groups？}
+  R --> O
+  O -->|有| FG[群組 = 只用 frontmatter 的清單<br/>不會加回目錄群組]
+  O -->|沒有| DG[群組 = 目錄群組]
+  FG --> E{群組是空的？}
+  DG --> E
+  E -->|是| A[只有 admin]
+  E -->|否| G[這些群組的成員，加上 admin]
+```
+
 ### 目錄：`_collection.edn`
 
 ```clojure

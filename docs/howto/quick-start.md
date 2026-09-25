@@ -192,6 +192,25 @@ diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 
 ### 8.3 Explainable: why this passage
 
+Every query runs through these stages; the Debug table's columns and the trace's stages use the same names. Both channels return only chunks the user may read.
+
+```mermaid
+flowchart TD
+  Q[Question + user] --> L[lexical<br/>full-text, CJK bigrams]
+  Q --> S[semantic<br/>vectors]
+  L --> F[RRF<br/>fuse the two rankings]
+  S --> F
+  F --> G[graph<br/>add chunks from documents<br/>linked to the fused hits]
+  F --> R[rerank<br/>cross-encoder scores<br/>every candidate]
+  G --> R
+  R --> T{"In the top final_k (8) and score ≥<br/>VLLM_RERANK_MIN_SCORE?"}
+  T -->|yes| SEL[選中 Selected<br/>plus neighbouring chunks,<br/>packed into the prompt]
+  T -->|no| N[Shown in Debug only]
+  SEL --> A["Answer with [n] citations"]
+```
+
+If rerank fails, the candidates keep their RRF order and the score threshold is skipped. If nothing is selected, the model is not called and the answer is "在你有權限存取的資料中找不到相關內容。" (No relevant content was found in the data you have access to.)
+
 - **Browser**: tick **Debug** next to "送出" (Submit). Below the answer, a table lists every candidate: its rank in the lexical and semantic channels, the fused (RRF) score, whether the link graph brought it in, the rerank score, and whether it went into the prompt; then the time per stage.
 - **API**: create a token (`bb token:create alice --label eval`, shown once) and:
 
@@ -217,6 +236,8 @@ diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 | `hybrid` | Both, fused with RRF |
 | `hybrid+rerank` | Hybrid, then the cross-encoder reranks the candidates |
 | `hybrid+rerank+graph` | Also follows links between documents |
+
+Each variant is the pipeline in [8.3](#83-explainable-why-this-passage) with some stages switched off; the web UI always runs all of them.
 
 - recall@5 / recall@10: the share of `:expected-docs` found in the top 5 / 10 documents. MRR@10: how high the first correct document is.
 - Expect `hybrid+rerank` to beat both single channels. On the bundled sample corpus every variant scores 1.0, which is why your own corpus and questions are needed.

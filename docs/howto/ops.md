@@ -12,6 +12,18 @@ Audience: the people who deploy, monitor and back up the system. For managing us
 - **The corpus directory `CORPUS_DIR`**: the real source of the data (Markdown / plain-text files). The application only reads it and never writes to it.
 - **Three model endpoints (OpenAI-compatible API)**: embedding, rerank, chat. The application does not start them; for a local setup, see [VLLM_SETUP.md](../../VLLM_SETUP.md).
 
+```mermaid
+flowchart LR
+  C[(CORPUS_DIR<br/>source of truth, read only)] -->|ingest| I
+  subgraph J[One JVM: web UI + /api/v1]
+    I[(index.dtlv<br/>derived: rebuild with bb reindex)]
+    P[(app.dtlv<br/>users, groups, tokens, traces:<br/>back this up)]
+  end
+  J --> M[Three model endpoints<br/>embedding · rerank · chat]
+  HL["GET /api/v1/health/live"] -.-> I & P
+  H["GET /api/v1/health"] -.-> I & P & M
+```
+
 Requirement: JDK 21. Every JVM that opens Datalevin must be started with these two flags:
 `--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED`.
 `clojure -M:jvm-opts`, the `bb` tasks and the Docker image already include them.

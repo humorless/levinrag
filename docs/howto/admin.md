@@ -55,6 +55,26 @@ A token calls `/api/v1/*` with `Authorization: Bearer <token>` and has the same 
 
 Permissions are written in files in the corpus directory and are **computed at ingest time and written into the index**. After editing a permissions file, you must ingest again for the change to take effect.
 
+How one document's readers are decided (the subsections below give the details):
+
+```mermaid
+flowchart TD
+  D[A document] --> F{Frontmatter read_groups<br/>malformed or misspelt?}
+  F -->|yes| X[Not indexed<br/>listed under errors]
+  F -->|no| W[Walk up from the document's directory<br/>to the first _collection.edn that is<br/>broken or declares :read-groups]
+  W -->|broken| X
+  W -->|declares :read-groups| C[Directory groups = that list]
+  W -->|none up to the root| R[Directory groups = ROOT_READ_GROUPS]
+  C --> O{Frontmatter has read_groups?}
+  R --> O
+  O -->|yes| FG[Groups = the frontmatter list only<br/>directory groups are not added]
+  O -->|no| DG[Groups = directory groups]
+  FG --> E{Groups empty?}
+  DG --> E
+  E -->|yes| A[Admins only]
+  E -->|no| G[Members of those groups, plus admins]
+```
+
 ### Directories: `_collection.edn`
 
 ```clojure

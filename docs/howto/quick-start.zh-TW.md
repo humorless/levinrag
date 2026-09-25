@@ -191,6 +191,25 @@ diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 
 ### 8.3 可解釋：為什麼是這一段
 
+每一次查詢都會經過下面這些階段；Debug 表格的欄位與 trace 的各階段用的是同樣的名稱。兩個通道都只會回傳該使用者可讀的段落。
+
+```mermaid
+flowchart TD
+  Q[問題＋使用者] --> L[lexical<br/>全文檢索，CJK bigram]
+  Q --> S[semantic<br/>向量]
+  L --> F[RRF<br/>融合兩份排名]
+  S --> F
+  F --> G[graph<br/>加入與融合結果<br/>有連結的文件段落]
+  F --> R[rerank<br/>cross-encoder 為<br/>每個候選打分數]
+  G --> R
+  R --> T{在前 final_k（8）名，且分數 ≥<br/>VLLM_RERANK_MIN_SCORE？}
+  T -->|是| SEL[選中<br/>連同前後相鄰段落，<br/>放進 prompt]
+  T -->|否| N[只顯示在 Debug]
+  SEL --> A["附 [n] 引用的回答"]
+```
+
+rerank 失敗時，候選維持 RRF 順序，也不套用分數門檻。沒有任何段落被選中時，不會呼叫模型，回答是「在你有權限存取的資料中找不到相關內容。」
+
 - **瀏覽器**：勾選「送出」旁的 **Debug**。回答下方的表格列出每個候選段落：它在 lexical 與 semantic 通道的名次、融合（RRF）分數、是否由連結圖帶進來、rerank 分數、是否放進 prompt；接著是各階段耗時。
 - **API**：建立一個 token（`bb token:create alice --label eval`，只顯示一次），然後：
 
@@ -216,6 +235,8 @@ diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 | `hybrid` | 兩者，以 RRF 融合 |
 | `hybrid+rerank` | hybrid 之後，用 cross-encoder 重新排序候選 |
 | `hybrid+rerank+graph` | 再加上沿著文件之間的連結擴展 |
+
+每個變體都是 [8.3](#83-可解釋為什麼是這一段) 的管線關掉部分階段；網頁則一律跑完整條。
 
 - recall@5／recall@10：`:expected-docs` 出現在前 5／10 份文件的比例。MRR@10：第一份正確文件排得多前面。
 - 預期 `hybrid+rerank` 會勝過兩個單一通道。內附的範例語料上每個變體都是 1.0，所以需要你自己的語料與題目。
