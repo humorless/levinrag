@@ -110,40 +110,6 @@
     (is (= ["all"] (:effective-groups result)))
     (is (= "" (:collection result)))))
 
-;; --- ACL overrides (deny/allow) ---
-
-(deftest test-apply-acl-overrides-deny
-  ;; Apply deny overrides: remove specified groups.
-  (let [groups #{"hr" "intern" "contractor"}]
-    (is (= #{"hr" "contractor"}
-           (acl/apply-acl-overrides groups [{:type :deny,
-                                             :groups ["intern"]}])))))
-
-(deftest test-apply-acl-overrides-allow
-  ;; Apply allow overrides: add specified groups.
-  (let [groups #{"hr" "finance"}]
-    (is (= #{"hr" "finance" "eng"}
-           (acl/apply-acl-overrides groups [{:type :allow,
-                                             :groups ["eng"]}])))))
-
-(deftest test-apply-acl-overrides-deny-takes-precedence
-  ;; Override semantics: if same group in deny and allow, deny wins.
-  (let [groups #{"hr" "finance"}]
-    (is (= #{"finance"}
-           (acl/apply-acl-overrides groups
-                                    [{:type :deny,
-                                      :groups ["hr"]}
-                                     {:type :allow,
-                                      :groups ["hr"]}])))))
-
-(deftest test-apply-acl-overrides-no-overrides
-  ;; No overrides → return original set unchanged.
-  (let [groups #{"hr" "finance" "eng"}]
-    (is (= groups
-           (acl/apply-acl-overrides groups))))
-  (is (= #{"hr" "finance"}
-         (acl/apply-acl-overrides #{"hr" "finance"} nil))))
-
 ;; --- Nearest collection edn ---
 
 (deftest test-nearest-collection-edn

@@ -47,8 +47,7 @@
 
 (defn- collection-problem
   "Why the parsed _collection.edn `v` would not be applied as written, or
-   nil. (:acl-overrides in ingest.acl is not wired into ingest, so it is
-   rejected rather than silently ignored.)"
+   nil."
   [v]
   (cond
     (not (map? v)) "內容必須是一個 map，例如 {:read-groups [\"hr\"]}"

@@ -191,7 +191,7 @@
   (doseq [[label text] [["unreadable" "{:read-groups [\"hr]}"]
                         ["not a map" "[\"hr\"]"]
                         ["unknown key" "{:read-group [\"hr\"]}"]
-                        ["overrides are not applied by ingest" "{:read-groups [\"hr\"] :acl-overrides []}"]
+                        ["unsupported key (there are no deny/allow overrides)" "{:read-groups [\"hr\"] :acl-overrides []}"]
                         ["groups not strings" "{:read-groups [hr]}"]
                         ["groups not a list" "{:read-groups \"hr\"}"]]]
     (with-tree {"_collection.edn" "{:read-groups [\"all\"]}" "hr/_collection.edn" text}

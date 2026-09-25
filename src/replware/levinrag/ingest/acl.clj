@@ -1,17 +1,15 @@
 (ns replware.levinrag.ingest.acl
-  "ACL rules engine — resolves §7.2 four rules and override semantics.
+  "ACL rules engine — resolves the SPEC.md §7.2 rules.
    Rules (per SPEC.md §7.2):
    1. Collection effective-groups: nearest ancestor _collection.edn :read-groups wins
    2. File effective-groups: frontmatter :read_groups overrides entirely; else uses
       collection effective-groups
    3. ACL changes only need to recalculate affected groups, no re-chunking needed
    4. Empty [] means \"admin only\"
-   Override extensions:
-   - _collection.edn may have :acl-overrides (list of {:type :deny/:allow :groups [...]})
-     Deny/allow apply to declared-groups from :read-groups. Deny takes precedence.
-   - Frontmatter :read_groups is a full override (replace, not union)."
-  (:require [clojure.set :as set]
-            [clojure.string :as str]))
+   Frontmatter :read_groups is a full override (replace, not union).
+   Settings that cannot be applied as written fail closed (rule 5): see
+   walker/scan-collection-edns and markdown/frontmatter-acl-problem."
+  (:require [clojure.string :as str]))
 
 ;; --- Collection group resolution ---
 
@@ -54,60 +52,6 @@
   ([dir-path collection-edns root-read-groups]
    (or (find-nearest-read-groups dir-path collection-edns)
        root-read-groups)))
-
-(defn apply-acl-overrides
-  "Apply deny/allow overrides to a group set.
-   Per plan: deny takes precedence, multiple overrides compose LIFO.
-   Deny overrides remove groups from the set.
-   Allow overrides add groups to the set.
-   If a group is in both deny and allow sets, deny wins.
-   
-   Parameters:
-     groups — set of group strings (from :read-groups)
-     overrides — list of {:type :deny/:allow :groups [...]}
-   Returns: set of group strings after overrides."
-  ([groups]
-   (apply-acl-overrides groups nil))
-  ([groups overrides]
-   (if (seq overrides)
-     (let [denied (reduce (fn [acc ov]
-                            (if (= (:type ov) :deny)
-                              (clojure.set/union acc (set (:groups ov)))
-                              acc))
-                          #{}
-                          overrides)
-           allowed (reduce (fn [acc ov]
-                             (if (= (:type ov) :allow)
-                               (clojure.set/union acc (set (:groups ov)))
-                               acc))
-                           #{}
-                           overrides)]
-       (-> (set groups)
-           (clojure.set/difference denied)
-           (clojure.set/union (clojure.set/difference allowed denied))))
-     groups)))
-
-(defn resolve-collection-groups-with-overrides
-  "Resolve collection effective-groups including optional :acl-overrides.
-   Parameters:
-     dir-path       — relative directory path
-     collection-edns — map of dir-path → _collection.edn map
-     root-read-groups — fallback for root
-   Returns: set of effective group strings."
-  ([dir-path collection-edns]
-   (resolve-collection-groups-with-overrides dir-path collection-edns []))
-  ([dir-path collection-edns root-read-groups]
-   (let [declared (resolve-collection-effective-groups dir-path collection-edns root-read-groups)
-         nearest-entry (loop [d (str/trim dir-path)]
-                         (let [entry (get collection-edns d)]
-                           (if (and entry (:read-groups entry))
-                             entry
-                             (let [p (parent-dir d)]
-                               (if (= p d)
-                                 nil
-                                 (recur p))))))
-         overrides (when nearest-entry (:acl-overrides nearest-entry))]
-     (apply-acl-overrides declared overrides))))
 
 ;; --- File group resolution ---
 

@@ -1151,3 +1151,13 @@ serve built the CSS; web login as bob: a restricted doc and a
 non-existent one gave the same 404 page; eval 38 questions, 0 leaks; a
 rebuild in `./data-rebuild` gave identical eval metrics and an identical
 `acl:report --docs`; the guide's curl/jq commands ran unchanged.
+
+## 2026-09-25 — `:acl-overrides` removed
+
+`ingest.acl` had `apply-acl-overrides` / `resolve-collection-groups-with-overrides`
+(deny/allow lists in `_collection.edn`) with unit tests, but ingest never
+called them: the key was silently ignored. Since §7.2 rule 5 it is rejected
+as an unknown key. User decision: delete the code and its tests rather
+than keep an unused second ACL model. The ACL model is only: a directory's
+nearest `:read-groups`, a document's frontmatter `read_groups` override,
+`[]` for admins only.
