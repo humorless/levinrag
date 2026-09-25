@@ -837,3 +837,23 @@ endpoints and index lag; any failed dependency → 503.
   tokens for this tokenizer.
 - `bb eval` prints a warning naming the variants that had degraded
   questions; the exit code still reflects ACL leaks only.
+
+
+## 2026-09-25 — Session lifetime and per-user revocation (T5.2a)
+
+Spec text (SPEC.md §13): Ring encrypted cookie sessions; silent on
+lifetime and revocation.
+
+- The cookie session carries `:issued-at`; `wrap-session-auth` rejects it
+  after `SESSION_MAX_AGE_HOURS` (default 8) or when it predates the
+  user's `:user/sessions-valid-after`. Cookies from before this change
+  have no `:issued-at` and are rejected (one extra login after deploy).
+- `POST /logout` and `bb user:passwd` set `:user/sessions-valid-after` to
+  now. The cookie is the whole session store, so revocation is per user:
+  logging out on one device ends every device's session (user's choice,
+  2026-09-25). A per-device session table is out of scope.
+- `bb user:groups` needs no revocation: the principal is re-read from
+  `app.dtlv` on every request. API tokens are unaffected
+  (`bb token:revoke`).
+- Adding the attribute to an existing `app.dtlv` was checked on a copy
+  of the walkthrough DB: users and groups intact.

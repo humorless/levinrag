@@ -140,9 +140,6 @@ Deferred minors (reviewer findings, not fixed):
   `config.edn`.
 - **`trace/recent` pulls and sorts every trace** on each `/admin` load;
   use a range scan on `:trace/at` or cap it.
-- **No session lifetime**: cookie-store sessions never expire and logout
-  cannot revoke a copied cookie. Store issued-at and reject old sessions
-  in `wrap-session-auth`.
 - **`/login` has no rate limiting or lockout** (spec silent).
 
 Set aside by the reviewer:

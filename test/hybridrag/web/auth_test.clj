@@ -5,9 +5,11 @@
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
+            [hybridrag.auth.users :as users]
             [hybridrag.fixtures :as fx]
             [hybridrag.web-client :as wc]
-            [hybridrag.web-fixtures :as wf]))
+            [hybridrag.web-fixtures :as wf]
+            [hybridrag.web.auth :as web-auth]))
 
 (use-fixtures :once fx/with-sample-index)
 (use-fixtures :each wf/with-app-users)
@@ -93,3 +95,45 @@
     (is (re-find #"(?i)SameSite=Lax" dflt))
     (is (not (str/includes? dflt "Secure")))
     (is (str/includes? (cookie {:secure-cookies? true}) "Secure"))))
+
+(deftest test-session-valid?
+  (let [h 3600000
+        user {:user/username "alice"}]
+    (is (web-auth/session-valid? {:username "alice"
+                                  :issued-at 1000} user 2000 (* 8 h)))
+    (testing "a cookie issued before sessions carried :issued-at"
+      (is (not (web-auth/session-valid? {:username "alice"} user 2000 (* 8 h)))))
+    (testing "older than the max age"
+      (is (not (web-auth/session-valid? {:username "alice"
+                                         :issued-at 0} user (* 8 h) (* 8 h)))))
+    (testing "issued before the user's last revocation"
+      (let [revoked (assoc user :user/sessions-valid-after (java.util.Date. 1000))]
+        (is (not (web-auth/session-valid? {:username "alice"
+                                           :issued-at 1000} revoked 2000 (* 8 h))))
+        (is (web-auth/session-valid? {:username "alice"
+                                      :issued-at 1001} revoked 2000 (* 8 h)))))))
+
+(deftest test-logout-revokes-other-devices
+  (let [a (wf/logged-in "alice")
+        b (wf/logged-in "alice")]
+    (is (= 200 (:status (wc/request! b :get "/"))))
+    (Thread/sleep 5)
+    (wc/post! a "/logout" {})
+    (is (= 302 (:status (wc/request! b :get "/"))))))
+
+(deftest test-new-password-revokes-sessions
+  (let [c (wf/logged-in "alice")]
+    (Thread/sleep 5)
+    (users/set-password! wf/*app* "alice" "new-password")
+    (users/revoke-sessions! wf/*app* "alice")
+    (is (= 302 (:status (wc/request! c :get "/"))))
+    (testing "a fresh login works"
+      (Thread/sleep 5)
+      (wc/login! c "alice" "new-password")
+      (is (= 200 (:status (wc/request! c :get "/")))))))
+
+(deftest test-session-expires
+  (let [c (wf/logged-in "alice" :options {:session-max-age-ms 200})]
+    (is (= 200 (:status (wc/request! c :get "/"))))
+    (Thread/sleep 250)
+    (is (= 302 (:status (wc/request! c :get "/"))))))

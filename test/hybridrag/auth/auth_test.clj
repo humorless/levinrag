@@ -86,6 +86,8 @@
         (is (:admin? (users/principal (users/find-user (d/db conn) "admin"))))
         (is (str/includes? (run "user:groups" "alice" "all,hr,finance") "all,finance,hr"))
         (is (str/includes? (run "user:passwd" "alice") "已更新"))
+        (is (inst? (:user/sessions-valid-after (users/find-user (d/db conn) "alice")))
+            "a new password ends the old web sessions")
         (is (some? (users/authenticate (d/db conn) "alice" "s3cret-pass")))
         (let [out (run "token:create" "alice" "--label" "cli")
               t (second (str/split-lines out))

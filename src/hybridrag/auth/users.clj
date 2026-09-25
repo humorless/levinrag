@@ -8,7 +8,8 @@
             [datalevin.core :as d]))
 
 (def ^:private user-pull
-  [:db/id :user/username :user/display-name :user/password-hash :user/groups :user/admin?])
+  [:db/id :user/username :user/display-name :user/password-hash :user/groups :user/admin?
+   :user/sessions-valid-after])
 
 (defn find-user
   "User entity map for `username`, or nil."
@@ -52,6 +53,13 @@
   [conn username password]
   (let [{:keys [db/id]} (existing-user! (d/db conn) username)]
     (d/transact! conn [[:db/add id :user/password-hash (hashers/derive password)]])
+    nil))
+
+(defn revoke-sessions!
+  "End every web session of `username` issued up to now (all devices)."
+  [conn username]
+  (let [{:keys [db/id]} (existing-user! (d/db conn) username)]
+    (d/transact! conn [[:db/add id :user/sessions-valid-after (java.util.Date.)]])
     nil))
 
 (defn authenticate

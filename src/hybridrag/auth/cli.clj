@@ -51,7 +51,9 @@
         (cond
           (not= pw again) (throw (ex-info "兩次輸入的密碼不一致。" {}))
           (< (count pw) 8) (throw (ex-info "密碼至少 8 個字元。" {}))
-          :else (do (users/set-password! conn a1 pw) (str a1 " 的密碼已更新。"))))
+          :else (do (users/set-password! conn a1 pw)
+                    (users/revoke-sessions! conn a1)
+                    (str a1 " 的密碼已更新，既有的網頁登入已失效。"))))
 
       "token:create"
       (let [{t :token

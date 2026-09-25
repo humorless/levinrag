@@ -11,6 +11,8 @@
    :user/groups {:db/valueType :db.type/string
                  :db/cardinality :db.cardinality/many}
    :user/admin? {:db/valueType :db.type/boolean}
+   ;; web sessions issued at or before this instant are void (logout, new password)
+   :user/sessions-valid-after {:db/valueType :db.type/instant}
 
    :token/hash {:db/valueType :db.type/string
                 :db/unique :db.unique/identity}

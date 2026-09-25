@@ -38,7 +38,10 @@
                 [:auto-reload? boolean?]
                 [:cache-assets? {:optional true} boolean?]
                 [:cache-control {:optional true} string?]
-                [:secure-cookies? {:optional true} boolean?]]]
+                [:secure-cookies? {:optional true} boolean?]
+                [:session-max-age-hours {:optional true} pos-int?]
+                ;; tests only: overrides the hours
+                [:session-max-age-ms {:optional true} pos-int?]]]
               [:index-conn [:fn {:error/message "Missing index-conn"} some?]]
               [:app-conn [:fn {:error/message "Missing app-conn"} some?]]
               [:search [:fn {:error/message "Missing search"} some?]]

@@ -26,6 +26,7 @@
                                     :dev true}
             :cache-assets? #profile {:default false
                                      :prod true}
+            :session-max-age-hours #long #or [#env SESSION_MAX_AGE_HOURS "8"]
             :secure-cookies? #profile {:default false
                                        :prod true}}
   :corpus-dir #or [#env CORPUS_DIR "./corpus"]

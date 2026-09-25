@@ -171,7 +171,8 @@ vllm serve <chat-model>             --port 8003 --api-key "$VLLM_API_KEY"
 | `:retrieve/final-k` | — | `8` |
 | `:retrieve/rerank-min-score` | `VLLM_RERANK_MIN_SCORE` | `-7.0`（llama.cpp 回傳的原始 logit 尺度；換 reranker 後端須重新校準，見 `docs/spikes/rerank-threshold.md`） |
 | `:context/max-tokens` | — | `6000` |
-| `:session/secret` | `SESSION_SECRET` | 必填（非 dev） |
+| `:session/secret` | `SESSION_SECRET`（實作為 `SESSION_SECRET_KEY`，見 decisions.md） | 必填（非 dev） |
+| `:session-max-age-hours` | `SESSION_MAX_AGE_HOURS` | `8`（登入後超過即須重新登入；登出與改密碼使該使用者所有 session 失效） |
 
 ---
 
