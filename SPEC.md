@@ -600,7 +600,7 @@ Every `/search` and `/ask` writes one trace (`app.dtlv`), including requests tha
  ]
 ```
 
-Eval identities come from `eval/users.edn`, so `bb eval` does not depend on `app.dtlv`. `--questions <file>` and `--users <file>` replace the two default files, for evaluating another corpus; a missing file is an error. The question set currently has 38 questions, 8 of them ACL negative questions.
+Eval identities come from `eval/users.edn`, so `bb eval` does not depend on `app.dtlv`. `--questions <file>` and `--users <file>` replace the two default files, for evaluating another corpus; a missing file is an error, and the users file gets the same checks as `bb user:import` (a misspelt `:groups` would make a user read nothing and the leak check pass vacuously). A missing `DATA_DIR/index.dtlv` is an error. Every `:expected-docs` / `:must-not-docs` path that is not in the index is listed as a warning: such a question measures nothing. The question set currently has 38 questions, 8 of them ACL negative questions.
 
 ### 15.2 Running
 

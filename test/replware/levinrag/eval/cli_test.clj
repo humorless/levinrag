@@ -41,3 +41,36 @@
                             (cli/read-inputs {:questions q
                                               :users (str dir "/missing.edn")})))
       (finally (tmp/delete-tree! dir)))))
+
+(deftest test-users-file-is-validated
+  ;; review 2026-09-25 M3: `{:group ...}` loaded as a user with no groups,
+  ;; who reads nothing, so the leak check passed vacuously
+  (let [dir (tmp/dir "eval-cli-users")
+        q (str dir "/q.edn")
+        u (str dir "/u.edn")]
+    (try
+      (spit q "[]")
+      (doseq [bad ["{\"bob\" {:group #{\"all\"}}}" "{\"bob\" {:groups \"hr\"}}"]]
+        (spit u bad)
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo #"使用者檔有錯誤"
+                              (cli/read-inputs {:questions q
+                                                :users u}))
+            bad))
+      (finally (tmp/delete-tree! dir)))))
+
+(deftest test-missing-docs
+  ;; a question whose documents are not in the index measures nothing: a
+  ;; :must-not-docs path with a typo, or a doc kept out by §7.2 rule 5,
+  ;; can never "leak"
+  (is (= [{:id "q1"
+           :key :expected-docs
+           :path "hr/leav.md"}
+          {:id "q2"
+           :key :must-not-docs
+           :path "hr/gone.md"}]
+         (cli/missing-docs [{:id "q1"
+                             :expected-docs ["hr/leave.md" "hr/leav.md"]}
+                            {:id "q2"
+                             :must-not-docs ["hr/gone.md"]
+                             :expected-docs ["hr/leave.md"]}]
+                           #{"hr/leave.md"}))))

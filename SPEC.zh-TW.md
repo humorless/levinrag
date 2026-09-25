@@ -602,7 +602,7 @@ bb user:import users.edn [--dry-run]              ; 檔案列出的使用者以�
  ]
 ```
 
-eval 的身分來自 `eval/users.edn`，所以 `bb eval` 不依賴 `app.dtlv`。`--questions <檔案>` 與 `--users <檔案>` 取代這兩個預設檔，用於評估其他語料；檔案不存在時報錯。目前題庫有 38 題，其中 8 題是 ACL 負向題。
+eval 的身分來自 `eval/users.edn`，所以 `bb eval` 不依賴 `app.dtlv`。`--questions <檔案>` 與 `--users <檔案>` 取代這兩個預設檔，用於評估其他語料；檔案不存在時報錯，而使用者檔會做和 `bb user:import` 相同的檢查（`:groups` 拼錯會讓使用者什麼都讀不到，洩漏檢查就空洞地通過）。`DATA_DIR/index.dtlv` 不存在時報錯。`:expected-docs`／`:must-not-docs` 裡不在索引中的路徑都會列為警告：這樣的題目什麼也量不到。目前題庫有 38 題，其中 8 題是 ACL 負向題。
 
 ### 15.2 執行
 

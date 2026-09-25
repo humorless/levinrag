@@ -1234,3 +1234,14 @@ without sharing code between bb and the JVM). Its fix text no longer
 claims the old fall-back behaviour. Note: on a case-insensitive file
 system (macOS default) `_Collection.edn` next to an existing
 `_collection.edn` is the same file.
+
+## 2026-09-25 — Review M3 / L2: `bb eval` input checks
+
+- The users file now goes through `user-import/parse` (the docs call it
+  "the same file" as `bb user:import`): `{:group ...}` or `{:groups "hr"}`
+  used to load as a user who reads nothing, so `ACL leaks: 0` was vacuous.
+- `:expected-docs` / `:must-not-docs` paths missing from the index are
+  listed as a `[WARN]` (exit status unchanged): a typo, or a doc kept out
+  by §7.2 rule 5, makes the question measure nothing.
+- A missing `DATA_DIR/index.dtlv` is an error (exit 2); before, eval opened
+  (created) an empty index and reported 0 leaks, exit 0.

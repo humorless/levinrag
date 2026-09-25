@@ -6,6 +6,7 @@
             [clojure.java.io :as io]
             [clojure.string :as str]
             [datalevin.core :as d]
+            [replware.levinrag.auth.user-import :as user-import]
             [replware.levinrag.config :as config]
             [replware.levinrag.db.index-conn :as index-conn]
             [replware.levinrag.eval.harness :as harness]
@@ -41,30 +42,60 @@
     (throw (ex-info (str "找不到" what "：" path) {:path path}))))
 
 (defn read-inputs
-  "{:questions [..] :principals {..}} from the files named in `opts`."
+  "{:questions [..] :principals {..}} from the files named in `opts`. The
+   users file gets the same checks as `bb user:import`: a user whose
+   `:groups` is misspelt would read nothing and make the leak check pass
+   vacuously."
   [{:keys [questions users]}]
   {:questions (edn/read-string (slurp (existing-file questions "題目檔")))
-   :principals (harness/load-principals (existing-file users "使用者檔"))})
+   :principals (into {}
+                     (map (fn [[u m]] [u (assoc m :username u)]))
+                     (user-import/parse (slurp (existing-file users "使用者檔"))))})
+
+(defn missing-docs
+  "[{:id :key :path}] for every :expected-docs / :must-not-docs path that is
+   not in the index: such a question measures nothing (a :must-not-docs
+   typo, or a doc kept out by SPEC.md §7.2 rule 5, can never leak)."
+  [questions indexed-paths]
+  (vec (for [q questions
+             k [:expected-docs :must-not-docs]
+             p (get q k)
+             :when (not (contains? indexed-paths p))]
+         {:id (:id q)
+          :key k
+          :path p})))
 
 (defn -main [& args]
   (let [{:keys [data-dir]} (config/corpus-config)
         embed-cfg (config/embed-config)
-        conn (index-conn/open (str (io/file data-dir "index.dtlv")) (:dims embed-cfg))
-        code (try
-               (let [opts (parse-args args)
-                     report (harness/run-eval
-                              {:retriever (rd/retriever conn #(embed/embed-all! embed-cfg % 32))
-                               :rerank-fn #(rerank-client/rerank! (config/rerank-config) %1 %2 %3)}
-                              conn
-                              (assoc (read-inputs opts) :variant-names (:variant-names opts)))
-                     path (harness/write-results! "eval/results" report)]
-                 (println (harness/table report))
-                 (some-> (harness/degraded-warning report) println)
-                 (println "results:" path)
-                 (if (pos? (:acl-leaks report)) 1 0))
-               (catch clojure.lang.ExceptionInfo e
-                 (binding [*out* *err*] (println "錯誤：" (ex-message e)))
-                 2)
-               (finally (d/close conn)))]
+        index (io/file data-dir "index.dtlv")
+        code (if-not (.exists index)
+               (do (binding [*out* *err*] (println "錯誤： 找不到" (str index) "：先執行 bb ingest，或檢查 DATA_DIR"))
+                   2)
+               (let [conn (index-conn/open (str index) (:dims embed-cfg))]
+                 (try
+                   (let [opts (parse-args args)
+                         inputs (read-inputs opts)
+                         missing (missing-docs (:questions inputs)
+                                               (set (d/q '[:find [?p ...] :where [_ :doc/path ?p]] (d/db conn))))
+                         report (harness/run-eval
+                                  {:retriever (rd/retriever conn #(embed/embed-all! embed-cfg % 32))
+                                   :rerank-fn #(rerank-client/rerank! (config/rerank-config) %1 %2 %3)}
+                                  conn
+                                  (assoc inputs :variant-names (:variant-names opts)))
+                         path (harness/write-results! "eval/results" report)]
+                     (println (harness/table report))
+                     (some-> (harness/degraded-warning report) println)
+                     (when (seq missing)
+                       (println (str "[WARN] 題目引用了索引裡沒有的文件（" (count missing)
+                                     " 處；路徑打錯，或文件因權限設定錯誤未匯入）："))
+                       (doseq [{:keys [id path] k :key} missing]
+                         (println (str "         " id " " (name k) " " path))))
+                     (println "results:" path)
+                     (if (pos? (:acl-leaks report)) 1 0))
+                   (catch clojure.lang.ExceptionInfo e
+                     (binding [*out* *err*] (println "錯誤：" (ex-message e)))
+                     2)
+                   (finally (d/close conn)))))]
     (shutdown-agents)
     (System/exit code)))

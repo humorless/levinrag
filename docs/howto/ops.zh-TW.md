@@ -170,5 +170,6 @@ bb eval --questions my-eval/questions.edn --users my-eval/users.edn   # 自己�
 評估會讀取 `eval/questions.edn` 與 `eval/users.edn`（或以 `--questions`／`--users` 指定的檔案），對 `DATA_DIR/index.dtlv` 以各題指定的使用者身分直接執行檢索，輸出 recall@5、recall@10、MRR@10、ACL 洩漏數、degraded 題數，以及各階段的 p50／p95 延遲。結果寫入 `eval/results/<時間>.edn`。
 
 - **ACL 洩漏大於 0 時，指令以非零狀態碼結束**。
+- 使用者檔的檢查和 `bb user:import` 相同（`:groups` 拼錯會報錯）。`[WARN]` 會列出題目中不在索引裡的路徑（打錯，或文件因權限設定錯誤未匯入）：這些題目什麼也量不到。
 - 有題目在降級狀態下執行時，會印出警告；這時的數字不代表完整 pipeline，先處理模型問題再比較。
 - 更換 reranker 之後，重新校準 `VLLM_RERANK_MIN_SCORE`。
