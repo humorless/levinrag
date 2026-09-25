@@ -20,3 +20,9 @@ tmux new-session -d -s nrepl 'clojure -M:jvm-opts:test:dev:nrepl --port 1667'
   Reload the source ns too; `remove-ns` a test ns after renaming/deleting deftests, then require it **with `:reload`** (the ns stays in `*loaded-libs*`, so a plain `require` silently does nothing).
 - Before committing (clean JVM + coverage): `clojure -X:jvm-opts:test`
 - Lint: `clj-kondo --lint src test`
+
+## Docs in two languages
+
+- README, SPEC, VLLM_SETUP, `docs/howto/*`, `docs/design/rationale` exist as `X.md` (English, authoritative) and `X.zh-TW.md` (Traditional Chinese translation).
+- Change one, change the other in the same commit; keep headings identical (other docs link to their anchors).
+- Single-language on purpose: `docs/decisions.md`, `docs/backlog.md`, spikes, plans, handoffs (English); `docs/design/2026-09-22-initial-spec.md` (Chinese, frozen).

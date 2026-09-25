@@ -172,3 +172,7 @@ from the handoff:
   embedding model or analyzer), then have the server switch its
   index-conn to it (e.g. an admin action) and drop the old one. Rebuild
   cost is dominated by re-embedding every chunk (SPEC §21.1 scale).
+- **Web UI localization**: labels, messages and the prompt's default
+  answer language are Traditional Chinese. Add an English UI (message
+  catalogue, language choice per user or per `Accept-Language`); the
+  English docs quote the Chinese labels with glosses until then.

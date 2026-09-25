@@ -1,5 +1,9 @@
 # vLLM 設定指南
 
+[English](VLLM_SETUP.md) | 繁體中文
+
+> 本文為英文版的翻譯；內容不一致時，以英文版為準。
+
 本專案需要三個 vLLM endpoints 才能運作：
 
 ## 環境變數設定
@@ -87,8 +91,11 @@ bb vllm:check
 ```
 [OK]   embed
 [OK]   rerank
+[OK]   rerank-long
 [OK]   chat
 ```
+
+`rerank-long` 以一份 1500 字元的文件探測 reranker（SPEC §4.3）。
 
 ## 注意事項
 
@@ -96,7 +103,7 @@ bb vllm:check
 - 如果 vLLM server 已經在運行，不需要額外設定
 - 第一次使用會自動下載模型（約 2-16GB）
 - 如果 `/v1/rerank` 路徑錯誤，嘗試改為 `/rerank`
-- 如果需要更詳細的 vLLM 啟動指令，請參考 `docs/vllm.md`（如果有的話）
+
 ## 本機替代：LM Studio（embedding 與 chat）
 
 沒有 vLLM 時，可以用 LM Studio 在本機提供 embedding 與 chat（OpenAI 相容 API，port 1234）：
@@ -134,10 +141,10 @@ export VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # 關閉 Qwen3 的�
 - vLLM 上的 Qwen3 則用 `VLLM_CHAT_EXTRA_BODY='{"chat_template_kwargs":{"enable_thinking":false}}'`。
 - **generate 的時間主要花在讀 prompt（prefill）**：M1 16 GB 上 Qwen3-8B prefill 約 125 token/s、生成約
   25 token/s（2026-09-25 實測：1389 token 的 prompt 首次 14.5 s，同一 prompt 再送一次因前綴快取只要 3.3 s）。
-  所以 `/ask` 的延遲大致與送進 prompt 的段落數成正比，`:retrieve/rerank-min-score` 濾掉不相關段落可直接縮短回答時間。
+  所以 `/ask` 的延遲大致與送進 prompt 的段落數成正比，search 元件的 `:rerank-min-score`（環境變數 `VLLM_RERANK_MIN_SCORE`）濾掉不相關段落可直接縮短回答時間。
+  長時間閒置或記憶體吃緊（swap）後的第一次請求會明顯更慢。
 - **`VLLM_RERANK_MIN_SCORE`**（預設 `-7.0`）是依 llama.cpp 回傳的原始 logit 校準的；若 reranker 後端回傳 0–1 的分數，
   需重新校準（`docs/spikes/rerank-threshold.md`）。
-  長時間閒置或記憶體吃緊（swap）後的第一次請求會明顯更慢。
 
 ### Rerank：llama.cpp `llama-server`
 
@@ -154,5 +161,5 @@ export VLLM_RERANK_MODEL=bge-reranker-v2-m3
 
 - 模型約 636 MB，首次啟動時下載到 `~/.cache/huggingface`；執行時約佔 1.1 GB 記憶體。
 - 回應格式與 SPEC §4.2 相同（`results[i] = {index, relevance_score}`，依分數排序）。
-- **分數是未經 sigmoid 的 logit**（例如 4.6、−6.5），不是 0–1。設定 `:retrieve/rerank-min-score` 時要以實際後端校準。
+- **分數是未經 sigmoid 的 logit**（例如 4.6、−6.5），不是 0–1。設定 search 元件的 `:rerank-min-score`（環境變數 `VLLM_RERANK_MIN_SCORE`）時要以實際後端校準。
 - M1 16 GB 實測：40 個 chunk（約 6–7k 估算 tokens）約 2.1 秒；20 個約 0.9–1.0 秒。

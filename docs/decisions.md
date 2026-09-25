@@ -933,3 +933,23 @@ existence". `:acl-starvation` leaks the same thing more coarsely.
   and a Debug-panel test; both fail with the redaction disabled.
 - Not addressed: stage timings (lexical ms grows with pre-ACL hits) are a
   theoretical timing channel; noted in the backlog.
+
+
+## 2026-09-25 — Bilingual docs: English is the default and the authority
+
+- The docs a reader reaches from the README exist in English (default)
+  and Traditional Chinese: `README`, `SPEC`, `VLLM_SETUP`,
+  `docs/howto/{ops,admin,user}`, `docs/design/rationale`. The Chinese
+  versions are `*.zh-TW.md` next to the English ones (moved with git mv,
+  history kept); each file links to its counterpart on its first line.
+- **SPEC.md in English is the single authoritative spec** (user's choice
+  "A1"): a 800-line living spec kept in two equal versions would drift.
+  `SPEC.zh-TW.md` is a translation and says it may lag.
+- Rule: a change to one language version updates the other in the same
+  commit (CLAUDE.md). Headings of each pair must match; anchors that other
+  docs link to have fixed English titles.
+- Stay single-language: the frozen initial spec (Chinese, no English
+  summary — user's choice), `docs/decisions.md`, `docs/backlog.md`,
+  `CLAUDE.md`, spikes, plans and handoffs (English).
+- The web UI is Traditional Chinese; the English README says so. UI
+  localization is on the backlog.
