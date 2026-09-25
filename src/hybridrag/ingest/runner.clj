@@ -91,16 +91,17 @@
            nil))))
 
 (defmethod ig/init-key ::runner
-  [_ {:keys [index-conn]
+  [_ {:keys [index-conn root-read-groups]
       :as opts}]
-  (let [{:keys [data-dir corpus-dir root-read-groups]} (config/corpus-config)
-        embed-cfg (config/embed-config)]
-    (make (merge {:corpus-dir corpus-dir
-                  :data-dir data-dir
-                  :root-read-groups root-read-groups
-                  :embed-fn #(embed/embed-all! embed-cfg % 32)}
+  ;; paths come from config.edn (:hybridrag.config/paths), so the server
+  ;; and the runner cannot disagree; ROOT_READ_GROUPS is a string there
+  (let [embed-cfg (config/embed-config)]
+    (make (merge {:embed-fn #(embed/embed-all! embed-cfg % 32)}
                  (dissoc opts :index-conn)
-                 {:index-conn index-conn}))))
+                 {:index-conn index-conn
+                  :root-read-groups (if (string? root-read-groups)
+                                      (config/split-groups root-read-groups)
+                                      (vec root-read-groups))}))))
 
 (def ^:private halt-wait-ms 120000)
 

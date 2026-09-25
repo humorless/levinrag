@@ -2,6 +2,7 @@
   "Plain env-var config for standalone CLI tools (bb tasks) that must not
    boot the full Integrant/Ring system. See SPEC.md §5 for the full table."
   (:require [clojure.string :as str]
+            [integrant.core :as ig]
             [jsonista.core :as json]))
 
 (defn- env [k] (System/getenv k))
@@ -37,12 +38,22 @@
    :read-timeout-ms (env-long "VLLM_CHAT_TIMEOUT_MS" 120000)
    :api-key (or (env "VLLM_CHAT_API_KEY") (env "VLLM_API_KEY"))})
 
+(defn split-groups
+  "Group names from a comma-separated string (ROOT_READ_GROUPS)."
+  [s]
+  (->> (str/split (or s "") #",")
+       (map str/trim)
+       (remove str/blank?)
+       vec))
+
 (defn corpus-config
-  "Ingestion settings (SPEC.md §5). ROOT_READ_GROUPS is comma-separated."
+  "Ingestion settings (SPEC.md §5) for CLI tools that do not boot the
+   Integrant system. The server reads the same env vars, with the same
+   defaults, through the :hybridrag.config/paths key of config.edn."
   []
-  {:data-dir (env-or "DATA_DIR" "./data")
+  {:data-dir (env-or "DATA_DIR" "data")
    :corpus-dir (env-or "CORPUS_DIR" "./corpus")
-   :root-read-groups (->> (str/split (env-or "ROOT_READ_GROUPS" "") #",")
-                          (map str/trim)
-                          (remove str/blank?)
-                          vec)})
+   :root-read-groups (split-groups (env "ROOT_READ_GROUPS"))})
+
+;; config.edn's single source of data/corpus paths; other keys #ref it
+(defmethod ig/init-key ::paths [_ paths] paths)

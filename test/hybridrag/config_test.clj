@@ -31,3 +31,22 @@
     #(do (is (= 5000 (:read-timeout-ms (config/embed-config))))
          (is (= 3000 (:read-timeout-ms (config/rerank-config))))
          (is (= 60000 (:read-timeout-ms (config/chat-config)))))))
+
+(deftest test-dirs-single-source
+  ;; server, runner and both DBs take their paths from one config key
+  (let [test-cfg (ig-extras/get-config :test)
+        default-cfg (ig-extras/get-config :default)]
+    (is (= "data-test" (get-in test-cfg [:hybridrag.ingest.runner/runner :data-dir])))
+    (is (= "data-test/index.dtlv" (get-in test-cfg [:hybridrag.db.index-conn/index-conn :dir])))
+    (is (= "data-test/app.dtlv" (get-in test-cfg [:hybridrag.db.app-conn/app-conn :dir])))
+    (doseq [cfg [test-cfg default-cfg]]
+      (is (= (get-in cfg [:hybridrag.ingest.runner/runner :corpus-dir])
+             (get-in cfg [:hybridrag.server/server :corpus-dir])
+             (get-in cfg [:hybridrag.config/paths :corpus-dir])))
+      (is (= (str (get-in cfg [:hybridrag.config/paths :data-dir]) "/index.dtlv")
+             (get-in cfg [:hybridrag.db.index-conn/index-conn :dir]))))))
+
+(deftest test-split-groups
+  (is (= [] (config/split-groups "")))
+  (is (= [] (config/split-groups nil)))
+  (is (= ["all" "hr"] (config/split-groups " all, hr ,"))))

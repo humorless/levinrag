@@ -127,11 +127,6 @@ Set aside by the reviewer, for later phases:
 
 Deferred minors (reviewer findings, not fixed):
 
-- **Two sources for `CORPUS_DIR`/`DATA_DIR`**: the server reads
-  `config.edn` (`#or [#env CORPUS_DIR "./corpus"]`), the runner reads
-  `config/corpus-config`; they can drift (e.g. `CORPUS_DIR=""`), and the
-  runner ignores the `:test` profile's `data-test/`. Pass both from
-  `config.edn`.
 - **`trace/recent` pulls and sorts every trace** on each `/admin` load;
   use a range scan on `:trace/at` or cap it.
 - **`/login` has no rate limiting or lockout** (spec silent).

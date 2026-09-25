@@ -1,10 +1,17 @@
-{:hybridrag.db.index-conn/index-conn
- {:dir #profile {:default "data/index.dtlv"
-                 :test "data-test/index.dtlv"}}
+{; the one place data and corpus paths come from (DATA_DIR, CORPUS_DIR,
+ ; ROOT_READ_GROUPS; same defaults as hybridrag.config/corpus-config,
+ ; which the CLI tools use)
+ :hybridrag.config/paths
+ {:data-dir #profile {:default #or [#env DATA_DIR "data"]
+                      :test "data-test"}
+  :corpus-dir #or [#env CORPUS_DIR "./corpus"]
+  :root-read-groups #or [#env ROOT_READ_GROUPS ""]}
+
+ :hybridrag.db.index-conn/index-conn
+ {:dir #join [#ref [:hybridrag.config/paths :data-dir] "/index.dtlv"]}
 
  :hybridrag.db.app-conn/app-conn
- {:dir #profile {:default "data/app.dtlv"
-                 :test "data-test/app.dtlv"}}
+ {:dir #join [#ref [:hybridrag.config/paths :data-dir] "/app.dtlv"]}
 
  :hybridrag.retrieval.system/search
  {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn
@@ -14,7 +21,10 @@
   :opts {:rerank-min-score #double #or [#env VLLM_RERANK_MIN_SCORE "-7.0"]}}
 
  :hybridrag.ingest.runner/runner
- {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn}
+ {:index-conn #ig/ref :hybridrag.db.index-conn/index-conn
+  :data-dir #ref [:hybridrag.config/paths :data-dir]
+  :corpus-dir #ref [:hybridrag.config/paths :corpus-dir]
+  :root-read-groups #ref [:hybridrag.config/paths :root-read-groups]}
 
  :hybridrag.server/server
  {:options {:port #profile {:default 8000
@@ -29,7 +39,7 @@
             :session-max-age-hours #long #or [#env SESSION_MAX_AGE_HOURS "8"]
             :secure-cookies? #profile {:default false
                                        :prod true}}
-  :corpus-dir #or [#env CORPUS_DIR "./corpus"]
+  :corpus-dir #ref [:hybridrag.config/paths :corpus-dir]
   :index-conn #ig/ref :hybridrag.db.index-conn/index-conn
   :app-conn #ig/ref :hybridrag.db.app-conn/app-conn
   :search #ig/ref :hybridrag.retrieval.system/search

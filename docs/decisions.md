@@ -857,3 +857,17 @@ lifetime and revocation.
   (`bb token:revoke`).
 - Adding the attribute to an existing `app.dtlv` was checked on a copy
   of the walkthrough DB: users and groups intact.
+
+
+## 2026-09-25 — One source for data and corpus paths
+
+- `config.edn` has a `:hybridrag.config/paths` key (`DATA_DIR`,
+  `CORPUS_DIR`, `ROOT_READ_GROUPS`); the DB dirs (`#join` on `#ref`), the
+  ingest runner and the server's `:corpus-dir` all `#ref` it, so the
+  server and the admin-triggered ingest cannot disagree, and the `:test`
+  profile's `data-test/` now applies to the runner too.
+- Before this, the server opened `data/index.dtlv` regardless of
+  `DATA_DIR` while `bb ingest` honoured it. `DATA_DIR` now moves the
+  server's DBs as well.
+- CLI tools (`bb ingest`, `bb user:*`, `bb eval`) do not boot Integrant
+  and keep `config/corpus-config`, with the same env vars and defaults.
