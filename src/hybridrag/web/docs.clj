@@ -12,7 +12,10 @@
   [{:keys [context principal path-params query-params]
     :as request}]
   (let [path (:path path-params)
-        found (docs/lookup (d/db (:index-conn context)) principal path)
+        db (d/db (:index-conn context))
+        found (if (:admin? principal)
+                (docs/lookup-admin db path)
+                (docs/lookup-acl db principal path))
         file (when found (docs/source-file (:corpus-dir context) path))]
     (if-not file
       (layout/not-found request)

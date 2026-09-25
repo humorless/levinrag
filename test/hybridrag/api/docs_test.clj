@@ -1,8 +1,10 @@
 (ns hybridrag.api.docs-test
   "GET /api/v1/docs/{path} (SPEC.md §11): metadata + ACL-visible chunks,
    404 (not 403) for unreadable docs."
-  (:require [clojure.test :refer [deftest is use-fixtures]]
+  (:require [clojure.test :refer [deftest is testing use-fixtures]]
+            [datalevin.core :as d]
             [hybridrag.auth.token :as token]
+            [hybridrag.docs :as docs]
             [hybridrag.fixtures :as fx]
             [hybridrag.web-fixtures :as wf]
             [jsonista.core :as json]))
@@ -29,3 +31,15 @@
   (is (= 404 (:status (get-doc "hr/leave.md" "bob"))))
   (is (= "not_found" (get-in (get-doc "hr/leave.md" "bob") [:body :error :code])))
   (is (= 401 (:status (get-doc "hr/leave.md" nil)))))
+
+(deftest test-lookup-split
+  ;; SPEC.md §9.3: the admin bypass is its own function, not a flag
+  (let [db (d/db fx/*index*)]
+    (is (= "hr/leave.md" (get-in (docs/lookup-admin db "hr/leave.md") [:doc :doc/path])))
+    (is (nil? (docs/lookup-admin db "nope.md")))
+    (is (some? (docs/lookup-acl db (fx/principals "alice") "hr/leave.md")))
+    (is (nil? (docs/lookup-acl db (fx/principals "bob") "hr/leave.md")))
+    (testing "lookup-acl ignores :admin? — admins go through lookup-admin"
+      (is (nil? (docs/lookup-acl db (fx/principals "admin") "hr/leave.md"))))
+    (is (nil? (docs/lookup-acl db fx/nobody "public/handbook.md")))
+    (is (nil? (docs/lookup-acl db (fx/principals "alice") "nope.md")))))

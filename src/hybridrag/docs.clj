@@ -12,17 +12,15 @@
            [org.commonmark.node Node]
            [org.commonmark.renderer.html HtmlRenderer]))
 
-(defn lookup
-  "{:doc {:doc/path :doc/title :doc/hash :doc/tags} :chunks [..]} for
-   `path` when `principal` may read it, else nil (unknown and unreadable
-   look the same). Chunks are ordered by position, each
+(defn- doc-eid [db path]
+  (d/q '[:find ?d . :in $ ?p :where [?d :doc/path ?p]] db path))
+
+(defn- doc-view
+  "{:doc {:doc/path :doc/title :doc/hash :doc/tags} :chunks [..]} for the
+   doc entity `eid`. Chunks are ordered by position, each
    {:chunk/id :chunk/ordinal :chunk/char-start :chunk/char-end :section/trail}."
-  [db principal path]
-  (when-let [eid (d/q '[:find ?d . :in $ ?p :where [?d :doc/path ?p]] db path)]
-    (when (or (:admin? principal)
-              (and (seq (:groups principal))
-                   (contains? (rd/accessible-doc-ids db (:groups principal)) eid)))
-      {:doc (d/pull db [:doc/path :doc/title :doc/hash :doc/tags] eid)
+  [db eid]
+  {:doc (d/pull db [:doc/path :doc/title :doc/hash :doc/tags] eid)
        :chunks (->> (d/q '[:find [(pull ?c [:chunk/id :chunk/ordinal :chunk/char-start :chunk/char-end
                                             {:chunk/section [:section/trail]}]) ...]
                            :in $ ?d :where [?c :chunk/doc ?d]]
@@ -31,7 +29,22 @@
                                      (assoc :section/trail (get-in c [:chunk/section :section/trail]))
                                      (dissoc :chunk/section))))
                     (sort-by (juxt :chunk/char-start :chunk/ordinal))
-                    vec)})))
+                    vec)})
+
+(defn lookup-admin
+  "doc-view for `path` with no ACL check — for admins only. A separate
+   function rather than a flag on lookup-acl (SPEC.md §9.3)."
+  [db path]
+  (some->> (doc-eid db path) (doc-view db)))
+
+(defn lookup-acl
+  "doc-view for `path` when `principal`'s groups may read it, else nil
+   (unknown and unreadable look the same). Ignores :admin?."
+  [db principal path]
+  (when-let [eid (doc-eid db path)]
+    (when (and (seq (:groups principal))
+               (contains? (rd/accessible-doc-ids db (:groups principal)) eid))
+      (doc-view db eid))))
 
 (defn source-file
   "The file for `path` inside `corpus-dir`, or nil when it would resolve

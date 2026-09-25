@@ -129,10 +129,6 @@ Set aside by the reviewer, for later phases:
 
 Deferred minors (reviewer findings, not fixed):
 
-- **`docs/lookup` has the admin bypass inside a shared function**
-  (`(or (:admin? principal) ...)`); SPEC §9 asks for a separate admin
-  function, not a parameter switch. Split into `lookup-admin` /
-  `lookup-acl`, or record the exception.
 - **Two sources for `CORPUS_DIR`/`DATA_DIR`**: the server reads
   `config.edn` (`#or [#env CORPUS_DIR "./corpus"]`), the runner reads
   `config/corpus-config`; they can drift (e.g. `CORPUS_DIR=""`), and the
