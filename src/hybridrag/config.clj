@@ -6,17 +6,20 @@
 
 (defn- env [k] (System/getenv k))
 (defn- env-or [k default] (or (env k) default))
+(defn- env-long [k default] (parse-long (env-or k (str default))))
 
 (defn embed-config []
   {:base-url (env-or "VLLM_EMBED_BASE_URL" "http://localhost:8001/v1")
    :model (env-or "VLLM_EMBED_MODEL" "BAAI/bge-m3")
    :dims (parse-long (env-or "VLLM_EMBED_DIMS" "1024"))
+   :read-timeout-ms (env-long "VLLM_EMBED_TIMEOUT_MS" 30000)
    :api-key (or (env "VLLM_EMBED_API_KEY") (env "VLLM_API_KEY"))})
 
 (defn rerank-config []
   {:base-url (env-or "VLLM_RERANK_BASE_URL" "http://localhost:8002")
    :path (env-or "VLLM_RERANK_PATH" "/v1/rerank")
    :model (env-or "VLLM_RERANK_MODEL" "BAAI/bge-reranker-v2-m3")
+   :read-timeout-ms (env-long "VLLM_RERANK_TIMEOUT_MS" 10000)
    :api-key (or (env "VLLM_RERANK_API_KEY") (env "VLLM_API_KEY"))})
 
 (defn- json-env
@@ -31,6 +34,7 @@
   {:base-url (env "VLLM_CHAT_BASE_URL")
    :model (env "VLLM_CHAT_MODEL")
    :extra-body (json-env "VLLM_CHAT_EXTRA_BODY")
+   :read-timeout-ms (env-long "VLLM_CHAT_TIMEOUT_MS" 120000)
    :api-key (or (env "VLLM_CHAT_API_KEY") (env "VLLM_API_KEY"))})
 
 (defn corpus-config

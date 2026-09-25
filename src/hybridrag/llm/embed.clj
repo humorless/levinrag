@@ -3,14 +3,14 @@
             [hybridrag.llm.http :as http]))
 
 (def ^:private connect-timeout-ms 2000)
-(def ^:private read-timeout-ms 30000)
 (def ^:private default-batch-size 32)
 
 (defn embed-batch!
   "Embed up to `default-batch-size` strings in one HTTP call. Returns a
    vector of float vectors in the same order as `texts`."
   ([texts] (embed-batch! (config/embed-config) texts))
-  ([{:keys [base-url model api-key]} texts]
+  ([{:keys [base-url model api-key read-timeout-ms]
+     :or {read-timeout-ms 30000}} texts]
    (let [response (http/post-json!
                     {:url (str base-url "/embeddings")
                      :api-key api-key

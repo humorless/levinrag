@@ -5,7 +5,8 @@
    API keys are never included in the exception or logged (SPEC.md §4.3)."
   (:require [hato.client :as hc]
             [jsonista.core :as json])
-  (:import [java.net ConnectException]
+  (:import [java.io IOException]
+           [java.net ConnectException]
            [java.net.http HttpTimeoutException]))
 
 (def ^:private object-mapper (json/object-mapper {:decode-key-fn keyword}))
@@ -32,7 +33,12 @@
             status (:status response)
             raw (:body response)]
         (if (<= 200 status 299)
-          (json/read-value raw object-mapper)
+          (try (json/read-value raw object-mapper)
+               (catch Exception e
+                 (throw (ex-info (str "vLLM " (name endpoint-kw) " returned a non-JSON body")
+                                 {:llm/endpoint endpoint-kw
+                                  :http/status status
+                                  :llm/body-excerpt (excerpt raw)} e))))
           (throw (ex-info (str "vLLM " (name endpoint-kw) " returned HTTP " status)
                           {:llm/endpoint endpoint-kw
                            :http/status status
@@ -43,5 +49,10 @@
                          :http/status nil} e)))
       (catch ConnectException e
         (throw (ex-info (str "vLLM " (name endpoint-kw) " connection refused")
+                        {:llm/endpoint endpoint-kw
+                         :http/status nil} e)))
+      ;; any other transport failure (reset, truncated response, ...)
+      (catch IOException e
+        (throw (ex-info (str "vLLM " (name endpoint-kw) " connection failed")
                         {:llm/endpoint endpoint-kw
                          :http/status nil} e))))))

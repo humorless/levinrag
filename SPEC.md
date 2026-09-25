@@ -160,6 +160,7 @@ vllm serve <chat-model>             --port 8003 --api-key "$VLLM_API_KEY"
 | `:embed/base-url` `:embed/model` `:embed/dims` | `VLLM_EMBED_BASE_URL` `VLLM_EMBED_MODEL` `VLLM_EMBED_DIMS` | 見 §4.1，`1024` |
 | `:rerank/base-url` `:rerank/path` `:rerank/model` | `VLLM_RERANK_BASE_URL` `VLLM_RERANK_PATH` `VLLM_RERANK_MODEL` | 見 §4.1 |
 | `:chat/base-url` `:chat/model` | `VLLM_CHAT_BASE_URL` `VLLM_CHAT_MODEL` | — / 必填 |
+| 讀取逾時（毫秒） | `VLLM_EMBED_TIMEOUT_MS` `VLLM_RERANK_TIMEOUT_MS` `VLLM_CHAT_TIMEOUT_MS` | `30000` `10000` `120000`（連線逾時固定 2000） |
 | API keys | `VLLM_EMBED_API_KEY` `VLLM_RERANK_API_KEY` `VLLM_CHAT_API_KEY`，未設則 fallback 至 `VLLM_API_KEY` | — |
 | `:chunk/target-tokens` `:chunk/max-tokens` `:chunk/min-tokens` `:chunk/overlap-tokens` | — | `350` `500` `60` `60` |
 | `:retrieve/channel-k` | — | `50` |

@@ -5,13 +5,13 @@
             [hybridrag.llm.http :as http]))
 
 (def ^:private connect-timeout-ms 2000)
-(def ^:private read-timeout-ms 120000)
 
 (defn complete!
   "Call chat/completions with `messages` ([{:role .. :content ..} ...]).
    Returns the raw parsed response map."
   ([messages opts] (complete! (config/chat-config) messages opts))
-  ([{:keys [base-url model api-key]} messages {:keys [temperature max-tokens extra-body]}]
+  ([{:keys [base-url model api-key read-timeout-ms]
+     :or {read-timeout-ms 120000}} messages {:keys [temperature max-tokens extra-body]}]
    (http/post-json!
      {:url (str base-url "/chat/completions")
       :api-key api-key

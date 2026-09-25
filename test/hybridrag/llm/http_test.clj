@@ -72,3 +72,34 @@
       (is (= "HTTP/1.1" (:protocol @seen)))
       (is (not (contains? (:headers @seen) "upgrade")))
       (finally (.stop server)))))
+
+(deftest test-post-json-non-json-200-is-dependency-failure
+  (let [[_server url stop-fn] (start-stub! 200 "<html>oops</html>")]
+    (try
+      (let [e (is (thrown? clojure.lang.ExceptionInfo
+                           (http/post-json! {:url url
+                                             :api-key "secret-key-xyz"
+                                             :body {}
+                                             :connect-timeout-ms 2000
+                                             :read-timeout-ms 5000
+                                             :endpoint-kw :chat})))]
+        (is (= :chat (:llm/endpoint (ex-data e))))
+        (is (= 200 (:http/status (ex-data e))))
+        (is (re-find #"oops" (:llm/body-excerpt (ex-data e)))))
+      (finally (stop-fn)))))
+
+(deftest test-post-json-connection-reset-is-dependency-failure
+  ;; accepts the connection, then closes it without a response
+  (let [ss (java.net.ServerSocket. 0)
+        fut (future (with-open [s (.accept ss)] (.getInputStream s)))]
+    (try
+      (let [e (is (thrown? clojure.lang.ExceptionInfo
+                           (http/post-json! {:url (str "http://localhost:" (.getLocalPort ss) "/")
+                                             :api-key "k"
+                                             :body {}
+                                             :connect-timeout-ms 2000
+                                             :read-timeout-ms 5000
+                                             :endpoint-kw :embed})))]
+        (is (= :embed (:llm/endpoint (ex-data e))))
+        (is (nil? (:http/status (ex-data e)))))
+      (finally (future-cancel fut) (.close ss)))))
