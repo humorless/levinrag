@@ -168,8 +168,6 @@ Deferred minors (reviewer findings, not fixed):
   title check is skipped whenever the title occurs anywhere in readable
   text (the spec only asked to skip when a readable doc has the same
   title).
-- **`</sources>` neutralization misses whitespace variants**
-  (`</sources >`, `</ sources>`, `<sources\n>`); allow `\s*` inside the tag.
 - **`bb user:passwd` revocation** is covered only by asserting
   `:user/sessions-valid-after` is set; no web-level test through the CLI.
 - **Docs**: admin.md says every request "including failures" writes a

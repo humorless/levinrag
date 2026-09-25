@@ -59,11 +59,12 @@
      :invalid (vec (sort (distinct (remove valid? found))))}))
 
 (defn- neutralize
-  "Document text with <sources>/</sources> turned into full-width
-   brackets, so a document cannot close the sources block and address the
-   model as the user (indirect prompt injection)."
+  "Document text with <sources>/</sources> (any case, whitespace inside
+   the tag) turned into full-width brackets, so a document cannot close
+   the sources block and address the model as the user (indirect prompt
+   injection)."
   [s]
-  (str/replace (str s) #"(?i)<(/?sources)>" "＜$1＞"))
+  (str/replace (str s) #"(?i)<(\s*/?\s*sources\s*)>" "＜$1＞"))
 
 (defn messages
   "Chat messages: the system prompt, then <sources> (each passage headed
