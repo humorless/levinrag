@@ -158,3 +158,31 @@ Set aside by the reviewer:
     new variant (semantic channel on the HyDE text), and re-run the
     threshold sweep: a better semantic match should also raise answer
     rerank scores and allow a tighter `rerank-min-score`.
+
+## From Phase 5 review (2026-09-25)
+
+Deferred minors (reviewer findings, not fixed):
+
+- **§18.3 prompt-check guard is global**: `security_test` asserts > 50
+  prompt checks ran overall, not at least one per user × doc pair; the
+  title check is skipped whenever the title occurs anywhere in readable
+  text (the spec only asked to skip when a readable doc has the same
+  title).
+- **`</sources>` neutralization misses whitespace variants**
+  (`</sources >`, `</ sources>`, `<sources\n>`); allow `\s*` inside the tag.
+- **`bb user:passwd` revocation** is covered only by asserting
+  `:user/sessions-valid-after` is set; no web-level test through the CLI.
+- **Docs**: admin.md says every request "including failures" writes a
+  trace (only dependency failures do; 500s do not); the ops.md backup
+  one-liner hard-codes `data/app.dtlv` and has no in-container variant
+  (no `clojure` in the runtime image); the `.kamal/deploy.yml` comment
+  about `data/index.dtlv` is stale; README quick start sets
+  `CORPUS_DIR=corpus-sample` only for `bb ingest`, so a server started
+  without it cannot show source files.
+
+Still open from the handoff:
+
+- `/login` rate limiting (user decision: not in Phase 5).
+- SSE streaming for `/ask` (T5.4, deferred).
+- Multi-process ingest locking (the docs now say CLI ingest only with the
+  server stopped).
