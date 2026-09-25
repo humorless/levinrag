@@ -188,16 +188,16 @@ called unusable.
 
 | # | Feature | State | Source |
 |---|---|---|---|
-| 1 | Full-text `:doc-filter` through Datalog `fulltext` | Failed, cause unknown: one attempt (inline fn in the options map) gave a cast error | `spikes/fulltext.md` §5, decisions T0.4 |
+| 1 | Full-text `:doc-filter` through Datalog `fulltext` | **Re-tested 2026-09-25: works** when the fn is a query input (T0.4 wrote it inside the quoted query). Applies after the top-k, so it is no pre-filter | `spikes/doc-filter.md` |
 | 2 | Phrase search (`{:phrase ..}`, `:index-position? true`) through Datalog | Failed, cause unknown. The spike queried `(fulltext $ ?q ..)` with no attribute, which reads the default `datalevin` domain; the attribute form (`fulltext $ :chunk/index-text ..`, what the code uses now) was not tried | `spikes/fulltext.md` §4, Known Issues 1 |
 | 3 | `:db.fulltext/indexPosition?` on the attribute | Failed, tied to #2 | `spikes/fulltext.md` §8 |
 | 4 | `:db.vec/domains` on a schema attribute | Confirmed 1.1.0 bug, root-caused (init and write paths disagree on domains); workaround in use | decisions 2026-09-22, debug notes §4 |
 | 5 | `retractEntity` and re-adding the same unique id in one tx | Fails with fulltext "Document does not exist."; observed, not root-caused; worked around by in-place upserts | decisions T1.4 |
 | 6 | Built-in embedding (`:db/embedding`, Path A) | Never tested end to end: rejected because it needs the embedding server at connect and transact time; async behaviour and batching untested | `spikes/embedding.md` Path A, decisions Path B |
-| 7 | Vector `:vec-filter` in `vec-neighbors` | Never tried. Reading 1.1.0 `vector.clj:855-868`, it filters after the HNSW top-k, so it cannot replace over-fetch | not in decisions |
+| 7 | Vector `:vec-filter` in `vec-neighbors` | **Tested 2026-09-25: works**, filters after the HNSW top-k, so it is no pre-filter | `spikes/doc-filter.md` |
 
-Tally: 3 failed with an unknown cause (#1–#3), 2 are known bugs with
-workarounds (#4 root-caused, #5 not), 2 were never tried (#6, #7).
-Worth retrying first: #1 (would allow pre-filtering the lexical channel)
-and #2 (phrase queries for exact terms, see "Query-side exact-token
+Tally at the review: 3 failed with an unknown cause (#1–#3), 2 are known
+bugs with workarounds (#4 root-caused, #5 not), 2 were never tried (#6,
+#7). #1 and #7 are now settled (both work, both post-filter). Next worth
+retrying: #2 (phrase queries for exact terms, see "Query-side exact-token
 matching" above). Re-check #4 and #5 on any Datalevin upgrade.

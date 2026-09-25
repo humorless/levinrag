@@ -953,3 +953,23 @@ existence". `:acl-starvation` leaks the same thing more coarsely.
   `CLAUDE.md`, spikes, plans and handoffs (English).
 - The web UI is Traditional Chinese; the English README says so. UI
   localization is on the backlog.
+
+## 2026-09-25 — Correction: `:doc-filter` works from Datalog, but filters after the top-k
+
+Spec text: n/a — corrects this file's T0.4 entry ("`:doc-filter` is
+unusable from Datalog") and `docs/spikes/fulltext.md` §5.
+
+Actual (`docs/spikes/doc-filter.md`, reproducible with
+`dev/spikes/doc_filter.clj`): the T0.4 cast error came from writing
+`(fn ..)` inside the quoted query, where it is an unevaluated list
+(`PersistentList cannot be cast to IFn`). Passing the options map as a
+query input works. The filter receives a datom ref (`[e aid v]`, or
+`[:g gid e aid]` for giant values, which most LevinRAG chunks are), not
+an entity id. It runs after the top-k: with 300 hits and only the 10
+worst admitted, `:top 50` returns 0. The vector `:vec-filter` behaves the
+same way.
+
+Decision: no code change. The T0.5 over-fetch + doc-id-set check stays;
+`:doc-filter` would give the same results and the same ACL starvation.
+The rationale's "the full-text and vector engines cannot filter by
+document before ranking" stands.

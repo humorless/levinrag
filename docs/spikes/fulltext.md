@@ -66,6 +66,11 @@ Even after configuring `{:search-domains {"chunk/text" {:index-position? true}}}
 
 ### 5. :doc-filter — ⚠️ Works in standalone, needs more testing
 
+> **Corrected 2026-09-25** (`docs/spikes/doc-filter.md`): the Datalog cast
+> error below came from writing `(fn ..)` inside the quoted query, where it
+> is an unevaluated list. Passed as a query input, `:doc-filter` works. It
+> filters after the top-k, so it is still not an ACL pre-filter.
+
 **Standalone**:
 ```clojure
 (d/search engine "quick" {:doc-filter (fn [doc-ref] (not= doc-ref 2))})
