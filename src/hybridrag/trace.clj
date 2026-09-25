@@ -1,7 +1,8 @@
 (ns hybridrag.trace
   "Query traces in app.dtlv (SPEC.md §14): one per /search or /ask, stage
    data as an EDN blob holding ids and scores only, never chunk text."
-  (:require [datalevin.core :as d]))
+  (:require [clojure.tools.logging :as log]
+            [datalevin.core :as d]))
 
 (defn write!
   "Store a trace; returns its uuid."
@@ -16,6 +17,22 @@
                              (seq degraded) (assoc :trace/degraded (vec degraded))
                              answer (assoc :trace/answer answer))])
     id))
+
+(defn write-failure!
+  "Trace for a /search or /ask that failed on a dependency (SPEC.md §14:
+   every request writes one). Returns the uuid, or nil when the write
+   itself fails — the caller still answers 503."
+  [app-conn {:keys [username kind query endpoint message]}]
+  (try
+    (write! app-conn {:username username
+                      :kind kind
+                      :query query
+                      :stages {:error {:endpoint endpoint
+                                       :message message}}
+                      :degraded [:dependency-failed]})
+    (catch Exception e
+      (log/error e "[TRACE] failure trace not written")
+      nil)))
 
 (defn fetch
   "Trace map by uuid, or nil."

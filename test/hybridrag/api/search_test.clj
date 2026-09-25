@@ -97,7 +97,15 @@
     (let [{:keys [status body]} (post {:query "特休"} "alice" ok-rerank
                                       (fn [_] (throw (ex-info "vLLM embed timed out" {:llm/endpoint :embed}))))]
       (is (= 503 status))
-      (is (= "dependency_unavailable" (get-in body [:error :code]))))))
+      (is (= "dependency_unavailable" (get-in body [:error :code])))
+      (testing "and still writes a trace"
+        (let [t (trace/fetch (d/db *app*) (parse-uuid (:trace_id body)))]
+          (is (= "alice" (:trace/username t)))
+          (is (= :search (:trace/kind t)))
+          (is (= "特休" (:trace/query t)))
+          (is (= {:endpoint :embed
+                  :message "vLLM embed timed out"} (get-in t [:trace/stages :error])))
+          (is (= [:dependency-failed] (vec (:trace/degraded t)))))))))
 
 (deftest test-search-never-leaks
   ;; §18.3: for every restricted doc and every seed user who cannot read

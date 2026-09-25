@@ -80,6 +80,11 @@
   (is (str/includes? (:body (ask! (wf/logged-in "nobody") "特休")) answer/no-evidence-message))
   (is (str/includes? (:body (ask! (wf/logged-in "alice" :chat-fn (fn [_ _] (throw (ex-info "down" {:llm/endpoint :chat})))) "特休"))
                      "問答服務暫時無法使用（chat）"))
+  (testing "the notice names the failure trace"
+    (let [body (:body (ask! (wf/logged-in "alice" :chat-fn (fn [_ _] (throw (ex-info "down" {:llm/endpoint :chat})))) "特休"))
+          id (second (re-find #"trace ([0-9a-f-]{36})" body))]
+      (is (some? id))
+      (is (= :chat (get-in (trace/fetch (d/db wf/*app*) (parse-uuid id)) [:trace/stages :error :endpoint]))))) 
   (let [{:keys [status body]} (ask! (wf/logged-in "alice" :rerank-fn (fn [& _] (throw (ex-info "x" {})))) "特休")]
     (is (= 200 status))
     (is (str/includes? body "重排序失敗"))))

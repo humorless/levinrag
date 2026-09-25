@@ -172,8 +172,14 @@
           (fragment (result-view res (when debug? (trace/fetch (d/db (:app-conn context)) trace-id)) debug?)))
         (catch clojure.lang.ExceptionInfo e
           (if-let [endpoint (:llm/endpoint (ex-data e))]
-            (do (log/warn "[ASK] dependency failed:" endpoint (ex-message e))
-                (fragment (notice :error (str "問答服務暫時無法使用（" (name endpoint) "）。"))))
+            (let [id (trace/write-failure! (:app-conn context) {:username (:username principal)
+                                                                :kind :ask
+                                                                :query query
+                                                                :endpoint endpoint
+                                                                :message (ex-message e)})]
+              (log/warn "[ASK] dependency failed:" endpoint (ex-message e))
+              (fragment (notice :error (str "問答服務暫時無法使用（" (name endpoint) "）。"
+                                            (when id (str " trace " id))))))
             (unexpected e)))
         (catch Exception e
           (unexpected e))))))

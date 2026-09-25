@@ -121,10 +121,6 @@ Deferred minors (reviewer-confirmed, not fixed):
 
 Set aside by the reviewer, for later phases:
 
-- **No trace when `/search` or `/ask` fails with 503** (§14 says every
-  request writes one) → T5.1.
-- **`llm/http.clj`**: other `IOException`s and non-JSON 200 bodies give
-  500 instead of 503 → T5.1.
 - **No-evidence only fires for users with nothing readable** while
   `:rerank-min-score` is nil (the semantic channel always returns
   neighbours) — calibrate the threshold with the book-corpus eval.

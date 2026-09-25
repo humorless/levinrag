@@ -121,9 +121,13 @@
     (let [{:keys [status body]} (post (stub-search (fn [_ _] {:error "model not loaded"})) {:query "特休"} "alice")]
       (is (= 503 status))
       (is (= "dependency_unavailable" (get-in body [:error :code])))))
-  (testing "chat timeout → 503"
-    (is (= 503 (:status (post (stub-search (fn [_ _] (throw (ex-info "timed out" {:llm/endpoint :chat}))))
-                              {:query "特休"} "alice")))))
+  (testing "chat timeout → 503 with a trace"
+    (let [{:keys [status body]} (post (stub-search (fn [_ _] (throw (ex-info "timed out" {:llm/endpoint :chat}))))
+                                      {:query "特休"} "alice")
+          t (trace/fetch (d/db *app*) (parse-uuid (:trace_id body)))]
+      (is (= 503 status))
+      (is (= :ask (:trace/kind t)))
+      (is (= :chat (get-in t [:trace/stages :error :endpoint])))))
   (testing "rerank down → 200, degraded, still answered"
     (let [{:keys [status body]} (post (stub-search (chat-reply "x[1]") :rerank-fn (fn [& _] (throw (ex-info "x" {}))))
                                       {:query "特休"} "alice")]

@@ -53,8 +53,6 @@
                           :trace_id (str trace-id)}
                    debug (assoc :candidates (mapv search/candidate-json (:candidates res))))})
         (catch clojure.lang.ExceptionInfo e
-          (if-let [endpoint (:llm/endpoint (ex-data e))]
-            (do (log/warn "[ASK] dependency failed:" endpoint (ex-message e))
-                (auth/error-response 503 "dependency_unavailable"
-                                     (str "問答服務暫時無法使用（" (name endpoint) "）。")))
+          (if (:llm/endpoint (ex-data e))
+            (search/dependency-failure-response (:app-conn context) principal :ask query e "問答服務暫時無法使用")
             (throw e)))))))

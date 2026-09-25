@@ -33,6 +33,21 @@
 (defn degraded-json [degraded]
   (mapv #(case % :rerank-failed "rerank_failed" (name %)) degraded))
 
+(defn dependency-failure-response
+  "503 for the dependency ex-info `e` (it carries :llm/endpoint), after
+   writing a failure trace; the body names the trace when one was
+   written. `user-message` is the start of the Chinese error text."
+  [app-conn principal kind query e user-message]
+  (let [endpoint (:llm/endpoint (ex-data e))
+        id (trace/write-failure! app-conn {:username (:username principal)
+                                           :kind kind
+                                           :query query
+                                           :endpoint endpoint
+                                           :message (ex-message e)})]
+    (log/warn "dependency failed:" kind endpoint (ex-message e))
+    (cond-> (auth/error-response 503 "dependency_unavailable" (str user-message "（" (name endpoint) "）。"))
+      id (assoc-in [:body :trace_id] (str id)))))
+
 (defn handler
   [{:keys [context principal parameters errors]}]
   (if errors
@@ -60,8 +75,6 @@
                   :degraded (degraded-json (:degraded res))
                   :trace_id (str trace-id)}})
         (catch clojure.lang.ExceptionInfo e
-          (if-let [endpoint (:llm/endpoint (ex-data e))]
-            (do (log/warn "[SEARCH] dependency failed:" endpoint (ex-message e))
-                (auth/error-response 503 "dependency_unavailable"
-                                     (str "檢索服務暫時無法使用（" (name endpoint) "）。")))
+          (if (:llm/endpoint (ex-data e))
+            (dependency-failure-response app-conn principal :search query e "檢索服務暫時無法使用")
             (throw e)))))))
