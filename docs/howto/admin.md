@@ -86,6 +86,16 @@ read_groups: [all]
 - Write the list on one line: `read_groups: [hr, all]`. A YAML block list (`read_groups:` followed by `- hr` lines), a bare word (`read_groups: hr`) or a misspelt key (`read_group`, `read-groups`) is an ingest error for that document.
 - Files or directories whose names start with `.` or `_` are ignored; you can use `_drafts/` for drafts that are not yet public.
 
+**Check the result with `bb acl:report`** after an ingest:
+
+```bash
+bb acl:report                    # users from the server (app.dtlv)
+bb acl:report --users users.edn  # or from a users file, e.g. the one for bb eval
+bb acl:report --docs             # also one line per document: groups | readers
+```
+
+It lists, per group, how many documents use it and which users hold it, and per user how many documents they can read (computed with the same function retrieval filters with). Read the `[WARN]` lines: a group that documents use but no user holds is usually a typo (in the corpus or in the users file), and the documents that use it can then be read only by admins.
+
 **Mistakes fail closed.** A `_collection.edn` that cannot be parsed, is not a map, has a key other than `:name` / `:read-groups`, or whose `:read-groups` is not a list of strings, and a malformed frontmatter `read_groups`, keep the affected documents out of the index (a copy indexed earlier is removed). They are listed under `errors` in the ingest report with the reason; fix the file and ingest again. `bb doctor` checks the `_collection.edn` files before you ingest.
 
 When only permissions change and the content does not, a re-ingest does not recompute embeddings, so it is fast; the report counts such documents as `acl-updated`.

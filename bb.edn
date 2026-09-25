@@ -114,6 +114,9 @@ vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
   user:import {:doc "Create/update the users in a file (eval/users.edn format): bb user:import users.edn [--dry-run]"
                :task (apply clj "-M:jvm-opts -m replware.levinrag.auth.cli user:import" *command-line-args*)}
 
+  acl:report {:doc "Who can read which indexed doc, with warnings: bb acl:report [--users users.edn] [--docs]"
+              :task (apply clj "-M:jvm-opts -m replware.levinrag.acl-report" *command-line-args*)}
+
   token:create {:doc "Create an API token (shown once): bb token:create alice --label cli"
                 :task (apply clj "-M:jvm-opts -m replware.levinrag.auth.cli token:create" *command-line-args*)}
 

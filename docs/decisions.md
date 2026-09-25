@@ -1107,3 +1107,24 @@ transaction. Rulings:
 - Same authority as `bb user:create --admin`: whoever can write `DATA_DIR`.
   Changes take effect on the next request, like `user:groups`; sessions
   are not revoked.
+
+## 2026-09-25 — `bb acl:report`
+
+Spec text: n/a (new task). The §18.3 security suite derives a "document ×
+unauthorized user" matrix from the index; nothing showed it to a person.
+
+Actual: `bb acl:report [--users <file>] [--docs]` prints, per group, its
+document count and holders; per user, readable document count; optionally
+per document, groups and readers. Rulings:
+
+- Readers come from `rd/accessible-doc-ids` (what retrieval filters with),
+  not from a separate intersection in the report; the test checks them
+  against the stored `:doc/effective-groups`, as the security suite does.
+- Warnings, not failures (exit 0): groups used by documents but held by no
+  user, documents only admins can read, users without groups, user groups
+  no document uses, and the error count of the latest ingest report (docs
+  kept out by §7.2 rule 5 are otherwise invisible here).
+- `--users` parses the file with `user-import/parse`, so the same checks
+  apply as for `bb user:import`.
+- Read-only; opens `index.dtlv` and `app.dtlv` next to a running server
+  (as `bb eval` and `bb user:*` already do).

@@ -87,6 +87,16 @@ read_groups: [all]
 - 清單要寫在同一行：`read_groups: [hr, all]`。YAML 多行清單（`read_groups:` 下面接 `- hr`）、單一個字（`read_groups: hr`）或拼錯的 key（`read_group`、`read-groups`）都會讓該文件在匯入時報錯。
 - 檔名或目錄名以 `.` 或 `_` 開頭的會被忽略；可以用 `_drafts/` 放尚未公開的草稿。
 
+**匯入後用 `bb acl:report` 檢查結果**：
+
+```bash
+bb acl:report                    # 使用者來自 server（app.dtlv）
+bb acl:report --users users.edn  # 或來自使用者檔，例如 bb eval 用的那份
+bb acl:report --docs             # 另外逐份列出文件：群組｜讀得到的使用者
+```
+
+它列出每個群組被幾份文件使用、哪些使用者擁有它，以及每位使用者讀得到幾份文件（用檢索過濾時的同一個函式計算）。請看 `[WARN]` 開頭的行：文件用到、但沒有任何使用者擁有的群組，通常是打錯字（語料或使用者檔），而使用這個群組的文件就只有 admin 讀得到。
+
 **寫錯時一律收緊。** `_collection.edn` 無法解析、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單，以及 frontmatter 的 `read_groups` 格式不對時，受影響的文件不會進索引（先前已匯入的會被移除）。它們會連同原因列在匯入報告的 `errors`；修正檔案後再匯入一次即可。`bb doctor` 會在匯入前先檢查 `_collection.edn`。
 
 只改權限、不改內文時，重新匯入不會重新計算 embedding，速度很快；報告中這類文件計為 `acl-updated`。

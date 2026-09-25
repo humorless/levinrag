@@ -260,6 +260,8 @@ corpus/
 4. 空集合 `[]` 表示除 admin 外沒有人可讀。
 5. **無法照字面套用的設定一律收緊**（2026-09-25）：該文件不匯入（先前已匯入的會從索引移除），並列在報告的 `errors`；絕不退回目錄的群組。涵蓋：`_collection.edn` 無法解析、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單——它所管轄的每一份文件（直到下層下一個有效宣告為止）都受影響；以及 frontmatter 的 `read_groups` 不是清單（`read_groups: hr`）、該行沒有值（包括 YAML 多行清單），或拼錯（`read_group`、`read-groups`、`Read_Groups`、`readgroups`）。
 
+`bb acl:report [--users <檔案>] [--docs]` 顯示結果：每個群組有哪些文件、哪些使用者擁有它；每位使用者讀得到幾份文件；加 `--docs` 時列出每份文件的群組與讀得到的使用者。讀者以 `accessible-doc-ids` 計算，也就是檢索時過濾用的同一個函式。它會警告：文件用到、但沒有使用者擁有的群組；只有 admin 讀得到的文件；沒有群組的使用者；沒有文件使用的使用者群組；以及最近一次匯入的錯誤。使用者來自 `app.dtlv`，或用 `--users` 指定的使用者檔。只有路徑和群組名稱，不含文件內容。
+
 ### 7.3 Markdown 解析與切塊
 
 用 commonmark 建立 section 樹（ATX 與 Setext）；第一個 heading 之前的內容歸入 level 0 的隱含 section。文件標題的優先序：frontmatter `title` → 第一個 H1 → 檔名。`.txt` 視為單一 section，以空行分段。

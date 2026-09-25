@@ -258,6 +258,8 @@ Accepted extensions: `.md`, `.markdown`, `.txt`. Files and directories starting 
 4. The empty set `[]` means no one except admins can read.
 5. **A setting that cannot be applied as written fails closed** (2026-09-25): the document is not indexed (a copy indexed earlier is removed) and appears in the report's `errors`; it never falls back to the directory's groups. This covers a `_collection.edn` that cannot be parsed, is not a map, has a key other than `:name` / `:read-groups`, or whose `:read-groups` is not a list of strings — every document it would govern (up to the next valid declaration below it) is affected — and a frontmatter `read_groups` that is not a list (`read_groups: hr`), has no value on its line (including a YAML block list), or is misspelt (`read_group`, `read-groups`, `Read_Groups`, `readgroups`).
 
+`bb acl:report [--users <file>] [--docs]` shows the result: per group, its documents and the users who hold it; per user, how many documents they can read; with `--docs`, every document's groups and readers. Readers are computed with `accessible-doc-ids`, the function retrieval filters with. It warns about groups that documents use but no user holds, documents only admins can read, users without groups, user groups no document uses, and errors in the latest ingest. Users come from `app.dtlv`, or from a users file with `--users`. Paths and group names only, no document text.
+
 ### 7.3 Markdown parsing and chunking
 
 commonmark builds the section tree (ATX and Setext); content before the first heading goes into an implicit level-0 section. Document title precedence: frontmatter `title` → first H1 → file name. `.txt` is treated as a single section, split into paragraphs at blank lines.
