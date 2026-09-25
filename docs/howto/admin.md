@@ -4,7 +4,7 @@
 
 **大部分管理工作在命令列與檔案上完成，不在網頁介面裡。** 網頁的 `/admin` 只提供三項功能：執行匯入、查看最近一次匯入報告、瀏覽 trace。帳號與群組用 `bb` 指令管理；文件權限則寫在語料目錄的檔案裡。
 
-以下指令都在專案目錄下執行，並透過 `DATA_DIR` 找到 `app.dtlv`／`index.dtlv`。正式環境的容器裡沒有 `bb`，改用[維運手冊](ops.md#部署kamal)中的 `java … -m` 寫法。server 執行中也可以直接下這些指令。
+以下指令都在專案目錄下執行，並透過 `DATA_DIR` 找到 `app.dtlv`／`index.dtlv`。正式環境的容器裡沒有 `bb`，改用[維運手冊](ops.md#部署kamal)中的 `java … -m` 寫法。server 執行中可以直接執行 `bb user:*` 與 `bb token:*`；匯入語料則請在 server 執行時改用網頁的按鈕（見[匯入語料](#匯入語料)）。
 
 ## 使用者與群組
 
@@ -70,7 +70,7 @@ read_groups: [all]
 兩種方式，結果相同，都是增量匯入：只處理新增、修改或刪除的檔案。
 
 - 網頁：以 admin 登入 → 上方「管理」→「執行增量 ingest」。執行期間狀態每 2 秒更新一次；同一時間只能有一個匯入在跑，重複按會顯示「已有 ingest 在執行」。
-- 命令列：`bb ingest`。要完整重建時用 `bb reindex`（見[維運手冊](ops.md#重建索引)）。
+- 命令列：`bb ingest`，**只在 server 停止時使用**：兩個 process 同時寫入索引的情況沒有驗證過，而 server 執行中請用網頁按鈕或 `POST /api/v1/ingest`（admin token）。要完整重建時用 `bb reindex`，同樣要先停止 server（見[維運手冊](ops.md#重建索引)）。
 
 報告摘要（網頁的「最近一次報告」，或 `DATA_DIR/ingest-reports/<時間>.edn`）：
 

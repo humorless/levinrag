@@ -34,6 +34,15 @@
          (is (= 3000 (:read-timeout-ms (config/rerank-config))))
          (is (= 60000 (:read-timeout-ms (config/chat-config)))))))
 
+(deftest test-unparsable-timeout-is-an-error
+  ;; nil would mean no read timeout at all
+  (with-env {"VLLM_CHAT_TIMEOUT_MS" "2m"}
+    #(is (thrown-with-msg? clojure.lang.ExceptionInfo #"VLLM_CHAT_TIMEOUT_MS" (config/chat-config))))
+  (with-env {"VLLM_EMBED_TIMEOUT_MS" "2m"}
+    #(is (thrown-with-msg? clojure.lang.ExceptionInfo #"VLLM_EMBED_TIMEOUT_MS"
+                           (ig/init-key :hybridrag.retrieval.system/search {:index-conn nil
+                                                                            :opts {}})))))
+
 (deftest test-dirs-single-source
   ;; server, runner and both DBs take their paths from one config key
   (let [test-cfg (ig-extras/get-config :test)

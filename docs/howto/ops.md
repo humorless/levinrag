@@ -62,7 +62,7 @@ clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-ext
 {"status":"ok","checks":{"index_db":"ok","app_db":"ok","embed":"ok","rerank":"ok","chat":"ok"},"index_lag":0}
 ```
 
-- 模型探測的結果快取 30 秒，所以頻繁輪詢不會壓垮模型。在 M1 本機實測：模型冷啟動時第一次約 20 秒，暖機後約 3 秒，命中快取時則是毫秒級。
+- 三個模型同時探測，每個最多等 5 秒，超過就回報 `down`。結果快取 30 秒（從探測結束時起算）；探測進行中收到的請求會等待同一輪的結果，不會另外再發請求，所以頻繁輪詢不會壓垮模型。在 M1 本機實測：暖機後一輪約 3 秒；模型冷啟動較慢，第一輪可能回報 `down`，30 秒後再查即可。
 - `index_lag` 是尚未完成的全文與向量索引工作量。匯入進行中大於 0 是正常的，所以它**不會**讓 health 回 503。
 
 ## 錯誤與降級
@@ -99,7 +99,7 @@ bb kamal setup      # 之後的更新用 bb kamal deploy
 J='java --add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED -cp standalone.jar clojure.main -m'
 bb kamal app exec -i "$J hybridrag.auth.cli user:create admin --admin"
 bb kamal app exec -i "$J hybridrag.auth.cli user:passwd admin"
-bb kamal app exec -i "$J hybridrag.ingest.cli ingest"
+# 匯入語料：server 執行中請用 /admin 的按鈕或 POST /api/v1/ingest，不要在容器裡另外執行 ingest
 ```
 
 部署後檢查：
@@ -122,13 +122,13 @@ clojure -M:jvm-opts -e "(require '[datalevin.core :as d]) (let [c (d/get-conn \"
 
 ## 重建索引
 
-以下情況需要 `bb reindex`（刪除 `index.dtlv` 後完整重新匯入；帳號不受影響）：
+以下情況需要 `bb reindex`（刪除 `index.dtlv` 後完整重新匯入；帳號不受影響）。**先停止 server**：server 開著舊的索引檔，重建期間與之後都不會看到新索引，直到重新啟動為止。
 
 - 更換 embedding 模型或維度；
 - 更換斷詞 analyzer；
 - 懷疑索引損壞。
 
-平常新增或修改語料，用增量匯入即可（`bb ingest` 或 `/admin` 的按鈕）。
+平常新增或修改語料，用增量匯入即可：server 執行中用 `/admin` 的按鈕或 `POST /api/v1/ingest`；server 停止時才用 `bb ingest`。
 
 ## 評估
 

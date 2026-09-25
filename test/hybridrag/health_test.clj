@@ -67,15 +67,57 @@
     (is (not (health/db-ok? nil)))
     (tmp/delete-tree! p)))
 
+(deftest test-db-ok-reads-one-datom-not-the-whole-db
+  ;; an unbounded (d/datoms db :eav) is an eager vector of every datom
+  (with-redefs [d/datoms (fn [& _] (throw (ex-info "unbounded scan" {})))]
+    (is (health/db-ok? fx/*index*))))
+
 (deftest test-probe-cache
   (let [cache (atom nil)
         calls (atom 0)
+        clock (atom 0)
+        now #(deref clock)
         probe #(do (swap! calls inc) {:embed "ok"})]
-    (is (= {:embed "ok"} (health/cached-probe cache 0 30000 probe)))
-    (health/cached-probe cache 29999 30000 probe)
+    (is (= {:embed "ok"} (health/cached-probe cache now 30000 probe)))
+    (reset! clock 29999)
+    (health/cached-probe cache now 30000 probe)
     (is (= 1 @calls))
-    (health/cached-probe cache 30000 30000 probe)
-    (is (= 2 @calls))))
+    (reset! clock 30000)
+    (health/cached-probe cache now 30000 probe)
+    (is (= 2 @calls))
+    (testing "the entry is stamped when the probe finishes, not when it started"
+      (let [cache (atom nil)
+            calls (atom 0)
+            clock (atom 0)
+            slow #(do (swap! calls inc) (swap! clock + 40000) {:embed "ok"})]
+        (health/cached-probe cache #(deref clock) 30000 slow)
+        (swap! clock + 1000)
+        (health/cached-probe cache #(deref clock) 30000 slow)
+        (is (= 1 @calls))))
+    (testing "concurrent callers share one probe round"
+      (let [cache (atom nil)
+            calls (atom 0)
+            slow #(do (swap! calls inc) (Thread/sleep 200) {:embed "ok"})
+            results (doall (for [_ (range 5)] (future (health/cached-probe cache now 30000 slow))))]
+        (is (every? #(= {:embed "ok"} (deref % 2000 :timeout)) results))
+        (is (= 1 @calls))))))
+
+(deftest test-probe-models-bounded-time
+  ;; a hung model is reported down within the probe timeout; probes run
+  ;; in parallel so the round is not the sum of three timeouts
+  (let [hang (fn [& _] (Thread/sleep 5000) nil)
+        t0 (System/nanoTime)
+        r (health/probe-models {:embed-fn hang
+                                :rerank-fn hang
+                                :chat-fn hang} 300)
+        ms (quot (- (System/nanoTime) t0) 1000000)]
+    (is (= {:embed "down" :rerank "down" :chat "down"} r))
+    (is (< ms 1500) (str ms " ms"))))
+
+(deftest test-chat-probe-checks-the-response
+  ;; HTTP 200 with an error payload is not a working chat endpoint
+  (is (= "down" (:chat (health/probe-models (assoc ok-models :chat-fn (fn [_ _] {:object "error"})) 1000))))
+  (is (= "ok" (:chat (health/probe-models ok-models 1000)))))
 
 (deftest test-live-through-system
   ((ig-extras/with-system)

@@ -8,14 +8,19 @@
 
 (def probe-ttl-ms 30000)
 
+;; a model slower than this to answer a one-token probe is reported down
+(def probe-timeout-ms 5000)
+
 (defn db-ok?
-  "True when `conn` is open and answers a real read. Datalevin asserts
-   on a closed conn (AssertionError, not an Exception), hence Throwable."
+  "True when `conn` is open and answers a real read of at most one datom
+   (an unbounded d/datoms is an eager vector of the whole DB). Datalevin
+   asserts on a closed conn (AssertionError, not an Exception), hence
+   Throwable."
   [conn]
   (try
     (boolean (and (some? conn)
                   (not (d/closed? conn))
-                  (do (d/datoms (d/db conn) :eav) true)))
+                  (do (d/seek-datoms (d/db conn) :eav nil nil nil 1) true)))
     (catch Throwable _ false)))
 
 (defn index-lag
@@ -35,25 +40,49 @@
       (log/warn "[HEALTH]" (name k) "probe failed:" (ex-message e))
       "down")))
 
+(defn- chat-probe [chat-fn]
+  (let [resp (chat-fn [{:role "user"
+                        :content "ping"}]
+                      {:temperature 0.0
+                       :max-tokens 1})]
+    ;; HTTP 200 with an error payload has no message
+    (when-not (map? (get-in resp [:choices 0 :message]))
+      (throw (ex-info "chat response has no choices[0].message" {:llm/endpoint :chat})))))
+
 (defn probe-models
-  "One minimal real request to each model endpoint."
-  [{:keys [embed-fn rerank-fn chat-fn]}]
-  {:embed (probe :embed #(embed-fn ["健康檢查"]))
-   :rerank (probe :rerank #(rerank-fn "健康檢查" ["健康"] 1))
-   :chat (probe :chat #(chat-fn [{:role "user"
-                                  :content "ping"}]
-                                {:temperature 0.0
-                                 :max-tokens 1}))})
+  "One minimal real request to each model endpoint, in parallel; an
+   endpoint that has not answered within `timeout-ms` of the start is
+   \"down\" (its request is left to finish or time out on its own)."
+  ([fns] (probe-models fns probe-timeout-ms))
+  ([{:keys [embed-fn rerank-fn chat-fn]} timeout-ms]
+   (let [deadline (+ (System/currentTimeMillis) timeout-ms)
+         running {:embed (future (probe :embed #(embed-fn ["健康檢查"])))
+                  :rerank (future (probe :rerank #(rerank-fn "健康檢查" ["健康"] 1)))
+                  :chat (future (probe :chat #(chat-probe chat-fn)))}]
+     (into {} (for [[k f] running]
+                [k (deref f (max 0 (- deadline (System/currentTimeMillis))) "down")])))))
 
 (defn cached-probe
-  "The cached probe result when younger than `ttl-ms` at `now-ms`, else
-   a fresh (probe-thunk) result, which is cached. Concurrent callers on
-   an expired cache may each probe; no locking."
-  [cache now-ms ttl-ms probe-thunk]
+  "The cached probe result when younger than `ttl-ms` (by `now-fn`),
+   else a fresh (probe-thunk) result, stamped when it finishes. Callers
+   arriving while a round runs wait for that round instead of starting
+   their own, so a slow model gets at most one probe per window."
+  [cache now-fn ttl-ms probe-thunk]
   (let [{:keys [at result]} @cache]
-    (if (and at (< (- now-ms at) ttl-ms))
+    (if (and at (< (- (now-fn) at) ttl-ms))
       result
-      (let [r (probe-thunk)]
-        (reset! cache {:at now-ms
-                       :result r})
-        r))))
+      (let [mine (promise)
+            [before _] (swap-vals! cache #(if (:pending %) % (assoc % :pending mine)))]
+        (if-let [theirs (:pending before)]
+          @theirs
+          (try
+            (let [r (probe-thunk)]
+              (reset! cache {:at (now-fn)
+                             :result r})
+              (deliver mine r)
+              r)
+            (finally
+              ;; a throwing probe must not leave waiters blocked forever
+              (when-not (realized? mine)
+                (swap! cache dissoc :pending)
+                (deliver mine nil)))))))))

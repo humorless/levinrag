@@ -18,8 +18,17 @@
                             :input (vec texts)}
                      :connect-timeout-ms connect-timeout-ms
                      :read-timeout-ms read-timeout-ms
-                     :endpoint-kw :embed})]
-     (mapv :embedding (:data response)))))
+                     :endpoint-kw :embed})
+         vectors (mapv :embedding (:data response))]
+     ;; SPEC.md §4.2: HTTP 200 can carry an error payload; any other
+     ;; shape would reach the index as an empty or wrong vector
+     (when-not (and (= (count texts) (count vectors))
+                    (every? #(and (sequential? %) (seq %) (every? number? %)) vectors))
+       (throw (ex-info "vLLM embed response has no embedding per input"
+                       {:llm/endpoint :embed
+                        :http/status 200
+                        :llm/body-excerpt (let [s (pr-str response)] (subs s 0 (min 500 (count s))))})))
+     vectors)))
 
 (defn embed-all!
   "Embed any number of strings, batching at `batch-size`."

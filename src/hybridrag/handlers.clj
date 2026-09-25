@@ -30,11 +30,12 @@
 
 (defn health-handler
   "GET /api/v1/health — SPEC.md §11: DBs, the three model endpoints
-   (probes cached for health/probe-ttl-ms) and index lag, which is
+   (parallel, health/probe-timeout-ms each, cached for
+   health/probe-ttl-ms, one round at a time) and index lag, which is
    reported but never a failure (it is normal while ingest runs)."
   [{:keys [context]}]
   (let [models (health/cached-probe (:health-cache context)
-                                    (System/currentTimeMillis)
+                                    #(System/currentTimeMillis)
                                     health/probe-ttl-ms
                                     #(health/probe-models (:search context)))]
     (health-response (merge (db-checks context) models)

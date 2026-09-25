@@ -7,7 +7,13 @@
 
 (defn- env [k] (System/getenv k))
 (defn- env-or [k default] (or (env k) default))
-(defn- env-long [k default] (parse-long (env-or k (str default))))
+(defn- env-long
+  "Long from env var `k`, `default` when unset. An unparsable value throws:
+   nil would silently disable the timeout it configures."
+  [k default]
+  (let [s (env-or k (str default))]
+    (or (parse-long (str/trim s))
+        (throw (ex-info (str k " must be a whole number of milliseconds: " s) {:env k})))))
 
 (defn embed-config []
   {:base-url (env-or "VLLM_EMBED_BASE_URL" "http://localhost:8001/v1")
