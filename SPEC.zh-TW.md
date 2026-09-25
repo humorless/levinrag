@@ -554,7 +554,10 @@ bb user:groups alice all,hr,finance              ; 取代整組群組
 bb user:passwd alice                             ; 互動輸入兩次，≥ 8 字元；撤銷其網頁 session
 bb token:create alice --label "cli"
 bb token:revoke <prefix>
+bb user:import users.edn [--dry-run]              ; 檔案列出的使用者以檔案為準
 ```
+
+`bb user:import` 讀 `eval/users.edn` 的格式（`{"alice" {:groups #{"all" "hr"} :admin? false}}`），所以 eval 和 server 可以共用同一份檔案。它在一個交易裡：建立檔案列出但還不存在的使用者（各產生一組隨機密碼，只印一次），並把已存在者的群組與 admin 設成和檔案一致（密碼不動）。不在檔案裡的使用者只會被列出，絕不刪除。檔案有任何問題（不認得的 key、群組不是字串、使用者名稱含空白）時整個檔案拒絕匯入，並指出每個有問題的使用者。密碼從不由檔案讀取。
 
 正式環境的容器裡沒有 `bb`，改用 `java … -cp standalone.jar clojure.main -m replware.levinrag.auth.cli <command>`（見 `docs/howto/ops.md`）。
 

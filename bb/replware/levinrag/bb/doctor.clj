@@ -12,7 +12,9 @@
 (def ^:private min-java 21)
 
 (defn- result [level item msg & [fix]]
-  (cond-> {:level level :item item :msg msg} fix (assoc :fix fix)))
+  (cond-> {:level level
+           :item item
+           :msg msg} fix (assoc :fix fix)))
 
 ;; --- tools ---
 
@@ -161,8 +163,10 @@
   "All checks for `env` (the shell environment with `.env` under it)."
   [env dotenv?]
   (let [corpus (get env "CORPUS_DIR" "./corpus")]
-    (concat (check-tools {:java-version (java-version) :clojure? (on-path? "clojure")})
-            (check-settings {:dotenv? dotenv? :env env})
+    (concat (check-tools {:java-version (java-version)
+                          :clojure? (on-path? "clojure")})
+            (check-settings {:dotenv? dotenv?
+                             :env env})
             [(result :ok "DATA_DIR" (get env "DATA_DIR" "data"))]
             (check-corpus corpus)
             (when (.isDirectory (io/file corpus))

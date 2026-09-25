@@ -22,6 +22,26 @@ bb user:groups alice all,hr,finance           # "Replace" the whole group set wi
 - After a password change, that user's web logins on **all devices** are invalidated immediately. The same happens when users log out themselves.
 - A web login is valid for 8 hours (`SESSION_MAX_AGE_HOURS`).
 
+### Many users at once: `bb user:import`
+
+```clojure
+;; users.edn — same format as eval/users.edn
+{"alice" {:groups #{"all" "hr"} :admin? false}
+ "bob"   {:groups #{"all" "engineering"}}
+ "admin" {:groups #{} :admin? true}}
+```
+
+```bash
+bb user:import users.edn --dry-run   # show what would change, write nothing
+bb user:import users.edn
+```
+
+- Users in the file that do not exist are created with a **random password printed once**; write it down (change it later with `bb user:passwd`).
+- Existing users get the file's groups and admin flag; their passwords are not touched. Running it again with the same file changes nothing.
+- Users **not** in the file are listed as "不在檔案中（未更動）" (not in the file, unchanged) and are never deleted.
+- If anything in the file is wrong, nothing is written and every problem is listed by user name.
+- Point `bb eval --users` at the same file so eval runs as the same people the server knows.
+
 ### API tokens (for scripts or CLIs)
 
 ```bash

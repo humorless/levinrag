@@ -5,6 +5,7 @@
             [clojure.string :as str]
             [datalevin.core :as d]
             [replware.levinrag.auth.token :as token]
+            [replware.levinrag.auth.user-import :as user-import]
             [replware.levinrag.auth.users :as users]
             [replware.levinrag.config :as config]
             [replware.levinrag.db.schema :as schema]))
@@ -17,6 +18,7 @@
       (nil? a) {:args pos
                 :opts opts}
       (= "--admin" a) (recur more pos (assoc opts :admin? true))
+      (= "--dry-run" a) (recur more pos (assoc opts :dry-run? true))
       (str/starts-with? a "--") (recur (rest more) pos (assoc opts (keyword (subs a 2)) (first more)))
       :else (recur more (conj pos a) opts))))
 
@@ -54,6 +56,13 @@
           :else (do (users/set-password! conn a1 pw)
                     (users/revoke-sessions! conn a1)
                     (str a1 " 的密碼已更新，既有的網頁登入已失效。"))))
+
+      "user:import"
+      (let [_ (when-not a1 (throw (ex-info "用法：bb user:import <users.edn> [--dry-run]" {})))
+            _ (when-not (.isFile (io/file a1)) (throw (ex-info (str "找不到使用者檔：" a1) {})))
+            dry-run? (boolean (:dry-run? opts))]
+        (user-import/summary (user-import/import! conn (user-import/parse (slurp a1)) {:dry-run? dry-run?})
+                             dry-run?))
 
       "token:create"
       (let [{t :token

@@ -1082,3 +1082,28 @@ matched after lower-casing and removing `_`, `-` and spaces
 
 `bb doctor` keeps its own copy of the `_collection.edn` check (it runs in
 bb, before Clojure is installed), so a broken file is caught before ingest.
+
+## 2026-09-25 — `bb user:import`
+
+Spec text: §13 — users are managed one command at a time (`user:create`,
+`user:groups`, `user:passwd`); eval identities live in `eval/users.edn`,
+separate from `app.dtlv`.
+
+Actual (design approved by the user 2026-09-25): `bb user:import <file>
+[--dry-run]` reads the `eval/users.edn` format so one file can serve eval
+(`bb eval --users`) and the server. It is a sync for the users listed:
+create missing ones, set groups and admin of existing ones, one
+transaction. Rulings:
+
+- Users not in the file are reported, never deleted (deleting is
+  destructive and a missing line should not do it).
+- Passwords never come from the file (it gets shared and committed). New
+  users get 12 random bytes, base64url (16 chars), printed once; existing
+  passwords are untouched.
+- `:groups` is required (an empty set is fine) so a typo such as `:group`
+  cannot silently mean "no groups"; unknown keys, non-string groups, a
+  non-boolean `:admin?` and user names with whitespace reject the whole
+  file, listing every problem by user name (EDN gives no line numbers).
+- Same authority as `bb user:create --admin`: whoever can write `DATA_DIR`.
+  Changes take effect on the next request, like `user:groups`; sessions
+  are not revoked.

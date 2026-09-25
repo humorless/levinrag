@@ -23,6 +23,26 @@ bb user:groups alice all,hr,finance           # 以新的清單「取代」整�
 - 變更密碼後，這位使用者在**所有裝置**上的網頁登入會立即失效。使用者自己登出時也一樣。
 - 網頁登入的有效期限為 8 小時（`SESSION_MAX_AGE_HOURS`）。
 
+### 一次匯入多位使用者：`bb user:import`
+
+```clojure
+;; users.edn——格式和 eval/users.edn 相同
+{"alice" {:groups #{"all" "hr"} :admin? false}
+ "bob"   {:groups #{"all" "engineering"}}
+ "admin" {:groups #{} :admin? true}}
+```
+
+```bash
+bb user:import users.edn --dry-run   # 只顯示會做什麼，不寫入
+bb user:import users.edn
+```
+
+- 檔案裡有、系統裡還沒有的使用者會被建立，並產生一組**只顯示一次的隨機密碼**；請記下來（之後可用 `bb user:passwd` 更改）。
+- 已存在的使用者，群組與 admin 會改成和檔案一致；密碼不動。用同一份檔案再跑一次不會有任何變更。
+- **不在**檔案裡的使用者會列為「不在檔案中（未更動）」，絕不刪除。
+- 檔案有任何錯誤時不寫入任何資料，並依使用者名稱列出每個問題。
+- 讓 `bb eval --users` 指向同一份檔案，eval 就會用 server 認得的同一批人來跑。
+
 ### API token（給程式或 CLI 使用）
 
 ```bash

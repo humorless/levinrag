@@ -28,11 +28,16 @@
     (try
       (spit q "[{:id \"x\" :user \"alice\" :query \"特休\" :expected-docs [\"hr/leave.md\"]}]")
       (spit u "{\"alice\" {:groups #{\"all\"} :admin? false}}")
-      (let [{:keys [questions principals]} (cli/read-inputs {:questions q :users u})]
+      (let [{:keys [questions principals]} (cli/read-inputs {:questions q
+                                                             :users u})]
         (is (= ["x"] (map :id questions)))
-        (is (= {:username "alice" :groups #{"all"} :admin? false} (get principals "alice"))))
+        (is (= {:username "alice"
+                :groups #{"all"}
+                :admin? false} (get principals "alice"))))
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"找不到題目檔：.*missing.edn"
-            (cli/read-inputs {:questions (str dir "/missing.edn") :users u})))
+                            (cli/read-inputs {:questions (str dir "/missing.edn")
+                                              :users u})))
       (is (thrown-with-msg? clojure.lang.ExceptionInfo #"找不到使用者檔：.*missing.edn"
-            (cli/read-inputs {:questions q :users (str dir "/missing.edn")})))
+                            (cli/read-inputs {:questions q
+                                              :users (str dir "/missing.edn")})))
       (finally (tmp/delete-tree! dir)))))

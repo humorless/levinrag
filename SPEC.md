@@ -552,7 +552,10 @@ bb user:groups alice all,hr,finance              ; replaces the whole group set
 bb user:passwd alice                             ; prompts twice, ≥ 8 chars; revokes their web sessions
 bb token:create alice --label "cli"
 bb token:revoke <prefix>
+bb user:import users.edn [--dry-run]              ; the file is the truth for the users it lists
 ```
+
+`bb user:import` reads the `eval/users.edn` format (`{"alice" {:groups #{"all" "hr"} :admin? false}}`), so eval and the server can share one file. In one transaction it creates the listed users that do not exist (each with a random password printed once) and sets the groups and admin flag of those that do (passwords untouched). Users not in the file are listed, never deleted. Any problem in the file (unknown key, groups not strings, a user name with spaces) rejects the whole file and names each user at fault. Passwords are never read from the file.
 
 The production container has no `bb`; use `java … -cp standalone.jar clojure.main -m replware.levinrag.auth.cli <command>` instead (see `docs/howto/ops.md`).
 

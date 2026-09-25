@@ -25,16 +25,18 @@
     (is (= {"A" "2"} (dotenv/parse "A=1\r\nA=2\r\n"))))
   (testing "a malformed line is an error naming its line, not skipped"
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"\.env 第 2 行"
-          (dotenv/parse "A=1\nVLLM_CHAT_MODEL qwen\n")))
+                          (dotenv/parse "A=1\nVLLM_CHAT_MODEL qwen\n")))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"\.env 第 1 行"
-          (dotenv/parse "A='unterminated\n")))
+                          (dotenv/parse "A='unterminated\n")))
     (is (thrown-with-msg? clojure.lang.ExceptionInfo #"\.env 第 1 行"
-          (dotenv/parse "1A=x\n")))))
+                          (dotenv/parse "1A=x\n")))))
 
 (deftest test-extra-env
   (testing "variables set in the shell are not overridden"
     (is (= {"B" "file"}
-           (dotenv/extra-env {"A" "file" "B" "file"} {"A" "shell" "PATH" "/bin"}))))
+           (dotenv/extra-env {"A" "file"
+                              "B" "file"} {"A" "shell"
+                                           "PATH" "/bin"}))))
   (testing "a missing .env gives no variables"
     (is (= {} (dotenv/read-file "/nonexistent/.env"))))
   (testing "read-file parses an existing file"
