@@ -8,28 +8,23 @@
    4. Empty [] means \"admin only\"
    Frontmatter :read_groups is a full override (replace, not union).
    Settings that cannot be applied as written fail closed (rule 5): see
-   walker/scan-collection-edns and markdown/frontmatter-acl-problem."
-  (:require [clojure.string :as str]))
+   walker/scan-collection-edns and markdown/frontmatter-acl-problem.")
 
 ;; --- Collection group resolution ---
 
 (defn parent-dir
   "Return parent directory of a relative path, or \"\" for root.
-   Handles trailing slashes and \"\"."
-  [dir-path]
-  (let [p (str/trim dir-path)]
-    (if (str/blank? p)
-      ""
-      (let [idx (.lastIndexOf p "/")]
-        (if (<= idx 0)
-          ""
-          (subs p 0 idx))))))
+   Segments are not trimmed: \" hr\" and \"hr\" are different directories,
+   and trimming made \" hr/\" miss its own _collection.edn."
+  [^String p]
+  (let [idx (.lastIndexOf p "/")]
+    (if (pos? idx) (subs p 0 idx) "")))
 
 (defn- find-nearest-read-groups
   "Walk up from dir-path to root, returning :read-groups from the nearest
    _collection.edn (as a vector of strings). Returns nil if none found."
   [dir-path collection-edns]
-  (loop [d (str/trim dir-path)]
+  (loop [d dir-path]
     (let [entry (get collection-edns d)]
       (if (and entry (:read-groups entry))
         (vec (:read-groups entry))
@@ -85,7 +80,7 @@
   ([rel-path collection-edns frontmatter]
    (resolve-effective-groups rel-path collection-edns [] frontmatter))
   ([rel-path collection-edns root-read-groups frontmatter]
-   (let [dir (str/trim (parent-dir rel-path))
+   (let [dir (parent-dir rel-path)
          declared (resolve-collection-effective-groups dir collection-edns root-read-groups)
          effective (resolve-file-groups declared frontmatter)]
      {:declared-groups declared

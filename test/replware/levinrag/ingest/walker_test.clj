@@ -223,3 +223,32 @@
             "a nearer valid :read-groups decides; the broken parent does not matter")
         (is (= ["hr-lead"] (:effective-groups (by-path "hr/lead/x.md"))))
         (is (re-find #"read_group" (str (:acl-error (by-path "fm/typo.md")))))))))
+
+(deftest test-more-broken-collection-shapes-fail-closed
+  ;; review 2026-09-25 M2
+  (testing "a second EDN value in the file is not silently dropped"
+    (with-tree {"_collection.edn" "{:read-groups [\"all\"]}"
+                "hr/_collection.edn" "{:name \"HR\"} {:read-groups [\"hr\"]}"
+                "hr/a.md" "# a"}
+      (fn [dir]
+        (let [{:keys [broken]} (walker/scan-collection-edns dir)
+              [f] (walker/walk-corpus dir nil ["all"] nil)]
+          (is (re-find #"不只一個" (str (get broken "hr"))))
+          (is (:acl-error f))))))
+  (testing "a misnamed settings file breaks its directory instead of being ignored"
+    (doseq [n ["_Collection.edn" "collection.edn" "_collections.edn" "_COLLECTION.EDN"]]
+      (with-tree {"_collection.edn" "{:read-groups [\"all\"]}"
+                  (str "hr/" n) "{:read-groups [\"hr\"]}"
+                  "hr/a.md" "# a"}
+        (fn [dir]
+          (let [[f] (walker/walk-corpus dir nil ["all"] nil)]
+            (is (re-find #"_collection\.edn" (str (:acl-error f))) n))))))
+  (testing "directory names with leading or trailing spaces keep their own settings"
+    (doseq [d [" hr" "hr "]]
+      (with-tree {"_collection.edn" "{:read-groups [\"all\"]}"
+                  (str d "/_collection.edn") "{:read-groups [\"hr\"]}"
+                  (str d "/a.md") "# a"}
+        (fn [dir]
+          (let [[f] (walker/walk-corpus dir nil ["all"] nil)]
+            (is (nil? (:acl-error f)) (pr-str d))
+            (is (= ["hr"] (:effective-groups f)) (pr-str d))))))))

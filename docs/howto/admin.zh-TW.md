@@ -97,7 +97,7 @@ bb acl:report --docs             # 另外逐份列出文件：群組｜讀得到
 
 它列出每個群組被幾份文件使用、哪些使用者擁有它，以及每位使用者讀得到幾份文件（用檢索過濾時的同一個函式計算）。請看 `[WARN]` 開頭的行：文件用到、但沒有任何使用者擁有的群組，通常是打錯字（語料或使用者檔），而使用這個群組的文件就只有 admin 讀得到。
 
-**寫錯時一律收緊。** `_collection.edn` 無法解析、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單，以及 frontmatter 的 `read_groups` 格式不對時，受影響的文件不會進索引（先前已匯入的會被移除）。它們會連同原因列在匯入報告的 `errors`；修正檔案後再匯入一次即可。伺服器 log 裡，每份這樣的文件也會有一行 `WARN [INGEST] acl fail-closed: <路徑> …`。因其他原因重新匯入失敗的文件（例如 embedding 端點掛掉）同樣會從索引移除，下一次匯入成功時會加回來。`bb doctor` 會在匯入前先檢查 `_collection.edn`。
+**寫錯時一律收緊。** `_collection.edn` 無法解析、含有不只一個 map、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單，檔名看起來像但不完全是 `_collection.edn` 的設定檔（`_Collection.edn`、`collection.edn`），以及 frontmatter 的 `read_groups` 格式不對時，受影響的文件不會進索引（先前已匯入的會被移除）。它們會連同原因列在匯入報告的 `errors`；修正檔案後再匯入一次即可。伺服器 log 裡，每份這樣的文件也會有一行 `WARN [INGEST] acl fail-closed: <路徑> …`。因其他原因重新匯入失敗的文件（例如 embedding 端點掛掉）同樣會從索引移除，下一次匯入成功時會加回來。`bb doctor` 會在匯入前先檢查 `_collection.edn`。
 
 只改權限、不改內文時，重新匯入不會重新計算 embedding，速度很快；報告中這類文件計為 `acl-updated`。
 

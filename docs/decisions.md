@@ -1214,3 +1214,23 @@ admins read everything anyway, and the user's rule is not to make admin
 debugging harder. `GET /api/v1/docs` returns only metadata and chunk
 ranges from the index, so it needs no change. Search results and answers
 come from indexed chunk text, not the file.
+
+## 2026-09-25 — Review M2: more `_collection.edn` shapes fail closed
+
+Review finding (reproduced): three more shapes left a directory with its
+parent's wider groups: two EDN values in one file (`edn/read-string` read
+only the first), a look-alike file name (`_Collection.edn`,
+`collection.edn`, `_collections.edn` were ignored), and a directory name
+with a leading or trailing space (`acl/parent-dir` trimmed segments, so
+`" hr"` looked up `"hr"`).
+
+Now: every EDN value in the file is read and more than one is an error; a
+look-alike name (`(?i)_?collections?\.edn`, not exactly `_collection.edn`)
+breaks its directory like a broken file (user decision: an error, not a
+warning, consistent with a misspelt frontmatter key); path segments are
+never trimmed. `bb doctor` has the same checks; a test feeds the same 16
+samples to doctor and ingest and requires them to agree (review L8,
+without sharing code between bb and the JVM). Its fix text no longer
+claims the old fall-back behaviour. Note: on a case-insensitive file
+system (macOS default) `_Collection.edn` next to an existing
+`_collection.edn` is the same file.

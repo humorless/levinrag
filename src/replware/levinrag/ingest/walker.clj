@@ -60,6 +60,22 @@
          (not (and (sequential? (:read-groups v)) (every? string? (:read-groups v)))))
     "`:read-groups` 必須是字串清單，例如 [\"hr\" \"all\"]"))
 
+(defn- read-edn-values
+  "Every EDN value in `s`: a second map after the first must not be
+   silently dropped, as edn/read-string would."
+  [^String s]
+  (let [r (java.io.PushbackReader. (java.io.StringReader. s))]
+    (loop [acc []]
+      (let [v (edn/read {:eof ::eof} r)]
+        (if (= ::eof v) acc (recur (conj acc v)))))))
+
+(defn- misnamed-collection-file?
+  "A name that looks meant as _collection.edn but is not exactly it
+   (_Collection.edn, collection.edn, _collections.edn): ignoring it would
+   silently leave its directory with its parent's groups."
+  [^String n]
+  (and (not= "_collection.edn" n) (boolean (re-matches #"(?i)_?collections?\.edn" n))))
+
 (defn scan-collection-edns
   "Every _collection.edn under corpus-dir outside skipped directories, keyed
    by relative directory path (\"hr/\" → \"hr\", the root → \"\"):
@@ -73,9 +89,14 @@
         (let [dir (rel-path-str root (.getParentFile file))]
           (if (and (not (str/blank? dir)) (skipped-segment? dir))
             acc
-            (let [[v err] (try [(edn/read-string (slurp file))]
-                               (catch Exception e [nil (str "無法解析：" (ex-message e))]))
-                  why (or err (collection-problem v))]
+            (let [[vs err] (if (misnamed-collection-file? (.getName file))
+                             [nil (str "檔名 " (.getName file) " 應為 _collection.edn")]
+                             (try [(read-edn-values (slurp file))]
+                                  (catch Exception e [nil (str "無法解析：" (ex-message e))])))
+                  v (first vs)
+                  why (or err
+                          (when (next vs) "檔案裡有不只一個 EDN 值，只能有一個 map")
+                          (collection-problem v))]
               (if why
                 (assoc-in acc [:broken dir] why)
                 (assoc-in acc [:edns dir] v))))))
@@ -84,7 +105,8 @@
       (when (.exists root)
         (->> (file-seq root)
              (filter #(.isFile ^java.io.File %))
-             (filter #(= "_collection.edn" (.getName ^java.io.File %))))))))
+             (filter #(let [n (.getName ^java.io.File %)]
+                        (or (= "_collection.edn" n) (misnamed-collection-file? n)))))))))
 
 (defn find-collection-edns
   "The valid _collection.edn files under corpus-dir (see
@@ -98,7 +120,7 @@
    message, or nil. Walks up like ACL resolution: the first directory with
    a broken file or with :read-groups decides."
   [rel-path edns broken]
-  (loop [dir (str/trim (acl/parent-dir rel-path))]
+  (loop [dir (acl/parent-dir rel-path)]
     (cond
       (contains? broken dir)
       (str (if (= "" dir) "" (str dir "/")) "_collection.edn：" (get broken dir)

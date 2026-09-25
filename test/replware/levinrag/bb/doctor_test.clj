@@ -5,6 +5,7 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing]]
             [replware.levinrag.bb.doctor :as doctor]
+            [replware.levinrag.ingest.walker :as walker]
             [replware.levinrag.tmp :as tmp]))
 
 (defn- levels [results] (into {} (map (juxt :item :level)) results))
@@ -136,3 +137,30 @@
     (is (str/includes? text "mise install"))
     (is (doctor/failed? results))
     (is (not (doctor/failed? (take 1 results))))))
+
+(deftest test-doctor-agrees-with-ingest-on-collection-files
+  ;; doctor keeps its own copy of the _collection.edn checks (it runs in bb,
+  ;; before Clojure is installed); both must call the same files broken
+  (doseq [[n text] [["_collection.edn" "{:read-groups [\"hr\"]}"]
+                    ["_collection.edn" "{:name \"only a name\"}"]
+                    ["_collection.edn" "{:read-groups []}"]
+                    ["_collection.edn" "{:read-groups [\"hr]}"]
+                    ["_collection.edn" "[\"hr\"]"]
+                    ["_collection.edn" "{:read-group [\"hr\"]}"]
+                    ["_collection.edn" "{:read-groups [hr]}"]
+                    ["_collection.edn" "{:read-groups \"hr\"}"]
+                    ["_collection.edn" "{:read-groups #{\"hr\"}}"]
+                    ["_collection.edn" "{:read-groups nil}"]
+                    ["_collection.edn" ""]
+                    ["_collection.edn" "{:name \"HR\"} {:read-groups [\"hr\"]}"]
+                    ["_collection.edn" "#_{:read-groups [\"all\"]} {:read-groups [\"hr\"]}"]
+                    ["_Collection.edn" "{:read-groups [\"hr\"]}"]
+                    ["collection.edn" "{:read-groups [\"hr\"]}"]
+                    ["_collections.edn" "{:read-groups [\"hr\"]}"]]]
+    (with-corpus {"_collection.edn" "{:read-groups [\"all\"]}"
+                  (str "hr/" n) text
+                  "hr/a.md" "# a"}
+      (fn [dir]
+        (let [[f] (walker/walk-corpus dir nil ["all"] nil)]
+          (is (= (boolean (:acl-error f)) (boolean (doctor/collection-file-problem n text)))
+              (str n " " text)))))))

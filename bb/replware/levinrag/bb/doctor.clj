@@ -118,24 +118,45 @@
          (not (and (sequential? (:read-groups v)) (every? string? (:read-groups v)))))
     "`:read-groups` 必須是字串清單，例如 [\"hr\" \"all\"]"))
 
+(defn- read-edn-values [^String s]
+  (let [r (java.io.PushbackReader. (java.io.StringReader. s))]
+    (loop [acc []]
+      (let [v (edn/read {:eof ::eof} r)]
+        (if (= ::eof v) acc (recur (conj acc v)))))))
+
+(defn- collection-file? [^String n]
+  (boolean (re-matches #"(?i)_?collections?\.edn" n)))
+
+(defn collection-file-problem
+  "Why the settings file named `n` with content `text` would not be applied
+   as written, or nil. Must agree with ingest (walker/scan-collection-edns);
+   a test checks that it does."
+  [^String n ^String text]
+  (if (not= "_collection.edn" n)
+    (str "檔名 " n " 應為 _collection.edn")
+    (let [[vs err] (try [(read-edn-values text)] (catch Exception e [nil (ex-message e)]))]
+      (cond
+        err (str "無法解析：" err)
+        (next vs) "檔案裡有不只一個 EDN 值，只能有一個 map"
+        :else (collection-problem (first vs))))))
+
 (defn check-permissions
-  "Every _collection.edn that ingest reads must parse and mean what it
-   says: ingest skips a broken one and the directory silently inherits its
-   parent's groups. Then the root's default groups."
+  "Every _collection.edn that ingest reads (and every look-alike name) must
+   parse and mean what it says: ingest keeps the docs a broken one governs
+   out of the index (SPEC.md §7.2 rule 5). Then the root's default groups."
   [dir root-read-groups]
-  (let [edns (for [[rel f] (corpus-files dir)
-                   :when (= "_collection.edn" (.getName ^java.io.File f))]
-               [rel (try {:v (edn/read-string (slurp f))}
-                         (catch Exception e {:err (ex-message e)}))])
-        broken (for [[rel {:keys [v err]}] edns
-                     :let [why (if err (str "無法解析：" err) (collection-problem v))]
+  (let [files (for [[rel ^java.io.File f] (corpus-files dir)
+                    :when (collection-file? (.getName f))]
+                [rel (.getName f) (slurp f)])
+        broken (for [[rel n text] files
+                     :let [why (collection-file-problem n text)]
                      :when why]
                  (result :fail "_collection.edn" (str rel "：" why)
-                         "修正這個檔案；在修好之前，這個目錄會被當成沒有設定，沿用上層目錄的群組"))
-        root (some (fn [[rel {:keys [v]}]]
-                     (when (and (= "_collection.edn" rel) (map? v) (nil? (collection-problem v)))
-                       (:read-groups v)))
-                   edns)
+                         "修正這個檔案；在修好之前，它管轄的文件都不會匯入（已匯入的會被移除）"))
+        root (some (fn [[rel n text]]
+                     (when (and (= "_collection.edn" rel) (nil? (collection-file-problem n text)))
+                       (:read-groups (first (read-edn-values text)))))
+                   files)
         env-groups (remove str/blank? (map str/trim (str/split (or root-read-groups "") #",")))]
     (conj (vec broken)
           (cond
