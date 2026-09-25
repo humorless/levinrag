@@ -970,6 +970,6 @@ worst admitted, `:top 50` returns 0. The vector `:vec-filter` behaves the
 same way.
 
 Decision: no code change. The T0.5 over-fetch + doc-id-set check stays;
-`:doc-filter` would give the same results and the same ACL starvation.
+`:doc-filter` would give the same results and the same ACL starvation, at the same latency (within ~1 ms at 100k chunks; a precomputed readable-chunk set is much slower).
 The rationale's "the full-text and vector engines cannot filter by
 document before ranking" stands.

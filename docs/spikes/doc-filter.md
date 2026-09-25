@@ -76,6 +76,32 @@ only then applies `doc-filter` in `display-xf`. In `vector.clj`
 `search-vec` (~855-868) HNSW returns `top` keys, then `vec-filter` drops
 some of them.
 
+### 4. Latency: no gain over the current post-filter
+
+Experiment 4 (`-main "bench"`): T0.5 scale (10,000 docs, 100,000 chunks,
+50 groups, 1–3 groups per doc), chunks of 80 terms (~700 bytes, giant
+like real chunks), `:top 200`, 100 timed runs per row after 20 warm-up
+runs, the same seeded query/group sequence for every variant. All three
+returned identical hits.
+
+- **A** (current `retrieval/datalevin.clj`): top 200, join to the doc,
+  keep hits whose doc is in the readable doc set.
+- **B1**: `:doc-filter` looks up each hit's doc (`d/datoms :eav e
+  :chunk/doc`) and checks the readable doc set.
+- **B2**: `:doc-filter` checks a precomputed readable *chunk* set.
+
+| User's groups | A p50 / p90 (ms) | B1 p50 / p90 | B2 p50 / p90 | Hits kept |
+|---|---|---|---|---|
+| 1 | 3.57 / 5.99 | 2.81 / 3.49 | 2.11 / 5.58 | 8.2 |
+| 3 | 3.06 / 3.82 | 2.68 / 3.32 | 10.44 / 11.59 | 23.9 |
+| 50 | 8.06 / 8.66 | 8.97 / 9.76 | 99.11 / 118.52 | 200 |
+
+A and B1 are within about 1 ms of each other either way, which is noise
+at this size (one run on an M1 laptop). B2 gets slow as the user's reach
+grows, because building the chunk set costs more than the search.
+`:doc-filter` saves only the tuple emission for rejected hits, and the
+join it skips is cheap next to the fulltext scoring both variants do.
+
 ## Decision
 
 - `:doc-filter` is usable from Datalog, correcting T0.4. It is not a

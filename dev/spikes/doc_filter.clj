@@ -14,8 +14,13 @@
   Run from the repo root in a fresh JVM (see gen_synthetic_corpus.clj for
   why load-file):
 
-    clojure -M:jvm-opts -e '(load-file \"dev/spikes/doc_filter.clj\")(spikes.doc-filter/-main)'"
-  (:require [datalevin.core :as d]))
+    clojure -M:jvm-opts -e '(load-file \"dev/spikes/doc_filter.clj\")(spikes.doc-filter/-main)'
+
+  Add \"bench\" for the latency comparison (experiment 4, ~100k chunks):
+
+    clojure -M:jvm-opts -e '(load-file \"dev/spikes/doc_filter.clj\")(spikes.doc-filter/-main \"bench\")'"
+  (:require [clojure.string :as str]
+            [datalevin.core :as d]))
 
 (defn- temp-dir [prefix]
   (str (java.nio.file.Files/createTempDirectory
@@ -98,7 +103,134 @@
       (println "   (a pre-top-k filter would return 10 in every row)")
       (d/close conn))))
 
-(defn -main [& _]
+;; --- experiment 4: cost of :doc-filter vs the current post-filter ---
+
+(def ^:private bench-schema
+  {:doc/path {:db/valueType :db.type/string
+              :db/unique :db.unique/identity}
+   :doc/effective-groups {:db/valueType :db.type/string
+                          :db/cardinality :db.cardinality/many}
+   :chunk/id {:db/valueType :db.type/string
+              :db/unique :db.unique/identity}
+   :chunk/doc {:db/valueType :db.type/ref}
+   :chunk/index-text {:db/valueType :db.type/string
+                      :db/fulltext true
+                      :db.fulltext/autoDomain true}})
+
+(def ^:private terms
+  ["合約" "條款" "甲方" "乙方" "違約" "賠償" "保密" "終止" "續約" "付款"
+   "交付" "驗收" "智慧財產權" "授權" "不可抗力" "爭議" "仲裁" "管轄" "生效" "解除"])
+
+(defn- generate!
+  "T0.5 shape (1–3 of n-groups per doc), but chunks of `n-terms`
+   space-joined terms: 80 terms is ~700 bytes, a giant datom like a real
+   ~350-token chunk."
+  [conn {:keys [n-docs chunks-per-doc n-groups n-terms]}]
+  (let [rng (java.util.Random. 42)
+        pick #(nth % (.nextInt rng (count %)))
+        groups (mapv #(str "group-" %) (range n-groups))]
+    (doseq [start (range 0 n-docs 250)]
+      (d/transact! conn
+                   (vec (mapcat (fn [i]
+                                  (let [tid (- -1 i)]
+                                    (cons {:db/id tid
+                                           :doc/path (str "doc-" i ".md")
+                                           :doc/effective-groups (vec (distinct (repeatedly (inc (.nextInt rng 3)) #(pick groups))))}
+                                          (for [c (range chunks-per-doc)]
+                                            {:chunk/id (str "doc-" i ".md::" c)
+                                             :chunk/doc tid
+                                             :chunk/index-text (str/join " " (repeatedly n-terms #(pick terms)))}))))
+                                (range start (min n-docs (+ start 250)))))))
+    groups))
+
+(defn- readable-docs [db groups]
+  (set (d/q '[:find [?d ...] :in $ [?g ...] :where [?d :doc/effective-groups ?g]] db groups)))
+
+(defn variant-a
+  "Current LevinRAG (retrieval/datalevin.clj): top-k, join to the doc,
+   filter by the readable doc set in Clojure."
+  [db q groups top]
+  (let [readable (readable-docs db groups)]
+    (->> (d/q '[:find ?e ?d ?s :in $ ?q ?opts
+                :where [(fulltext $ :chunk/index-text ?q ?opts) [[?e _ _ ?s]]] [?e :chunk/doc ?d]]
+              db q {:top top
+                    :display :refs+scores})
+         (filterv (fn [[_ d]] (contains? readable d))))))
+
+(defn variant-b1
+  ":doc-filter that looks up each hit's doc."
+  [db q groups top]
+  (let [readable (readable-docs db groups)
+        doc-of (fn [e] (:v (first (d/datoms db :eav e :chunk/doc))))]
+    (vec (d/q '[:find ?e ?d ?s :in $ ?q ?opts
+                :where [(fulltext $ :chunk/index-text ?q ?opts) [[?e _ _ ?s]]] [?e :chunk/doc ?d]]
+              db q {:top top
+                    :display :refs+scores
+                    :doc-filter #(contains? readable (doc-of (ref-eid %)))}))))
+
+(defn variant-b2
+  ":doc-filter over a precomputed readable chunk set."
+  [db q groups top]
+  (let [chunks (set (d/q '[:find [?c ...] :in $ [?g ...]
+                           :where [?d :doc/effective-groups ?g] [?c :chunk/doc ?d]]
+                         db groups))]
+    (vec (d/q '[:find ?e ?d ?s :in $ ?q ?opts
+                :where [(fulltext $ :chunk/index-text ?q ?opts) [[?e _ _ ?s]]] [?e :chunk/doc ?d]]
+              db q {:top top
+                    :display :refs+scores
+                    :doc-filter #(contains? chunks (ref-eid %))}))))
+
+(defn- p [sorted q] (nth sorted (int (Math/floor (* q (dec (count sorted)))))))
+
+(defn- bench [f db groups n-user-groups runs]
+  (let [rng (java.util.Random. 7)
+        run (fn []
+              (let [gs (let [l (java.util.ArrayList. ^java.util.Collection groups)]
+                         (java.util.Collections/shuffle l rng)
+                         (vec (take n-user-groups l)))
+                    q (nth terms (.nextInt rng (count terms)))
+                    t0 (System/nanoTime)
+                    r (f db q gs 200)]
+                [(/ (- (System/nanoTime) t0) 1e6) (count r)]))
+        _ (dotimes [_ 20] (run))
+        res (vec (repeatedly runs run))
+        ms (sort (map first res))]
+    {:p50 (p ms 0.5)
+     :p90 (p ms 0.9)
+     :hits-avg (double (/ (reduce + (map second res)) runs))}))
+
+(defn experiment-4
+  "Latency of A, B1, B2 at T0.5 scale. Also checks the three return the
+   same hits."
+  ([] (experiment-4 {:n-docs 10000
+                     :chunks-per-doc 10
+                     :n-groups 50
+                     :n-terms 80
+                     :runs 100}))
+  ([{:keys [runs]
+     :as opts}]
+   (let [conn (d/create-conn (temp-dir "docfilter-bench") bench-schema)
+         t0 (System/nanoTime)
+         groups (generate! conn opts)
+         _ (println (format "4. generated %d docs × %d chunks in %.0f s"
+                            (:n-docs opts) (:chunks-per-doc opts) (/ (- (System/nanoTime) t0) 1e9)))
+         db (d/db conn)
+         key-set (fn [r] (set (map (juxt first second) r)))]
+     (doseq [n [1 3 50]]
+       (let [gs (vec (take n groups))]
+         (println (format "   same hits (%d groups, 合約): %s" n
+                          (= (key-set (variant-a db "合約" gs 200))
+                             (key-set (variant-b1 db "合約" gs 200))
+                             (key-set (variant-b2 db "合約" gs 200))))))
+       (doseq [[label f] [["A  current" variant-a] ["B1 doc-filter+lookup" variant-b1] ["B2 doc-filter+chunk set" variant-b2]]]
+         (let [{:keys [p50 p90 hits-avg]} (bench f db groups n runs)]
+           (println (format "   %2d groups  %-24s p50 %7.2f ms  p90 %7.2f ms  hits %.1f"
+                            n label p50 p90 hits-avg)))))
+     (d/close conn))))
+
+(defn -main [& args]
   (experiment-1-2)
   (experiment-3)
+  (when (= "bench" (first args))
+    (experiment-4))
   (shutdown-agents))
