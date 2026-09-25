@@ -1,6 +1,6 @@
 # LevinRAG
 
-單一 JVM、嵌入式 Datalevin 的企業 RAG MVP：Markdown／純文字語料 → 詞彙＋語意＋連結圖多路召回 → RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用 `[n]` 的回答。內建 ACL、每次查詢的 trace 與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫。現行規格見 [SPEC.md](SPEC.md)（含尚未完成的工作，§21）；初版規格保存在 [docs/design/2026-09-22-initial-spec.md](docs/design/2026-09-22-initial-spec.md)；每一處設計調整的理由見 [docs/decisions.md](docs/decisions.md)。
+單一 JVM、嵌入式 Datalevin 的企業 RAG MVP：Markdown／純文字語料 → 詞彙＋語意＋連結圖多路召回 → RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用 `[n]` 的回答。內建 ACL、每次查詢的 trace 與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫。現行規格見 [SPEC.zh-TW.md](SPEC.zh-TW.md)（含尚未完成的工作，§21）；初版規格保存在 [docs/design/2026-09-22-initial-spec.md](docs/design/2026-09-22-initial-spec.md)；每一處設計調整的理由見 [docs/decisions.md](docs/decisions.md)。
 
 ## 設計理念
 
@@ -34,25 +34,25 @@ flowchart LR
 
 代價同樣明確：規模上限約十萬個 chunk，不做水平擴展；依賴一個維護者集中的資料庫；功能廣度不及通用框架。在這個規模內，簡單與可驗證比極致的吞吐量更值得。
 
-完整的論證（與各框架的比較、為什麼選 Datalevin、適用範圍、待驗證的問題）見 [docs/design/rationale.md](docs/design/rationale.md)。
+完整的論證（與各框架的比較、為什麼選 Datalevin、適用範圍、待驗證的問題）見 [docs/design/rationale.zh-TW.md](docs/design/rationale.zh-TW.md)。
 
 ## 使用手冊
 
-- [維運手冊](docs/howto/ops.md)：部署、環境變數、health、備份、評估。
-- [管理者手冊](docs/howto/admin.md)：使用者與群組、文件權限、匯入、trace。
-- [使用者手冊](docs/howto/user.md)：登入、提問、引用、文件檢視、Debug 面板。
+- [維運手冊](docs/howto/ops.zh-TW.md)：部署、環境變數、health、備份、評估。
+- [管理者手冊](docs/howto/admin.zh-TW.md)：使用者與群組、文件權限、匯入、trace。
+- [使用者手冊](docs/howto/user.zh-TW.md)：登入、提問、引用、文件檢視、Debug 面板。
 
 ## 快速開始（本機）
 
-1. 在同一個 shell 設定環境變數，後面每一步（包括 server）都要用到。完整清單見[維運手冊](docs/howto/ops.md#環境變數)。
+1. 在同一個 shell 設定環境變數，後面每一步（包括 server）都要用到。完整清單見[維運手冊](docs/howto/ops.zh-TW.md#環境變數)。
    ```bash
    export DATA_DIR=./data CORPUS_DIR=corpus-sample VLLM_API_KEY=...
    export VLLM_EMBED_BASE_URL=... VLLM_RERANK_BASE_URL=... VLLM_CHAT_BASE_URL=... VLLM_CHAT_MODEL=...
    ```
-2. 啟動三個模型端點，做法見 [VLLM_SETUP.md](VLLM_SETUP.md)，然後確認：`bb vllm:check`（全部 `[OK]` 才繼續）。
+2. 啟動三個模型端點，做法見 [VLLM_SETUP.zh-TW.md](VLLM_SETUP.zh-TW.md)，然後確認：`bb vllm:check`（全部 `[OK]` 才繼續）。
 3. 匯入語料：`bb ingest`。
 4. 建立使用者：`bb user:create alice --groups all,hr`，再用 `bb user:passwd alice` 設定密碼（管理者加 `--admin`）。
-5. 在同一個 shell 啟動 server（指令見[維運手冊](docs/howto/ops.md#啟動)），開啟 http://localhost:8000 登入。server 需要同一個 `CORPUS_DIR` 才能在文件檢視頁顯示原文。
+5. 在同一個 shell 啟動 server（指令見[維運手冊](docs/howto/ops.zh-TW.md#啟動)），開啟 http://localhost:8000 登入。server 需要同一個 `CORPUS_DIR` 才能在文件檢視頁顯示原文。
 
 ## 文件權限規則（ACL）
 
@@ -63,7 +63,7 @@ flowchart LR
 3. 群組為空 `[]` 表示除 admin 外沒有人可讀。
 4. 看不到的文件一律回 404（不回 403），不透露是否存在。
 
-設定方式見[管理者手冊](docs/howto/admin.md#文件權限)。
+設定方式見[管理者手冊](docs/howto/admin.zh-TW.md#文件權限)。
 
 ## 開發
 
@@ -98,4 +98,4 @@ Your assets will be updated in `resources/public` folder.
 
 ## 部署
 
-見[維運手冊](docs/howto/ops.md#部署kamal)。
+見[維運手冊](docs/howto/ops.zh-TW.md#部署kamal)。

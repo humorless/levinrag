@@ -1,6 +1,6 @@
 # 維運手冊
 
-對象：負責部署、監控與備份的人。管理使用者與文件權限見[管理者手冊](admin.md)。
+對象：負責部署、監控與備份的人。管理使用者與文件權限見[管理者手冊](admin.zh-TW.md)。
 
 ## 系統組成
 
@@ -8,7 +8,7 @@
   - `DATA_DIR/index.dtlv`：由語料衍生的索引，隨時可以用 `bb reindex` 砍掉重建。
   - `DATA_DIR/app.dtlv`：使用者、群組、API token 與 trace。**這是唯一需要備份的資料**。
 - **語料目錄 `CORPUS_DIR`**：真正的資料來源（Markdown／純文字檔）。應用程式只會讀取，不會寫入。
-- **三個模型端點（OpenAI 相容 API）**：embedding、rerank、chat。應用程式不負責啟動它們；本機的架設方式見 [VLLM_SETUP.md](../../VLLM_SETUP.md)。
+- **三個模型端點（OpenAI 相容 API）**：embedding、rerank、chat。應用程式不負責啟動它們；本機的架設方式見 [VLLM_SETUP.zh-TW.md](../../VLLM_SETUP.zh-TW.md)。
 
 需求：JDK 21。每一個會開啟 Datalevin 的 JVM，都必須帶這兩個參數：
 `--add-opens=java.base/java.nio=ALL-UNNAMED --add-opens=java.base/sun.nio.ch=ALL-UNNAMED`。
