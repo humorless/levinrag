@@ -992,3 +992,18 @@ its issue tracker.
 Decision: `replace-tx` stays; it never retracts a datom twice. The
 backlog idea that fixing this would let the writer drop `replace-tx` is
 withdrawn.
+
+## 2026-09-25 — Evaluator onboarding: `bb eval --questions / --users`
+
+Spec text: §15.2 read the question and user files from fixed paths
+(`eval/questions.edn`, `eval/users.edn`).
+
+Actual: an outside evaluator testing their own corpus had to overwrite
+tracked files. Both paths are now flags with the old defaults; a missing
+file, an unknown flag or a flag without a value is an error instead of a
+silent fallback to the sample files (the wrong questions would still
+"work" and give meaningless numbers).
+
+Part of the evaluator quick-start work (user request 2026-09-25: eval
+flags, `.env` + `bb serve`, `bb doctor`, `bb user:import`,
+`bb acl:report`, `docs/howto/quick-start.md`).

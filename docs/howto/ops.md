@@ -156,9 +156,10 @@ For everyday additions or edits to the corpus, an incremental ingest is enough: 
 ```bash
 bb eval                                    # five retrieval variants
 bb eval --variants lexical,hybrid+rerank
+bb eval --questions my-eval/questions.edn --users my-eval/users.edn   # your own corpus
 ```
 
-The evaluation reads `eval/questions.edn` and `eval/users.edn`, runs retrieval directly against `DATA_DIR/index.dtlv` as the user each question specifies, and outputs recall@5, recall@10, MRR@10, the ACL leak count, the number of degraded questions, and p50 / p95 latency per stage. Results are written to `eval/results/<timestamp>.edn`.
+The evaluation reads `eval/questions.edn` and `eval/users.edn` (or the files given with `--questions` / `--users`), runs retrieval directly against `DATA_DIR/index.dtlv` as the user each question specifies, and outputs recall@5, recall@10, MRR@10, the ACL leak count, the number of degraded questions, and p50 / p95 latency per stage. Results are written to `eval/results/<timestamp>.edn`.
 
 - **If the ACL leak count is above 0, the command exits with a non-zero status**.
 - If any question ran in degraded mode, a warning is printed; the numbers then do not represent the full pipeline, so fix the model problem before comparing.

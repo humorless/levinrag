@@ -593,11 +593,11 @@ Every `/search` and `/ask` writes one trace (`app.dtlv`), including requests tha
  ]
 ```
 
-Eval identities come from `eval/users.edn`, so `bb eval` does not depend on `app.dtlv`. The question set currently has 38 questions, 8 of them ACL negative questions.
+Eval identities come from `eval/users.edn`, so `bb eval` does not depend on `app.dtlv`. `--questions <file>` and `--users <file>` replace the two default files, for evaluating another corpus; a missing file is an error. The question set currently has 38 questions, 8 of them ACL negative questions.
 
 ### 15.2 Running
 
-`bb eval [--variants lexical,semantic,hybrid,hybrid+rerank,hybrid+rerank+graph]` calls the retrieval pipeline directly (not over HTTP) as the user each question specifies, and outputs:
+`bb eval [--variants lexical,semantic,hybrid,hybrid+rerank,hybrid+rerank+graph] [--questions <file>] [--users <file>]` calls the retrieval pipeline directly (not over HTTP) as the user each question specifies, and outputs:
 
 - doc-level recall@5, recall@10, MRR@10 per variant (document ranking after de-duplication);
 - ACL leak count: a `must-not-docs` entry appearing at any position in any variant counts 1; **when > 0, it exits with a non-zero status**;

@@ -595,11 +595,11 @@ bb token:revoke <prefix>
  ]
 ```
 
-eval 的身分來自 `eval/users.edn`，所以 `bb eval` 不依賴 `app.dtlv`。目前題庫有 38 題，其中 8 題是 ACL 負向題。
+eval 的身分來自 `eval/users.edn`，所以 `bb eval` 不依賴 `app.dtlv`。`--questions <檔案>` 與 `--users <檔案>` 取代這兩個預設檔，用於評估其他語料；檔案不存在時報錯。目前題庫有 38 題，其中 8 題是 ACL 負向題。
 
 ### 15.2 執行
 
-`bb eval [--variants lexical,semantic,hybrid,hybrid+rerank,hybrid+rerank+graph]` 以各題指定的使用者身分，直接呼叫檢索 pipeline（不經 HTTP），輸出：
+`bb eval [--variants lexical,semantic,hybrid,hybrid+rerank,hybrid+rerank+graph] [--questions <檔案>] [--users <檔案>]` 以各題指定的使用者身分，直接呼叫檢索 pipeline（不經 HTTP），輸出：
 
 - 每個變體的 doc-level recall@5、recall@10、MRR@10（去重後的文件排名）；
 - ACL 洩漏數：`must-not-docs` 出現在任何變體的任何位置就計 1；**> 0 時以非零狀態碼結束**；

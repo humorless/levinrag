@@ -89,7 +89,7 @@ vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
   token:revoke {:doc "Revoke an API token by prefix: bb token:revoke <prefix>"
                 :task (apply clojure "-M:jvm-opts -m replware.levinrag.auth.cli token:revoke" *command-line-args*)}
 
-  eval {:doc "Evaluate retrieval variants on eval/questions.edn: bb eval [--variants lexical,hybrid]"
+  eval {:doc "Evaluate retrieval variants: bb eval [--variants lexical,hybrid] [--questions q.edn] [--users u.edn]"
         :task (apply clojure "-M:jvm-opts -m replware.levinrag.eval.cli" *command-line-args*)}
 
   reindex {:doc "Delete DATA_DIR/index.dtlv and ingest CORPUS_DIR from scratch"
