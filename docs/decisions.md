@@ -1007,3 +1007,27 @@ silent fallback to the sample files (the wrong questions would still
 Part of the evaluator quick-start work (user request 2026-09-25: eval
 flags, `.env` + `bb serve`, `bb doctor`, `bb user:import`,
 `bb acl:report`, `docs/howto/quick-start.md`).
+
+## 2026-09-25 — `.env` for the bb tasks, `bb serve`
+
+Spec text: §5 — configuration comes from environment variables only; the
+local server was started with a long `clojure -M:jvm-opts -e "…"` line.
+
+Actual: an evaluator had to re-export ~10 variables in every shell and
+paste a Clojure expression to start the server. Now:
+
+- `bb` tasks that run the app (`serve`, `ingest`, `reindex`, `eval`,
+  `vllm:check`, `user:*`, `token:*`) pass the variables of `./.env` to the
+  JVM they start (`bb/replware/levinrag/bb/dotenv.clj`). `bb test`,
+  `bb build` and `bb browser-check` do not: tests must not pick up real
+  model endpoints by accident.
+- A variable already set in the shell wins (the dotenv convention), so
+  existing `export` workflows and `DATA_DIR=… bb reindex` are unchanged.
+- A malformed line is an error naming the line, not skipped: a silently
+  dropped `VLLM_CHAT_MODEL` would surface much later as a confusing 503.
+- The JVM never reads `.env`; production (Kamal) keeps its own env.
+- `bb serve` wraps the `:default`-profile start command.
+- `.env.example` has Traditional Chinese comments (the first evaluator
+  reads Chinese); `ROOT_READ_GROUPS=all` there so a corpus without
+  `_collection.edn` is readable by the `all` group rather than by admins
+  only — the unset default is unchanged.

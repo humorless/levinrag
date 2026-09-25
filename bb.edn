@@ -1,8 +1,21 @@
 {:deps {io.github.abogoyavlensky/manifest-edn {:mvn/version "0.1.1"}}
+ :paths ["bb"]
  :tasks
  {:init (do
           (def input-css-file "resources/public/css/input.css")
-          (def output-css-file "resources/public/css/output.css"))
+          (def output-css-file "resources/public/css/output.css")
+          (require 'replware.levinrag.bb.dotenv)
+          ;; `clojure` plus the .env variables not already set in the shell;
+          ;; for the tasks that run the app (SPEC.md §5). .env is read on
+          ;; each call, so a syntax error in it only stops those tasks.
+          (defn clj [& args]
+            (let [file-env (try (replware.levinrag.bb.dotenv/read-file ".env")
+                                (catch clojure.lang.ExceptionInfo e
+                                  (binding [*out* *err*] (println "錯誤：" (ex-message e)))
+                                  (System/exit 1)))]
+              (apply clojure
+                     {:extra-env (replware.levinrag.bb.dotenv/extra-env file-env (into {} (System/getenv)))}
+                     args))))
   :enter (println "Running task:" (:name (current-task)))
 
   deps {:doc "Install all deps"
@@ -27,7 +40,7 @@
                      "--lint" (with-out-str (clojure "-Spath")))}
 
   lint {:doc "Linting project's code"
-        :task (shell "clj-kondo" "--parallel" "--lint" "src" "test")}
+        :task (shell "clj-kondo" "--parallel" "--lint" "src" "test" "bb")}
 
   outdated-check {:doc "Check outdated Clojure deps versions"
                   :task (clojure "-M:outdated")}
@@ -69,31 +82,37 @@
                  (clojure "-T:build:jvm-opts build"))}
 
 vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
-            :task (clojure "-X:vllm-check")}
+            :task (clj "-X:vllm-check")}
 
   ingest {:doc "Incrementally ingest CORPUS_DIR into DATA_DIR/index.dtlv"
-          :task (clojure "-M:jvm-opts -m replware.levinrag.ingest.cli ingest")}
+          :task (clj "-M:jvm-opts -m replware.levinrag.ingest.cli ingest")}
 
   user:create {:doc "Create a user: bb user:create alice --groups all,hr [--admin]"
-               :task (apply clojure "-M:jvm-opts -m replware.levinrag.auth.cli user:create" *command-line-args*)}
+               :task (apply clj "-M:jvm-opts -m replware.levinrag.auth.cli user:create" *command-line-args*)}
 
   user:groups {:doc "Replace a user's groups: bb user:groups alice all,hr,finance"
-               :task (apply clojure "-M:jvm-opts -m replware.levinrag.auth.cli user:groups" *command-line-args*)}
+               :task (apply clj "-M:jvm-opts -m replware.levinrag.auth.cli user:groups" *command-line-args*)}
 
   user:passwd {:doc "Set a user's password (prompted): bb user:passwd alice"
-               :task (apply clojure "-M:jvm-opts -m replware.levinrag.auth.cli user:passwd" *command-line-args*)}
+               :task (apply clj "-M:jvm-opts -m replware.levinrag.auth.cli user:passwd" *command-line-args*)}
 
   token:create {:doc "Create an API token (shown once): bb token:create alice --label cli"
-                :task (apply clojure "-M:jvm-opts -m replware.levinrag.auth.cli token:create" *command-line-args*)}
+                :task (apply clj "-M:jvm-opts -m replware.levinrag.auth.cli token:create" *command-line-args*)}
 
   token:revoke {:doc "Revoke an API token by prefix: bb token:revoke <prefix>"
-                :task (apply clojure "-M:jvm-opts -m replware.levinrag.auth.cli token:revoke" *command-line-args*)}
+                :task (apply clj "-M:jvm-opts -m replware.levinrag.auth.cli token:revoke" *command-line-args*)}
 
   eval {:doc "Evaluate retrieval variants: bb eval [--variants lexical,hybrid] [--questions q.edn] [--users u.edn]"
-        :task (apply clojure "-M:jvm-opts -m replware.levinrag.eval.cli" *command-line-args*)}
+        :task (apply clj "-M:jvm-opts -m replware.levinrag.eval.cli" *command-line-args*)}
+
+  serve {:doc "Start the web server (profile :default) on http://localhost:8000"
+         :task (clj "-M:jvm-opts" "-e"
+                    (str "(require '[integrant-extras.core :as ig-extras]) "
+                         "(ig-extras/run-system {:profile :default :config-path \"config.edn\"}) "
+                         "@(promise)"))}
 
   reindex {:doc "Delete DATA_DIR/index.dtlv and ingest CORPUS_DIR from scratch"
-           :task (clojure "-M:jvm-opts -m replware.levinrag.ingest.cli reindex")}
+           :task (clj "-M:jvm-opts -m replware.levinrag.ingest.cli reindex")}
 
   kamal {:doc "Deploy application using Kamal"
          :task (apply shell "kamal" (concat *command-line-args* ["--config-file" ".kamal/deploy.yml"]))}

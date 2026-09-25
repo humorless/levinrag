@@ -40,10 +40,13 @@ API keys are never written to logs, traces or health responses.
 Local (`:default` profile, port 8000):
 
 ```bash
-export DATA_DIR=./data CORPUS_DIR=corpus-sample VLLM_API_KEY=...
-export VLLM_EMBED_BASE_URL=... VLLM_EMBED_MODEL=...
-export VLLM_RERANK_BASE_URL=... VLLM_RERANK_MODEL=...
-export VLLM_CHAT_BASE_URL=... VLLM_CHAT_MODEL=...
+cp .env.example .env      # once; then edit .env
+bb serve
+```
+
+The `bb` tasks that run the app (`serve`, `ingest`, `reindex`, `eval`, `vllm:check`, `user:*`, `token:*`) read `.env` from the project directory and pass its variables to the JVM they start. A variable already set in the shell wins over `.env`, so `DATA_DIR=/tmp/other bb reindex` still works. A malformed line in `.env` stops those tasks with its line number. `.env` is gitignored; `.env.example` lists every variable. The server itself never reads `.env`: without `bb`, export the variables and run
+
+```bash
 clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-extras/run-system {:profile :default :config-path \"config.edn\"}) @(promise)"
 ```
 

@@ -19,7 +19,7 @@ tmux new-session -d -s nrepl 'clojure -M:jvm-opts:test:dev:nrepl --port 1667'
 - Fast loop (nREPL): `(require 'ns 'ns-test :reload)` then `(binding [clojure.test/*test-out* *out*] (clojure.test/run-tests 'ns-test))`.
   Reload the source ns too; `remove-ns` a test ns after renaming/deleting deftests, then require it **with `:reload`** (the ns stays in `*loaded-libs*`, so a plain `require` silently does nothing).
 - Before committing (clean JVM + coverage): `clojure -X:jvm-opts:test`
-- Lint: `clj-kondo --lint src test`
+- Lint: `clj-kondo --lint src test bb`
 
 ## Docs in two languages
 

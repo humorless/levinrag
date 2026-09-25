@@ -48,15 +48,11 @@ The full argument (comparison with the frameworks, why Datalevin, scope of appli
 
 ## Quick start (local)
 
-1. Set the environment variables in one shell; every later step (including the server) needs them. The full list is in the [Operations guide](docs/howto/ops.md#environment-variables).
-   ```bash
-   export DATA_DIR=./data CORPUS_DIR=corpus-sample VLLM_API_KEY=...
-   export VLLM_EMBED_BASE_URL=... VLLM_RERANK_BASE_URL=... VLLM_CHAT_BASE_URL=... VLLM_CHAT_MODEL=...
-   ```
+1. Copy the settings template and fill in the model endpoints: `cp .env.example .env`. Every `bb` task below reads `.env` (variables exported in the shell win). The full list is in the [Operations guide](docs/howto/ops.md#environment-variables).
 2. Start the three model endpoints as described in [VLLM_SETUP.md](VLLM_SETUP.md), then check: `bb vllm:check` (continue only when everything is `[OK]`).
 3. Ingest the corpus: `bb ingest`.
 4. Create a user: `bb user:create alice --groups all,hr`, then set the password with `bb user:passwd alice` (add `--admin` for an administrator).
-5. Start the server in the same shell (command in the [Operations guide](docs/howto/ops.md#starting-the-server)), open http://localhost:8000 and log in. The server needs the same `CORPUS_DIR` to show the original text in the document viewer.
+5. Start the server: `bb serve` (details in the [Operations guide](docs/howto/ops.md#starting-the-server)), open http://localhost:8000 and log in.
 
 ## Document permission rules (ACL)
 
@@ -72,7 +68,7 @@ How to set this up is in the [Administrator guide](docs/howto/admin.md#document-
 ## Development
 
 - nREPL, test loop: see [CLAUDE.md](CLAUDE.md).
-- Full test run (clean JVM + coverage): `clojure -X:jvm-opts:test`; lint: `clj-kondo --lint src test`.
+- Full test run (clean JVM + coverage): `clojure -X:jvm-opts:test`; lint: `clj-kondo --lint src test bb`.
 - Tests that need real models are tagged `:vllm` and are skipped automatically when `VLLM_*` is not set.
 - `bb docs:check`: the English and Traditional Chinese docs have matching headings, language switches, and working links and anchors (also part of `bb check`).
 - `bb tasks` lists all Babashka commands.

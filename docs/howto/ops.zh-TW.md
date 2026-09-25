@@ -41,10 +41,13 @@ API key 不會寫進 log、trace 或 health 回應。
 本機（`:default` profile，port 8000）：
 
 ```bash
-export DATA_DIR=./data CORPUS_DIR=corpus-sample VLLM_API_KEY=...
-export VLLM_EMBED_BASE_URL=... VLLM_EMBED_MODEL=...
-export VLLM_RERANK_BASE_URL=... VLLM_RERANK_MODEL=...
-export VLLM_CHAT_BASE_URL=... VLLM_CHAT_MODEL=...
+cp .env.example .env      # 只需一次；接著編輯 .env
+bb serve
+```
+
+會執行應用程式的 `bb` 指令（`serve`、`ingest`、`reindex`、`eval`、`vllm:check`、`user:*`、`token:*`）會讀取專案目錄的 `.env`，把其中的變數傳給它們啟動的 JVM。shell 裡已設定的變數優先於 `.env`，所以 `DATA_DIR=/tmp/other bb reindex` 照樣可用。`.env` 有格式錯誤的行時，這些指令會停下來並指出行號。`.env` 已被 gitignore；`.env.example` 列出所有變數。server 本身不讀 `.env`：不用 `bb` 時，先 export 變數再執行
+
+```bash
 clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-extras/run-system {:profile :default :config-path \"config.edn\"}) @(promise)"
 ```
 

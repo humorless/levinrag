@@ -48,15 +48,11 @@ flowchart LR
 
 ## 快速開始（本機）
 
-1. 在同一個 shell 設定環境變數，後面每一步（包括 server）都要用到。完整清單見[維運手冊](docs/howto/ops.zh-TW.md#環境變數)。
-   ```bash
-   export DATA_DIR=./data CORPUS_DIR=corpus-sample VLLM_API_KEY=...
-   export VLLM_EMBED_BASE_URL=... VLLM_RERANK_BASE_URL=... VLLM_CHAT_BASE_URL=... VLLM_CHAT_MODEL=...
-   ```
+1. 複製設定範本並填入模型端點：`cp .env.example .env`。後面每個 `bb` 指令都會讀 `.env`（shell 裡 export 的變數優先）。完整清單見[維運手冊](docs/howto/ops.zh-TW.md#環境變數)。
 2. 啟動三個模型端點，做法見 [VLLM_SETUP.zh-TW.md](VLLM_SETUP.zh-TW.md)，然後確認：`bb vllm:check`（全部 `[OK]` 才繼續）。
 3. 匯入語料：`bb ingest`。
 4. 建立使用者：`bb user:create alice --groups all,hr`，再用 `bb user:passwd alice` 設定密碼（管理者加 `--admin`）。
-5. 在同一個 shell 啟動 server（指令見[維運手冊](docs/howto/ops.zh-TW.md#啟動)），開啟 http://localhost:8000 登入。server 需要同一個 `CORPUS_DIR` 才能在文件檢視頁顯示原文。
+5. 啟動 server：`bb serve`（細節見[維運手冊](docs/howto/ops.zh-TW.md#啟動)），開啟 http://localhost:8000 登入。
 
 ## 文件權限規則（ACL）
 
@@ -72,7 +68,7 @@ flowchart LR
 ## 開發
 
 - nREPL、測試迴圈：見 [CLAUDE.md](CLAUDE.md)。
-- 完整測試（乾淨 JVM＋coverage）：`clojure -X:jvm-opts:test`；lint：`clj-kondo --lint src test`。
+- 完整測試（乾淨 JVM＋coverage）：`clojure -X:jvm-opts:test`；lint：`clj-kondo --lint src test bb`。
 - 需要真實模型的測試標記 `:vllm`，未設定 `VLLM_*` 時自動略過。
 - `bb docs:check`：檢查中英文件的標題是否一致、有沒有語言切換，以及連結與錨點是否正確（`bb check` 也會執行）。
 - `bb tasks` 列出所有 Babashka 指令。

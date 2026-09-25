@@ -44,7 +44,7 @@
                  :extra-deps {integrant/repl {:mvn/version "0.4.0"}
                               ring/ring-devel {:mvn/version "1.14.2"}}}
 
-           :test {:extra-paths ["test"]
+           :test {:extra-paths ["test" "bb"]
                   :extra-deps {eftest/eftest {:mvn/version "0.6.0"}
                                cloverage/cloverage {:mvn/version "1.2.4"}
                                clj-http/clj-http {:mvn/version "3.13.1"}
