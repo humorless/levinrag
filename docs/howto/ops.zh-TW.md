@@ -84,6 +84,8 @@ clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-ext
 
 > ⚠️ 以下步驟**尚未在實機上驗證過**，第一次部署後請修正本節。
 
+GitHub Actions：`checks.yaml`（格式、lint、雙語文件、測試）在每次 push 到 `main` 與每個 pull request 時執行。`deploy.yaml`（先跑 checks，再 `bb kamal deploy`）在第一次部署設定好之前**只能手動觸發**（Actions → Deploy → Run workflow），需要 repository secrets：`SSH_PRIVATE_KEY`、`SERVER_IP`、`APP_DOMAIN`、`SESSION_SECRET_KEY`。`outdated.yaml` 每週一列出有新版的依賴，只提出警告，不會讓執行失敗。
+
 設定在 `.kamal/deploy.yml`（執行 `bb kamal <指令>` 時會帶入）：
 
 - 映像檔推到 ghcr.io，並在伺服器上遠端建置（`builder.remote`）。

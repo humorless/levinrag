@@ -83,6 +83,8 @@ If any check fails, it returns `503`, and the body lists the status of each chec
 
 > ⚠️ The steps below **have not yet been verified on a real server**. Please correct this section after the first deployment.
 
+GitHub Actions: `checks.yaml` (format, lint, bilingual docs, tests) runs on every push to `main` and on pull requests. `deploy.yaml` (checks, then `bb kamal deploy`) is **manual only** (Actions → Deploy → Run workflow) until the first deployment is set up; it needs the `SSH_PRIVATE_KEY`, `SERVER_IP`, `APP_DOMAIN` and `SESSION_SECRET_KEY` repository secrets. `outdated.yaml` lists newer dependency versions every Monday as a warning; it never fails a run.
+
 The configuration is in `.kamal/deploy.yml` (passed in when you run `bb kamal <command>`):
 
 - The image is pushed to ghcr.io and built remotely on the server (`builder.remote`).

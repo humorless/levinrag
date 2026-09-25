@@ -1,8 +1,11 @@
 name: Deploy
 
+# Manual only until the Kamal deployment exists (SPEC.md §21.1): it needs
+# the SSH_PRIVATE_KEY, SERVER_IP, APP_DOMAIN and SESSION_SECRET_KEY secrets.
+# Checks run on every push by themselves (checks.yaml). To deploy on push
+# again, add `push: branches: [ main ]` back here.
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:
 
 jobs:
   checks:
@@ -16,19 +19,19 @@ jobs:
     timeout-minutes: 20
     needs: [ checks ]
     steps:
-      - uses: actions/checkout@v4
-      - uses: webfactory/ssh-agent@v0.9.1
+      - uses: actions/checkout@v7
+      - uses: webfactory/ssh-agent@v0.10.0
         with:
           ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
-      - uses: jdx/mise-action@v2
+      - uses: jdx/mise-action@v4
         with:
           install_args: "babashka"
 
       - name: Setup Docker Buildx
-        uses: docker/setup-buildx-action@v3
+        uses: docker/setup-buildx-action@v4
 
       - name: Expose GitHub Runtime for cache
-        uses: crazy-max/ghaction-github-runtime@v3
+        uses: crazy-max/ghaction-github-runtime@v4
 
       - uses: ruby/setup-ruby@v1
         with:

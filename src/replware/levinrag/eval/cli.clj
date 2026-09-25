@@ -89,7 +89,8 @@
                      (when (seq missing)
                        (println (str "[WARN] 題目引用了索引裡沒有的文件（" (count missing)
                                      " 處；路徑打錯，或文件因權限設定錯誤未匯入）："))
-                       (doseq [{:keys [id path] k :key} missing]
+                       (doseq [{:keys [id path]
+                                k :key} missing]
                          (println (str "         " id " " (name k) " " path))))
                      (println "results:" path)
                      (if (pos? (:acl-leaks report)) 1 0))

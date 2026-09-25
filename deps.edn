@@ -60,8 +60,13 @@
            ; use together with :dev (dev/ path): -M:jvm-opts:test:dev:spike-hanlp
            :spike-hanlp {:extra-deps {com.hankcs/hanlp {:mvn/version "portable-1.8.6"}}}
 
+           ; commonmark is pinned to datalevin's version (see :deps above), so
+           ; antq neither reports nor upgrades it
            :outdated {:extra-deps {com.github.liquidz/antq {:mvn/version "2.11.1276"}}
-                      :main-opts ["-m" "antq.core" "--no-diff"]}
+                      :main-opts ["-m" "antq.core" "--no-diff"
+                                  "--exclude=org.commonmark/commonmark"
+                                  "--exclude=org.commonmark/commonmark-ext-gfm-tables"
+                                  "--exclude=org.commonmark/commonmark-ext-yaml-front-matter"]}
 
            :build {:deps {io.github.abogoyavlensky/slim {:mvn/version "0.3.2"}}
                    :ns-default slim.app

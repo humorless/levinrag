@@ -1,0 +1,29 @@
+name: Outdated deps
+
+# A weekly reminder, not a gate: newer versions are listed in the run
+# summary and as a warning, and the run never fails because of them.
+on:
+  schedule:
+    - cron: '0 1 * * 1'
+  workflow_dispatch:
+
+jobs:
+  outdated:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/cache-clojure-deps
+        with:
+          key-label: 'outdated'
+      - uses: jdx/mise-action@v4
+        with:
+          install_args: "babashka java clojure"
+      - name: List outdated deps
+        run: |
+          bb deps
+          if bb outdated-check > outdated.txt 2>&1; then
+            echo "All dependencies are up to date." >> "$GITHUB_STEP_SUMMARY"
+          else
+            { echo '```'; cat outdated.txt; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Newer dependency versions exist; see the run summary."
+          fi

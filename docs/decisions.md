@@ -1276,3 +1276,26 @@ line 1 an error with an invisible character in the message.
   directory now gets none. The "which broken file governs this directory"
   walk is one function, `acl/governing-broken-dir`, used by the walker and
   the writer.
+
+## 2026-09-25 — CI: checks on push, deploy manual, outdated as a weekly reminder
+
+Every run of the Deploy workflow on GitHub had failed since the first push:
+`lint-fmt` (26 files not cljfmt-formatted; fixed by the cljfmt pass) and
+`outdated` (antq fails on any newer version, and commonmark is pinned on
+purpose to datalevin's 0.24.0, so it could never pass). `deploy` was
+skipped because checks failed; once they passed it would have run
+`kamal deploy` with no repository secrets set and failed.
+
+User decision:
+- `checks.yaml` runs on push to `main` and on pull requests (plus
+  `bb docs:check` in the lint job); `deploy.yaml` is `workflow_dispatch`
+  only until §21.1's deployment exists.
+- `outdated` left the checks and `bb check`; `outdated.yaml` runs weekly
+  and on demand, writes the list to the run summary with a warning, never
+  fails. antq excludes the three commonmark artifacts (also for
+  `bb outdated`, which would otherwise upgrade them).
+- Actions moved to their Node 24 majors (checkout v7, cache v6,
+  mise-action v4, ssh-agent v0.10.0, setup-buildx v4,
+  ghaction-github-runtime v4; setup-ruby v1 already runs on Node 24);
+  the inputs used are unchanged. Verified locally: the lint-fmt chain
+  passes; the workflows themselves are verified by the first push.
