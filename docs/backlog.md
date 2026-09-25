@@ -201,3 +201,20 @@ bugs with workarounds (#4 root-caused, #5 not), 2 were never tried (#6,
 #7). #1 and #7 are now settled (both work, both post-filter). Next worth
 retrying: #2 (phrase queries for exact terms, see "Query-side exact-token
 matching" above). Re-check #4 and #5 on any Datalevin upgrade.
+
+**Conclusion (2026-09-25): none of these is likely to improve retrieval
+quality or permissions.** Measured: #1 and #7 work but give the same
+results at the same latency as the current post-filter
+(`spikes/doc-filter.md`). Judged, not measured: #2/#3 add little on top
+of overlapping CJK bigrams, and the known exact-identifier problem has a
+simpler query-side fix; fixing #4 adds no capability. Two exceptions,
+neither about core retrieval:
+
+- **#6 may pay off in deployment**: Datalevin 1.1.0 also has an
+  in-process llama.cpp embedder, which might remove the separate
+  embedding server. It would trade away vector reuse on ACL-only edits,
+  per-file error isolation and model-free tests, and async mode would
+  break "a document's vectors and permissions change together". Needs a
+  spike before any decision.
+- **#5 would simplify code**: `replace-tx` in `ingest/writer.clj` exists
+  only to work around it.
