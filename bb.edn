@@ -96,7 +96,7 @@
                     (do (println "\n檢查模型端點（bb vllm:check）：")
                         (clj "-X:vllm-check"))))}
 
-  dev:models {:doc "Start the local model servers (LM Studio + llama.cpp, VLLM_SETUP.md) that are not running"
+  dev:models {:doc "Start the local llama.cpp model servers (embed, chat, rerank; VLLM_SETUP.md) that are not running"
               :requires ([replware.levinrag.bb.dev :as dev]
                          [replware.levinrag.bb.dotenv :as dotenv])
               :task (dev/run-task (fn [] (dev/models! (merge (dotenv/read-file ".env") (into {} (System/getenv))))))}
@@ -105,7 +105,7 @@
           :requires ([replware.levinrag.bb.dev :as dev])
           :task (dev/run-task dev/up!)}
 
-  dev:down {:doc "Stop the tmux sessions started by dev:models / dev:up (LM Studio keeps running)"
+  dev:down {:doc "Stop the tmux sessions started by dev:models / dev:up"
             :requires ([replware.levinrag.bb.dev :as dev])
             :task (dev/run-task dev/down!)}
 

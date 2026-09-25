@@ -4,7 +4,7 @@
 
 ## Starting the environment
 
-Models and servers down (e.g. after a reboot)? Run `bb dev:models` (the local LM Studio + llama.cpp model servers) and then `bb dev:up` (`bb serve` in tmux `levinrag`, the nREPL below in tmux `nrepl`, then `bb doctor`). Both start only what is not running. Do not assemble `lms` / `llama-server` / tmux commands by hand; settings come from `.env`. See `docs/howto/dev.md`.
+Models and servers down (e.g. after a reboot)? Run `bb dev:models` (the three local llama.cpp model servers) and then `bb dev:up` (`bb serve` in tmux `levinrag`, the nREPL below in tmux `nrepl`, then `bb doctor`). Both start only what is not running. Do not assemble `llama-server` / tmux commands by hand (their flags are tuned in `bb dev:models`); settings come from `.env`. See `docs/howto/dev.md`.
 
 ## nREPL
 

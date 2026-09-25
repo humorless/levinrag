@@ -9,8 +9,9 @@ Audience: people developing LevinRAG, mainly on a Mac. To evaluate LevinRAG on y
 ```mermaid
 flowchart LR
   subgraph M[Model servers: bb dev:models]
-    L[LM Studio :1234<br/>embedding + chat]
-    R[llama-server :8002<br/>rerank · tmux rerank]
+    E1[llama-server :8001<br/>embedding · tmux embed]
+    C1[llama-server :8003<br/>chat · tmux chat]
+    R1[llama-server :8002<br/>rerank · tmux rerank]
   end
   subgraph A[The project: bb dev:up]
     S[bb serve :8000<br/>tmux levinrag]
@@ -21,15 +22,15 @@ flowchart LR
   M --> S
 ```
 
-- **Your settings live in `.env`** (gitignored; the template is `.env.example`). Which model server, which model names and ports: all of it. Nothing about your machine is in the repo.
-- The model servers are the documented Mac recipe of [VLLM_SETUP.md](../../VLLM_SETUP.md). With a GPU vLLM or a shared endpoint instead, point the `VLLM_*_BASE_URL` values at it; `bb dev:models` then has nothing to start and says so.
+- **Your settings live in `.env`** (gitignored; the template is `.env.example`): which endpoints, model names and ports. Nothing about your machine is in the repo.
+- The model servers are the documented Mac recipe of [VLLM_SETUP.md](../../VLLM_SETUP.md#local-alternative-llamacpp-embedding-chat-and-rerank): three llama.cpp `llama-server` processes whose flags are tuned per role and built into `bb dev:models`. With a GPU vLLM or a shared endpoint instead, point the `VLLM_*_BASE_URL` values at it; `bb dev:models` then has nothing to start and says so.
 
 ## First-time setup
 
 1. Tools: `mise trust && mise install` in the project directory (Java, Clojure, Babashka, Tailwind, cljfmt, clj-kondo), plus `brew install tmux llama.cpp`.
-2. LM Studio: install it from https://lmstudio.ai and open it once (this installs `~/.lmstudio/bin/lms`). Download the embedding model as in [VLLM_SETUP.md](../../VLLM_SETUP.md#local-alternative-lm-studio-embedding-and-chat) (`lms get https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF`), and Qwen3 8B from LM Studio's model search (this machine's setup uses the 4-bit MLX build). The reranker downloads itself on its first start (about 636 MB).
-3. Settings: `cp .env.example .env`, then fill in the LM Studio + llama.cpp values from VLLM_SETUP.md (the block at the end of `.env.example`).
-4. Start everything (next section), then load data once:
+2. Settings: `cp .env.example .env`, then fill in the llama.cpp values from [VLLM_SETUP.md](../../VLLM_SETUP.md#local-alternative-llamacpp-embedding-chat-and-rerank) (the block at the end of `.env.example`).
+3. Start everything (next section). The first `bb dev:models` downloads the three models into `~/.cache/huggingface` (about 6 GB in total; the 5 GB chat model can take half an hour on a slow connection).
+4. Load data once:
 
    ```bash
    bb ingest                           # the sample corpus, or your CORPUS_DIR
@@ -39,31 +40,30 @@ flowchart LR
 ## Every day, or after a reboot
 
 ```bash
-bb dev:models   # LM Studio server + embedding + chat model, llama-server reranker
+bb dev:models   # the three llama-servers: embedding, chat, rerank
 bb dev:up       # bb serve (http://localhost:8000) and the nREPL (port 1667), then bb doctor
 ```
 
 - Each step checks first and starts only what is not running, so running either command again is harmless.
-- Order matters on a 16 GB Mac: `bb dev:models` loads embedding, then chat, then the reranker; start the models before `bb dev:up`.
+- `bb dev:models` starts the servers one at a time (embedding, chat, rerank), waiting for each; start the models before `bb dev:up`.
 - `bb dev:up` ends with `bb doctor`; everything should be `[OK]`.
-- Measured on an M1 16 GB after a simulated reboot: `bb dev:models` about 13 s, `bb dev:up` about 28 s.
+- Measured on an M1 16 GB after a simulated reboot: `bb dev:models` about 10 s, `bb dev:up` about 22 s.
 
-To look at a process: `tmux attach -t levinrag` (or `nrepl`, `rerank`); leave with Ctrl-b d.
+To look at a process: `tmux attach -t levinrag` (or `nrepl`, `embed`, `chat`, `rerank`); leave with Ctrl-b d.
 
 ## Stopping
 
 ```bash
-bb dev:down                              # stops the levinrag, nrepl and rerank tmux sessions
-lms server stop && lms unload --all      # only if you also want LM Studio's memory back
+bb dev:down     # stops all five tmux sessions: levinrag, nrepl, embed, chat, rerank
 ```
 
-After changing `.env`, restart the server so it reads the new values: `tmux kill-session -t levinrag && bb dev:up`.
+After changing `.env`, restart what reads it: the server with `tmux kill-session -t levinrag && bb dev:up`; after changing a model or `LOCAL_*`, `bb dev:down`, then both start commands.
 
 ## Settings
 
 - `bb` tasks read `.env`; a variable exported in your shell wins over it. The tmux sessions do not see your shell's exports, so put settings for `bb dev:up` in `.env`.
 - Running `clojure` or `java` directly (not through `bb`) does not read `.env`: export the variables yourself.
-- `LOCAL_CHAT_CONTEXT` (default 8192) and `LOCAL_RERANK_HF` (default `gpustack/bge-reranker-v2-m3-GGUF:Q8_0`) are read only by `bb dev:models`.
+- `LOCAL_EMBED_HF`, `LOCAL_CHAT_HF`, `LOCAL_RERANK_HF` (Hugging Face `repo:quant`) and `LOCAL_CHAT_CONTEXT` (default 8192) are read only by `bb dev:models`; the defaults and each flag's reason are in [VLLM_SETUP.md](../../VLLM_SETUP.md#local-alternative-llamacpp-embedding-chat-and-rerank).
 - The full list with defaults is in the [Operations guide](ops.md#environment-variables).
 
 ## Daily development commands
@@ -81,9 +81,8 @@ After changing `.env`, restart the server so it reads the new values: `tmux kill
 
 | Symptom | Fix |
 |---|---|
-| `找不到 lms` (lms not found) | Open the LM Studio app once; it installs `~/.lmstudio/bin/lms` |
-| `lms load … 失敗` (failed) | The model name in `.env` must match LM Studio's (`lms ls`) |
-| `reranker 沒有回應` (not responding) | `tmux attach -t rerank`; the first start downloads the model; port 8002 may be taken |
+| `找不到 llama-server` (not found) | `brew install llama.cpp` |
+| `… 沒有回應` (not responding) for embed / chat / rerank | `tmux attach -t <name>`: a first download still running, a port already taken, or a wrong `LOCAL_*_HF` |
 | `server 沒有回應` (not responding) | `tmux attach -t levinrag` for the error, often a malformed `.env` |
-| Swapping, very slow answers | 16 GB is tight for three models: close other apps, or unload what you do not need |
-| `bb doctor` shows chat `down` right after start | LM Studio's first request after loading is slow; run it again |
+| `每個端點要用不同的 port` (distinct ports) | Two `VLLM_*_BASE_URL` values in `.env` use the same port |
+| Swapping, very slow answers | The three models use about 10 GB: close other apps |

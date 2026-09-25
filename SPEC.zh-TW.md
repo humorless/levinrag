@@ -11,7 +11,7 @@
 > - 每一處偏離初版的**理由與證據**記在 [`docs/decisions.md`](docs/decisions.md)，本文件只寫結論，並在括號中標出對應的決策日期。
 > - 尚未完成的工作與下一步見 [§21](#21-尚未完成與下一步)。
 
-一個單一 JVM process、單一資料目錄的企業 RAG：Markdown／純文字語料 → 多路召回（詞彙、語意、連結圖）→ RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用的生成，內建 ACL、查詢追蹤（trace）與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫，可以是 vLLM，也可以是本機的 LM Studio／llama.cpp。
+一個單一 JVM process、單一資料目錄的企業 RAG：Markdown／純文字語料 → 多路召回（詞彙、語意、連結圖）→ RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用的生成，內建 ACL、查詢追蹤（trace）與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫，可以是 vLLM，也可以是本機的 llama.cpp server。
 
 程式的 namespace 根為 `replware.levinrag`（2026-09-25 由 `hybridrag` 改名）。
 
@@ -101,7 +101,7 @@ flowchart LR
 | D2 | 語料目錄是唯一的資料來源 | DB 永遠可以從檔案推導出來。應用程式只讀語料，不寫。 |
 | D3 | **ACL 在寫入時物化；查詢時用「可讀文件 id 集合」過濾** | 階層繼承的遞迴計算放在 ingestion。查詢時先從使用者群組算出可讀的 doc id 集合，再對每個原始命中做 `contains?`。初版的 Datalog join 寫法在 100k chunks 下太慢（2026-09-22，T0.5）。 |
 | D4 | `Retriever` protocol 隔離儲存層，**ACL 只在 Retriever 內完成** | 萬一 Datalevin 不適用，換實作不必重寫 pipeline；pipeline 層拿到的候選一定已經過濾。 |
-| D5 | 三個模型端點（embed／rerank／chat），OpenAI 相容 API | 可以是 vLLM，也可以是 LM Studio（embed、chat）加 llama.cpp（rerank）。 |
+| D5 | 三個模型端點（embed／rerank／chat），OpenAI 相容 API | 可以是 vLLM，也可以是本機的三個 llama.cpp `llama-server`（2026-09-26 之前 embed、chat 用 LM Studio；見 `docs/spikes/llama-cpp-only.md`）。 |
 | D6 | 全文索引建在 `:chunk/index-text`；向量存在另一個屬性 `:chunk/vec`，由應用程式計算（Path B） | Datalevin 內建的 embedding provider 在 transact 時就會呼叫模型端點，測試與建置都離不開模型；Path B 沒有這個依賴（2026-09-22）。 |
 | D7 | Rerank 失敗時降級為 RRF 排序，請求不失敗 | 可用性優先；降級狀態記入 trace，並回傳給呼叫端。 |
 | D8 | 檢索沒有有效證據時不呼叫 LLM | 省成本，也杜絕沒有依據的回答。 |
@@ -131,9 +131,9 @@ flowchart LR
 
 | 用途 | 模型 | 預設位址 | 本機開發實際使用 |
 |---|---|---|---|
-| Embedding | `BAAI/bge-m3`（1024 維） | `http://localhost:8001/v1` | LM Studio `text-embedding-bge-m3`（Q8_0） |
+| Embedding | `BAAI/bge-m3`（1024 維） | `http://localhost:8001/v1` | llama.cpp `llama-server --embedding`，`bge-m3`（Q8_0） |
 | Rerank | `BAAI/bge-reranker-v2-m3` | `http://localhost:8002`，路徑 `/v1/rerank` | llama.cpp `llama-server --reranking`（Q8_0） |
-| Chat | 可設定 | 無預設，必填 | LM Studio `qwen/qwen3-8b` |
+| Chat | 可設定 | 無預設，必填 | llama.cpp `llama-server`，`qwen3-8b`（Q4_K_M） |
 
 啟動方式見 `VLLM_SETUP.md`。應用程式不負責啟動模型。
 
@@ -145,7 +145,7 @@ flowchart LR
 
 **Rerank**：`POST {rerank-base}{rerank-path}`，body `{"model", "query", "documents", "top_n"}`，回應 `results[i] = {index, relevance_score}`。缺少 `results`、index 重複或超出範圍、分數不是數字，都視為失敗。**分數依後端原樣使用**：llama.cpp 回傳原始 logit（例如 4.6／−6.5／−11.0），vLLM 通常回傳 0–1；兩者的門檻不能互換（2026-09-24）。
 
-**Chat**：`POST {chat-base}/chat/completions`，標準 OpenAI 格式。`VLLM_CHAT_EXTRA_BODY`（JSON 物件）會原樣合併進 request body。例如 Qwen3 on LM Studio 要用 `{"reasoning_effort":"none"}`，因為 LM Studio 不理會 `chat_template_kwargs`。回應必須有 `choices[0].message`；`content` 為 null 視為空回答。
+**Chat**：`POST {chat-base}/chat/completions`，標準 OpenAI 格式。`VLLM_CHAT_EXTRA_BODY`（JSON 物件）會原樣合併進 request body。Qwen3 的 thinking 在 llama.cpp 上由伺服器端關掉（`--reasoning off`，不需要 extra body）；在 vLLM 上用 `{"chat_template_kwargs":{"enable_thinking":false}}`，在 LM Studio 上用 `{"reasoning_effort":"none"}`，因為 LM Studio 不理會 `chat_template_kwargs`。回應必須有 `choices[0].message`；`content` 為 null 視為空回答。
 
 ### 4.3 共通要求
 
@@ -797,7 +797,7 @@ analyzer 測試向量、chunker、token 估算、ACL 解析、RRF（含平手）
 | ACL-only 變更 | 不重新計算 embedding（規則已有） | 同左；第一版實作其實違反了它，已修正 | frontmatter 的變動改變檔案 hash，導致整份文件重新 embed | 09-25 | §7.2 |
 | Context 合併 | 同一文件內連續的 chunk | 同一 **section** 內連續的 chunk | 每個 passage 只有一條準確的章節路徑 | 09-24 | §9.7 |
 | Rerank 分數與門檻 | 預設不設門檻，等 eval 校準 | 使用原始分數；門檻 -7.0 | 本機 llama.cpp 回傳 logit；以兩份語料校準 | 09-24、09-25 | §4.2、§9.6 |
-| 模型端點 | vLLM | 任何 OpenAI 相容端點；本機用 LM Studio 加 llama.cpp；HTTP/1.1 | 開發環境沒有 vLLM；LM Studio 不回應 h2c upgrade | 09-24 | §4 |
+| 模型端點 | vLLM | 任何 OpenAI 相容端點；本機用三個 llama.cpp server（2026-09-26 之前是 LM Studio 加 llama.cpp）；HTTP/1.1 | 開發環境沒有 vLLM；LM Studio 不回應 h2c upgrade | 09-24 | §4 |
 | CSRF | HTMX 請求帶 CSRF | 只套用在網頁路由 | 全域套用會擋掉所有 API POST；bearer token 不需要 CSRF | 09-24 | §12 |
 | 錯誤碼 | 只定義錯誤格式 | 400／401／404／409／503，且 503 帶 `trace_id` | 規格沒有定義；另外依 §14 補上「失敗時也寫 trace」 | 09-24、09-25 | §11、§14 |
 | Health | 單一 `/health` | `/health/live`（DB）與 `/health`（完整、平行、快取） | 模型重啟不應該讓整個服務被負載平衡器摘除 | 09-25 | §11 |

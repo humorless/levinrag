@@ -104,73 +104,69 @@ bb vllm:check
 - 第一次使用會自動下載模型（約 2-16GB）
 - 如果 `/v1/rerank` 路徑錯誤，嘗試改為 `/rerank`
 
-## 本機替代：LM Studio（embedding 與 chat）
+## 本機替代：llama.cpp（embedding、chat 與 rerank）
 
-沒有 vLLM 時，可以用 LM Studio 在本機提供 embedding 與 chat（OpenAI 相容 API，port 1234）：
-
-照下面填好 `.env` 之後，`bb dev:models` 會啟動整個本機方案（LM Studio server、兩個模型，以及下一節的 reranker），已在執行的部分會跳過；見[開發者指南](docs/howto/dev.zh-TW.md)。手動的做法：
-
-```bash
-lms get https://huggingface.co/ggml-org/bge-m3-Q8_0-GGUF   # 約 600 MB，只需一次
-lms load text-embedding-bge-m3
-lms server start
-```
+沒有 vLLM 時，在 Mac 上用三個 llama.cpp `llama-server` 提供三個端點（`brew install llama.cpp`，不需要 sudo）。**`bb dev:models` 會啟動它們**（各自一個 tmux session：`embed`、`chat`、`rerank`），使用下面的參數，已在執行的部分會跳過；見[開發者指南](docs/howto/dev.zh-TW.md)。模型會在第一次啟動時下載到 `~/.cache/huggingface`（約 600 MB、5 GB、640 MB）。
 
 ```bash
 # .env
-VLLM_EMBED_BASE_URL=http://localhost:1234/v1
-VLLM_EMBED_MODEL=text-embedding-bge-m3
-VLLM_API_KEY=lm-studio        # LM Studio 不檢查 key，但 client 需要一個值
-```
-
-- bge-m3 GGUF 輸出 1024 維，與 `VLLM_EMBED_DIMS` 預設一致。
-- **LM Studio 沒有 rerank endpoint。** 對不存在的路徑它會回 **HTTP 200 + `{"error": ...}`**，
-  rerank client 必須檢查回應結構（SPEC §4.2），系統會降級為 RRF 排序。
-
-### Chat：LM Studio（Qwen3-8B）
-
-```bash
-lms load qwen/qwen3-8b --context-length 8192   # 約 4.6 GB；context 需容納約 6000 token 的資料 + 1024 輸出
-```
-
-```bash
-# .env
-VLLM_CHAT_BASE_URL=http://localhost:1234/v1
-VLLM_CHAT_MODEL=qwen/qwen3-8b
-VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'   # 關閉 Qwen3 的思考模式
-```
-
-- `VLLM_CHAT_EXTRA_BODY` 是 JSON 物件，原樣合併進 chat request body（SPEC §4.2 的 `:chat/extra-body`）。
-- **LM Studio 不理會 `chat_template_kwargs.enable_thinking`**（vLLM 用的寫法）；要用
-  `reasoning_effort: "none"`。思考內容放在獨立的 `reasoning_content` 欄位，不在 `content` 裡的
-  `<think>`；思考吃光 `max_tokens` 時 `content` 為空字串，`/ask` 會回固定訊息並在 trace 標 `:empty-answer`。
-- M1 16 GB 實測（樣本語料、`特休天數怎麼計算？`）：`/ask` 全程思考開啟約 29 s，關閉約 9.4 s，
-  兩者都得到帶引用的正確回答。
-- vLLM 上的 Qwen3 則用 `VLLM_CHAT_EXTRA_BODY='{"chat_template_kwargs":{"enable_thinking":false}}'`。
-- **generate 的時間主要花在讀 prompt（prefill）**：M1 16 GB 上 Qwen3-8B prefill 約 125 token/s、生成約
-  25 token/s（2026-09-25 實測：1389 token 的 prompt 首次 14.5 s，同一 prompt 再送一次因前綴快取只要 3.3 s）。
-  所以 `/ask` 的延遲大致與送進 prompt 的段落數成正比，search 元件的 `:rerank-min-score`（環境變數 `VLLM_RERANK_MIN_SCORE`）濾掉不相關段落可直接縮短回答時間。
-  長時間閒置或記憶體吃緊（swap）後的第一次請求會明顯更慢。
-- **`VLLM_RERANK_MIN_SCORE`**（預設 `-7.0`）是依 llama.cpp 回傳的原始 logit 校準的；若 reranker 後端回傳 0–1 的分數，
-  需重新校準（`docs/spikes/rerank-threshold.md`）。
-
-### Rerank：llama.cpp `llama-server`
-
-LM Studio 沒有 rerank，改用 llama.cpp（`brew install llama.cpp`，不需要 sudo）：
-
-```bash
-llama-server -hf gpustack/bge-reranker-v2-m3-GGUF:Q8_0 --reranking \
-  --port 8002 --host 127.0.0.1 -ub 8192 -b 8192 -c 8192 -np 1
-```
-
-```bash
-# .env
+VLLM_API_KEY=local            # llama-server 不檢查 key，但 client 需要一個值
+VLLM_EMBED_BASE_URL=http://localhost:8001/v1
+VLLM_EMBED_MODEL=bge-m3
+VLLM_CHAT_BASE_URL=http://localhost:8003/v1
+VLLM_CHAT_MODEL=qwen3-8b
 VLLM_RERANK_BASE_URL=http://localhost:8002
 VLLM_RERANK_PATH=/v1/rerank
 VLLM_RERANK_MODEL=bge-reranker-v2-m3
 ```
 
-- 模型約 636 MB，首次啟動時下載到 `~/.cache/huggingface`；執行時約佔 1.1 GB 記憶體。
-- 回應格式與 SPEC §4.2 相同（`results[i] = {index, relevance_score}`，依分數排序）。
-- **分數是未經 sigmoid 的 logit**（例如 4.6、−6.5），不是 0–1。設定 search 元件的 `:rerank-min-score`（環境變數 `VLLM_RERANK_MIN_SCORE`）時要以實際後端校準。
-- M1 16 GB 實測：40 個 chunk（約 6–7k 估算 tokens）約 2.1 秒；20 個約 0.9–1.0 秒。
+`bb dev:models` 實際執行的指令，以及每個參數的理由（量測見 [docs/spikes/llama-cpp-only.md](docs/spikes/llama-cpp-only.md)）：
+
+```bash
+llama-server -hf ggml-org/bge-m3-Q8_0-GGUF --port 8001 --host 127.0.0.1 -a bge-m3 -np 1 \
+  --embedding -c 2048 -b 2048 -ub 2048
+llama-server -hf Qwen/Qwen3-8B-GGUF:Q4_K_M --port 8003 --host 127.0.0.1 -a qwen3-8b -np 1 \
+  -c 8192 --reasoning off --top-k 20 --top-p 0.8 --min-p 0
+llama-server -hf gpustack/bge-reranker-v2-m3-GGUF:Q8_0 --port 8002 --host 127.0.0.1 -a bge-reranker-v2-m3 -np 1 \
+  --reranking -c 8192 -b 8192 -ub 8192
+```
+
+| 參數 | 理由 |
+|---|---|
+| `-np 1`（全部） | 一位開發者用一個 slot 就好；多個 slot 會平分 `-c` |
+| `-a <名稱>`（全部） | 讓 server 回應 `.env` 裡的模型名稱 |
+| 不設 `-ngl`、`-fa` | 預設的 `auto` 會把所有層放到 Metal GPU |
+| embed `-c/-b/-ub 2048` | 非因果模型的每筆輸入必須放進一個 ubatch；chunk 上限約 500 個估計 token。用 8192 會白白多占 8 GB |
+| embed 不設 pooling | 使用模型內建的 pooling；向量和 LM Studio 的完全相同（cosine 1.0） |
+| chat `-c 8192` | 約 6000 token 的段落＋1024 的輸出 |
+| chat `--reasoning off` | 在伺服器端關掉 Qwen3 的 thinking，所以不需要 `VLLM_CHAT_EXTRA_BODY` |
+| chat `--top-k 20 --top-p 0.8 --min-p 0` | Qwen 對 non-thinking 模式的取樣建議；`temperature` 由程式自己送 0.2。不設 presence penalty：回答很短，而且要原樣重複數字與 `[n]` 引用 |
+| rerank `-c/-b/-ub 8192` | 放得下一整個 chunk 加上查詢（`bb vllm:check` 的 `rerank-long`） |
+
+要換模型，在 `.env` 設 `LOCAL_EMBED_HF`、`LOCAL_CHAT_HF`、`LOCAL_RERANK_HF`；chat 的 context 用 `LOCAL_CHAT_CONTEXT`。換 embedding 模型時，還要改 `VLLM_EMBED_DIMS` 並執行 `bb reindex`。
+
+### Embedding：bge-m3
+
+- GGUF 輸出 1024 維，與 `VLLM_EMBED_DIMS` 的預設值一致。
+- M1 16 GB 上的吞吐量：206 段 chunk 大小的段落約 3.8 秒（和 ingest 一樣，每批 32 筆）。
+
+### Chat：Qwen3-8B
+
+- M1 16 GB 實測（2026-09-26）：prefill 約 210 token/s，生成約 22 token/s；前 10 題範例問題的 `/ask` p50 約 6.4 秒。
+- **回答時間大部分花在讀 prompt（prefill）**，所以 `/ask` 延遲大致和送進去的段落數成正比；search 元件的 `:rerank-min-score`（env `VLLM_RERANK_MIN_SCORE`）濾掉不相關的段落，能直接縮短時間。同一個 prompt 再送一次，約 0.06 秒就開始回答（prompt 快取）。
+- 在 vLLM 上跑 Qwen3 時，用 `VLLM_CHAT_EXTRA_BODY='{"chat_template_kwargs":{"enable_thinking":false}}'` 關掉 thinking；`VLLM_CHAT_EXTRA_BODY` 是一個 JSON 物件，會原樣合併進 chat 請求（SPEC §4.2 的 `:chat/extra-body`）。
+- 閒置很久之後的第一個請求，或在記憶體吃緊（swap）時，會明顯比較慢。
+
+### Rerank：bge-reranker-v2-m3
+
+- 執行時約占 1.3 GB 記憶體。回應格式和 SPEC §4.2 相同（`results[i] = {index, relevance_score}`，依分數排序）。
+- **分數是沒有經過 sigmoid 的 logit**（例如 4.6、−6.5），不是 0–1。**`VLLM_RERANK_MIN_SCORE`**（預設 `-7.0`）就是用這種分數校準的；回傳 0–1 分數的後端必須重新校準（`docs/spikes/rerank-threshold.md`）。
+- M1 16 GB 實測：40 個 chunk（約 6–7k 估計 token）約 2.1 秒；20 個約 0.9–1.0 秒。
+
+### 改用 LM Studio
+
+LM Studio 也能提供 embedding 與 chat（OpenAI 相容，port 1234）。它是本專案最早的本機方案，檢索結果相同，但 `/ask` 比較慢（p50 約 9 秒：Qwen3 在 MLX 上的 prefill 約 120 token/s），記憶體也用得比較多。`bb dev:models` 不管理它。如果要用：
+
+- **LM Studio 沒有 rerank 端點**（reranker 仍用 llama.cpp）。對不存在的路徑，它回 **HTTP 200 + `{"error": ...}`**，所以 rerank client 會檢查回應結構（SPEC §4.2）。
+- 它只支援 HTTP/1.1。
+- 用 `VLLM_CHAT_EXTRA_BODY='{"reasoning_effort":"none"}'` 關掉 Qwen3 的 thinking：**LM Studio 會忽略 `chat_template_kwargs.enable_thinking`**。它的推理內容放在另一個 `reasoning_content` 欄位；推理用光 `max_tokens` 時 `content` 會是空的，`/ask` 會回固定訊息並在 trace 標記 `:empty-answer`。

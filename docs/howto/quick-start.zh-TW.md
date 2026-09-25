@@ -17,7 +17,7 @@
 ## 0. 需要準備什麼
 
 - macOS 或 Linux、`git`，以及 [mise](https://mise.jdx.dev)（它會依 `.mise.toml` 安裝 Java 21、Clojure、Babashka、Tailwind 的指定版本）。
-- **三個模型端點**，OpenAI 相容 API：embedding（預設 bge-m3）、rerank（bge-reranker-v2-m3）、chat。[VLLM_SETUP.zh-TW.md](../../VLLM_SETUP.zh-TW.md) 說明 GPU 上的 vLLM，或筆電上的 LM Studio + llama.cpp。
+- **三個模型端點**，OpenAI 相容 API：embedding（預設 bge-m3）、rerank（bge-reranker-v2-m3）、chat。[VLLM_SETUP.zh-TW.md](../../VLLM_SETUP.zh-TW.md) 說明 GPU 上的 vLLM，或筆電上的三個 llama.cpp server。
 - **語料要是 Markdown（`.md`、`.markdown`）或純文字（`.txt`）。** PDF 與 Office 檔不會被讀取，請先轉檔（例如用 `pandoc`、`marker` 或 `docling`）。請保留標題：chunk 不會跨章節，而章節路徑是每個 chunk 上下文的一部分。
 - 20–50 個你知道答案出處的問題（第 8.4 節）。有了它，數字才有意義。
 
@@ -40,7 +40,7 @@ cp .env.example .env
 編輯 `.env`。下面每個 `bb` 指令都會讀它；在 shell 裡 `export` 的變數優先於檔案。
 
 - `CORPUS_DIR`：語料目錄。`DATA_DIR`：索引與帳號放的地方（`./data` 即可）。
-- 三組 `VLLM_*_BASE_URL`／`VLLM_*_MODEL` 與 `VLLM_API_KEY`。用 LM Studio + llama.cpp 時，取消檔案最後那一段的註解。
+- 三組 `VLLM_*_BASE_URL`／`VLLM_*_MODEL` 與 `VLLM_API_KEY`。用本機 llama.cpp 方案時，取消檔案最後那一段的註解。
 - `ROOT_READ_GROUPS=all`：沒有其他權限設定的文件，`all` 群組讀得到。留空的話，只有 admin 讀得到。
 - `VLLM_EMBED_DIMS`：只有在 embedding 模型不是 1024 維時才要改。
 
@@ -232,7 +232,7 @@ diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 | 匯入後少了文件 | 權限寫錯（一律收緊） | 匯入輸出的錯誤會指出檔案與原因 |
 | `[WARN]` 沒有使用者擁有的群組 | 語料或使用者檔打錯字 | `bb acl:report --docs`，修正後 `bb ingest` 或 `bb user:import` |
 | `問答服務暫時無法使用（chat）` | chat 端點失敗 | `bb vllm:check`；訊息裡的 trace id 會指出是哪個端點 |
-| 剛啟動時 `/api/v1/health` 顯示 chat `down` | LM Studio 閒置後的第一個請求比較慢 | 等 30 秒再看一次 |
+| 剛啟動時 `/api/v1/health` 顯示 chat `down` | 剛載入或閒置很久之後的第一個請求比較慢 | 等 30 秒再看一次 |
 | 網頁沒有樣式 | CSS 尚未建置，也沒有 `tailwindcss` | `mise install tailwindcss`，再 `bb css-build` |
 
 ## 回報結果

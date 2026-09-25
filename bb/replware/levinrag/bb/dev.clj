@@ -7,7 +7,6 @@
   (:require [babashka.fs :as fs]
             [babashka.http-client :as http]
             [babashka.process :as p]
-            [cheshire.core :as json]
             [clojure.string :as str]
             [replware.levinrag.bb.dev-plan :as plan]))
 
@@ -61,12 +60,6 @@
 (defn- require-tool! [cmd fix]
   (or (fs/which cmd) (fail! (str "找不到 " cmd "：" fix))))
 
-(defn- lms-path []
-  (or (some-> (fs/which "lms") str)
-      (let [p (fs/path (fs/home) ".lmstudio" "bin" "lms")]
-        (when (fs/executable? p) (str p)))
-      (fail! "找不到 lms：安裝 LM Studio（https://lmstudio.ai）並開啟一次，它會裝好 ~/.lmstudio/bin/lms")))
-
 (defn run-task
   "Run `f`; a ::fail (or any ExceptionInfo) prints its message and exits 1."
   [f]
@@ -77,54 +70,39 @@
 
 ;; --- dev:models ---
 
-(defn- lmstudio-up! [{:keys [port]
-                      :as lms}]
-  (let [lms-bin (lms-path)
-        models-url (str "http://localhost:" port "/v1/models")]
-    (if (http-ok? models-url)
-      (println (str "[OK]   LM Studio server 已在 :" port " 執行"))
-      (do (println (str "[..]   啟動 LM Studio server（:" port "）"))
-          (sh lms-bin "server" "start" "--port" (str port))
-          (when-not (wait-until #(http-ok? models-url) 60)
-            (fail! (str "LM Studio server 沒有在 :" port " 回應；開啟 LM Studio app 看看")))))
-    (let [loaded (json/parse-string (:out (p/shell {:out :string} lms-bin "ps" "--json")))]
-      (doseq [{:keys [model context]} (plan/to-load lms loaded)]
-        (println (str "[..]   載入 " model (when context (str "（context " context "）"))))
-        (when-not (apply sh lms-bin "load" model "-y"
-                         (when context ["--context-length" (str context)]))
-          (fail! (str "lms load " model " 失敗；模型名稱是否和 LM Studio 裡的一致？（lms ls）"))))
-      (doseq [{:keys [model]} (:models lms)]
-        (println (str "[OK]   " model " 已載入"))))))
+(defn- health-url [port] (str "http://localhost:" port "/health"))
 
-(defn- llama-up! [{:keys [port]
-                   :as llama}]
-  (let [health (str "http://localhost:" port "/health")]
-    (if (http-ok? health)
-      (println (str "[OK]   reranker（llama-server）已在 :" port " 執行"))
-      (do
-        (require-tool! "llama-server" "brew install llama.cpp")
-        (if (tmux-session? "rerank")
-          (println "[..]   tmux session rerank 已存在，等它就緒")
-          (do (println (str "[..]   在 tmux session rerank 啟動 llama-server（:" port "）；"
-                            "第一次會下載約 636 MB 的模型"))
-              (tmux-start! "rerank" (str/join " " (plan/llama-command llama)))))
-        (if (wait-until #(http-ok? health) 600)
-          (println (str "[OK]   reranker 已在 :" port " 執行"))
-          (fail! "reranker 沒有回應；用 tmux attach -t rerank 看它的輸出"))))))
+(defn- llama-up!
+  "Start one planned llama-server in its tmux session unless its port
+   already answers; wait until it does."
+  [{:keys [role session port hf download]
+    :as p}]
+  (let [label (str (name role) "（" hf "，:" port "）")]
+    (if (http-ok? (health-url port))
+      (println (str "[OK]   " label " 已在執行"))
+      (do (if (tmux-session? session)
+            (println (str "[..]   tmux session " session " 已存在，等它就緒"))
+            (do (println (str "[..]   在 tmux session " session " 啟動 " label "；第一次會下載模型（" download "）"))
+                (tmux-start! session (str/join " " (plan/llama-command p)))))
+          ;; the chat model's first download is ~5 GB
+          (if (wait-until #(http-ok? (health-url port)) 3600)
+            (println (str "[OK]   " label " 已就緒"))
+            (fail! (str (name role) " 沒有回應；用 tmux attach -t " session " 看它的輸出")))))))
 
 (defn models!
-  "Start the local model servers of the VLLM_SETUP.md Mac recipe that are not
-   running. `env` is the shell environment with .env under it."
+  "Start the llama-servers of the VLLM_SETUP.md Mac recipe that are not
+   running, for the endpoints `env` (the shell environment with .env under
+   it) points at locally."
   [env]
-  (let [{:keys [lmstudio llama]} (plan/models-plan env)]
-    (if-not (or lmstudio llama)
+  (let [plan (plan/models-plan env)]
+    (if (empty? plan)
       (do (println "模型端點都不在本機（見 .env 的 VLLM_*_BASE_URL），這個指令不適用；用 bb doctor 檢查連線。")
           true)
-      (do (when llama (require-tool! "tmux" "brew install tmux"))
-          ;; embed and chat first: on a 16 GB Mac, loading them after the
-          ;; reranker can run out of memory
-          (some-> lmstudio lmstudio-up!)
-          (some-> llama llama-up!)
+      (do (require-tool! "tmux" "brew install tmux")
+          (require-tool! "llama-server" "brew install llama.cpp")
+          ;; one at a time, embed → chat → rerank: on a 16 GB Mac loading
+          ;; them all at once can run out of memory
+          (run! llama-up! plan)
           (println "模型都已就緒。下一步：bb dev:up")
           true))))
 
@@ -156,17 +134,16 @@
           (fail! "nREPL 沒有啟動；用 tmux attach -t nrepl 看它的輸出"))))
   (println "\n檢查整體設定（bb doctor）：")
   (let [ok? (sh "bb" "doctor")]
-    (println "\ntmux session：levinrag（server）、nrepl、rerank；用 tmux attach -t <名稱> 查看，Ctrl-b d 離開")
+    (println "\ntmux session：levinrag（server）、nrepl、embed、chat、rerank；用 tmux attach -t <名稱> 查看，Ctrl-b d 離開")
     ok?))
 
 (defn down!
-  "Stop the tmux sessions the dev tasks start. LM Studio is left running
-   (quit it from its menu, or `lms server stop` / `lms unload --all`)."
+  "Stop the tmux sessions the dev tasks start: the server, the nREPL and the
+   three llama-servers."
   []
   (require-tool! "tmux" "brew install tmux")
-  (doseq [s ["levinrag" "nrepl" "rerank"]]
+  (doseq [s ["levinrag" "nrepl" "embed" "chat" "rerank"]]
     (if (tmux-session? s)
       (do (sh "tmux" "kill-session" "-t" s) (println (str "[OK]   已停止 tmux session " s)))
       (println (str "[--]   tmux session " s " 沒有在執行"))))
-  (println "LM Studio 沒有動；要停止它：lms server stop、lms unload --all")
   true)

@@ -1377,3 +1377,29 @@ The project CLAUDE.md tells agents to use `bb dev:models` / `bb dev:up`
 instead of assembling `lms` / `llama-server` / tmux commands (user asked
 for that line; a machine-local instruction file was judged unnecessary
 because the machine-specific part is `.env`).
+
+## 2026-09-26 — The Mac dev setup is llama.cpp only; tuned flags live in `bb dev:models`
+
+Spike `docs/spikes/llama-cpp-only.md`. Decision rule set by the user
+before measuring: `/ask` p50 within 20 %, eval unchanged, memory of the
+three models within 15 %. Result: p50 9.04 s → 6.43 s (Qwen3 prefill 120
+tok/s on MLX vs 210 on llama.cpp Metal), eval identical to every
+question's ranking (embedding vectors equal: cosine 1.0, so no reindex),
+memory 12.2 GB → 9.8 GB. Switched.
+
+- `bb dev:models` starts three `llama-server`s (tmux `embed`, `chat`,
+  `rerank`) for the local endpoints; LM Studio logic removed. The flags per
+  role are code (`dev-plan/llama-command`) with their reasons in the
+  docstring, VLLM_SETUP.md and the spike — the user asked that tuned
+  parameters be part of the automatic setup, since finding them is the
+  slow part. Overridable: `LOCAL_EMBED_HF`, `LOCAL_CHAT_HF`,
+  `LOCAL_RERANK_HF`, `LOCAL_CHAT_CONTEXT`.
+- Embedding `-np 1 -c/-b/-ub 2048` (8192 + auto slots cost 8.3 GB); chat
+  `-np 1 -c 8192 --reasoning off --top-k 20 --top-p 0.8 --min-p 0`
+  (Qwen's non-thinking sampling; temperature stays the app's 0.2; no
+  presence penalty, kept as an open question); reranker unchanged.
+- `VLLM_CHAT_EXTRA_BODY` is no longer needed locally (thinking is off
+  server-side). Local ports are the code defaults 8001 / 8002 / 8003.
+- LM Studio stays documented as an alternative (VLLM_SETUP.md "Using LM
+  Studio instead"), not managed by the tasks. Its downloaded models were
+  not deleted (user decides).

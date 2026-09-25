@@ -18,7 +18,7 @@ The command output and the web UI are in Traditional Chinese; the English glosse
 ## 0. What you need
 
 - macOS or Linux, `git`, and [mise](https://mise.jdx.dev) (it installs Java 21, Clojure, Babashka and Tailwind at the versions in `.mise.toml`).
-- **Three model endpoints**, OpenAI-compatible: embedding (bge-m3 by default), rerank (bge-reranker-v2-m3) and chat. [VLLM_SETUP.md](../../VLLM_SETUP.md) shows vLLM on a GPU, or LM Studio + llama.cpp on a laptop.
+- **Three model endpoints**, OpenAI-compatible: embedding (bge-m3 by default), rerank (bge-reranker-v2-m3) and chat. [VLLM_SETUP.md](../../VLLM_SETUP.md) shows vLLM on a GPU, or three llama.cpp servers on a laptop.
 - **Your corpus as Markdown (`.md`, `.markdown`) or plain text (`.txt`).** PDF and Office files are not read; convert them first (for example with `pandoc`, `marker` or `docling`). Keep the headings: chunks never cross a section, and the section trail is part of every chunk's context.
 - 20–50 questions about that corpus whose answers you know (step 8.4). This is what makes the numbers mean something.
 
@@ -41,7 +41,7 @@ cp .env.example .env
 Edit `.env`. Every `bb` command below reads it; a variable you `export` in the shell wins over the file.
 
 - `CORPUS_DIR`: your corpus directory. `DATA_DIR`: where the index and the accounts go (`./data` is fine).
-- The three `VLLM_*_BASE_URL` / `VLLM_*_MODEL` pairs and `VLLM_API_KEY`. For LM Studio + llama.cpp, uncomment the block at the end of the file.
+- The three `VLLM_*_BASE_URL` / `VLLM_*_MODEL` pairs and `VLLM_API_KEY`. For the local llama.cpp setup, uncomment the block at the end of the file.
 - `ROOT_READ_GROUPS=all`: documents with no other permission setting can be read by the group `all`. Leave it empty and they can be read by admins only.
 - `VLLM_EMBED_DIMS`: change it only if your embedding model is not 1024-dimensional.
 
@@ -233,7 +233,7 @@ diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 | Documents missing after ingest | Permissions mistakes (fail closed) | The errors in the ingest output name the file and the reason |
 | `[WARN]` group held by no user | A typo in the corpus or the users file | `bb acl:report --docs`, fix, `bb ingest` or `bb user:import` |
 | `問答服務暫時無法使用（chat）` (Q&A unavailable) | The chat endpoint failed | `bb vllm:check`; the message's trace id names the endpoint |
-| `/api/v1/health` shows chat `down` right after start | LM Studio's first request after idle is slow | Wait 30 s and check again |
+| `/api/v1/health` shows chat `down` right after start | The first request after loading or a long idle period is slow | Wait 30 s and check again |
 | The web page has no styling | CSS not built and no `tailwindcss` | `mise install tailwindcss`, then `bb css-build` |
 
 ## Reporting back

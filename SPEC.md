@@ -9,7 +9,7 @@ Version v1.0 | 2026-09-25 | The system as it stands after Phases 0–5
 > - The **reasons and evidence** for every departure from the initial spec are recorded in [`docs/decisions.md`](docs/decisions.md). This document states only the conclusions, with the matching decision date in parentheses.
 > - Remaining work and next steps: see [§21](#21-remaining-work-and-next-steps).
 
-An enterprise RAG in a single JVM process with a single data directory: Markdown / plain-text corpus → multi-channel recall (lexical, semantic, link graph) → RRF fusion → cross-encoder rerank → context expansion → generation with citations, with built-in ACL, query tracing, and an evaluation framework. Models (embedding, rerank, chat) are always called through an OpenAI-compatible API; this can be vLLM, or a local LM Studio / llama.cpp.
+An enterprise RAG in a single JVM process with a single data directory: Markdown / plain-text corpus → multi-channel recall (lexical, semantic, link graph) → RRF fusion → cross-encoder rerank → context expansion → generation with citations, with built-in ACL, query tracing, and an evaluation framework. Models (embedding, rerank, chat) are always called through an OpenAI-compatible API; this can be vLLM, or local llama.cpp servers.
 
 The code's root namespace is `replware.levinrag` (renamed from `hybridrag` on 2026-09-25).
 
@@ -99,7 +99,7 @@ flowchart LR
 | D2 | The corpus directory is the single source of truth | The DB can always be derived from the files. The application only reads the corpus, never writes it. |
 | D3 | **ACL is materialized at write time; queries filter with the "accessible-doc-id set"** | The recursive computation of hierarchical inheritance happens at ingestion. At query time, first compute the set of accessible doc ids from the user's groups, then do `contains?` on each raw hit. The initial spec's Datalog-join approach was too slow at 100k chunks (2026-09-22, T0.5). |
 | D4 | A `Retriever` protocol isolates the storage layer, and **ACL is done only inside the Retriever** | If Datalevin turns out not to fit, swapping the implementation does not require rewriting the pipeline; candidates the pipeline receives are always already filtered. |
-| D5 | Three model endpoints (embed / rerank / chat), OpenAI-compatible API | Can be vLLM, or LM Studio (embed, chat) plus llama.cpp (rerank). |
+| D5 | Three model endpoints (embed / rerank / chat), OpenAI-compatible API | Can be vLLM, or locally three llama.cpp `llama-server` processes (LM Studio for embed and chat until 2026-09-26; see `docs/spikes/llama-cpp-only.md`). |
 | D6 | The full-text index is on `:chunk/index-text`; vectors are stored in a separate attribute `:chunk/vec`, computed by the application (Path B) | Datalevin's built-in embedding provider calls the model endpoint at transact time, so tests and builds cannot run without the model; Path B has no such dependency (2026-09-22). |
 | D7 | When rerank fails, degrade to RRF ordering; the request does not fail | Availability first; the degraded state is recorded in the trace and returned to the caller. |
 | D8 | Do not call the LLM when retrieval finds no valid evidence | Saves cost and rules out unsupported answers. |
@@ -129,9 +129,9 @@ Platform limits: Datalevin's vector features support Linux x86_64 / arm64 and ma
 
 | Purpose | Model | Default address | Actually used in local development |
 |---|---|---|---|
-| Embedding | `BAAI/bge-m3` (1024 dims) | `http://localhost:8001/v1` | LM Studio `text-embedding-bge-m3` (Q8_0) |
+| Embedding | `BAAI/bge-m3` (1024 dims) | `http://localhost:8001/v1` | llama.cpp `llama-server --embedding`, `bge-m3` (Q8_0) |
 | Rerank | `BAAI/bge-reranker-v2-m3` | `http://localhost:8002`, path `/v1/rerank` | llama.cpp `llama-server --reranking` (Q8_0) |
-| Chat | Configurable | No default, required | LM Studio `qwen/qwen3-8b` |
+| Chat | Configurable | No default, required | llama.cpp `llama-server`, `qwen3-8b` (Q4_K_M) |
 
 How to start them: see `VLLM_SETUP.md`. The application does not start the models.
 
@@ -143,7 +143,7 @@ Every request carries `Authorization: Bearer <key>`.
 
 **Rerank**: `POST {rerank-base}{rerank-path}`, body `{"model", "query", "documents", "top_n"}`, response `results[i] = {index, relevance_score}`. A missing `results`, a duplicate or out-of-range index, or a non-numeric score all count as failure. **Scores are used as the backend returns them**: llama.cpp returns raw logits (e.g. 4.6 / −6.5 / −11.0), vLLM usually returns 0–1; thresholds are not interchangeable between the two (2026-09-24).
 
-**Chat**: `POST {chat-base}/chat/completions`, standard OpenAI format. `VLLM_CHAT_EXTRA_BODY` (a JSON object) is merged into the request body as is. For example, Qwen3 on LM Studio needs `{"reasoning_effort":"none"}`, because LM Studio ignores `chat_template_kwargs`. The response must have `choices[0].message`; a null `content` counts as an empty answer.
+**Chat**: `POST {chat-base}/chat/completions`, standard OpenAI format. `VLLM_CHAT_EXTRA_BODY` (a JSON object) is merged into the request body as is. Qwen3's thinking is turned off server-side on llama.cpp (`--reasoning off`, no extra body needed); on vLLM use `{"chat_template_kwargs":{"enable_thinking":false}}`, and on LM Studio `{"reasoning_effort":"none"}`, because LM Studio ignores `chat_template_kwargs`. The response must have `choices[0].message`; a null `content` counts as an empty answer.
 
 ### 4.3 Common requirements
 
@@ -795,7 +795,7 @@ Many designs in the initial spec (`docs/design/2026-09-22-initial-spec.md`) were
 | ACL-only changes | Do not recompute embeddings (the rule already existed) | Same; the first implementation actually violated it, now fixed | The frontmatter change altered the file hash, causing the whole document to be re-embedded | 09-25 | §7.2 |
 | Context merging | Consecutive chunks within the same document | Consecutive chunks within the same **section** | Each passage has exactly one accurate section trail | 09-24 | §9.7 |
 | Rerank scores and threshold | No threshold by default, to be calibrated by eval | Raw scores used; threshold -7.0 | Local llama.cpp returns logits; calibrated on two corpora | 09-24, 09-25 | §4.2, §9.6 |
-| Model endpoints | vLLM | Any OpenAI-compatible endpoint; LM Studio plus llama.cpp locally; HTTP/1.1 | No vLLM in the development environment; LM Studio does not respond to the h2c upgrade | 09-24 | §4 |
+| Model endpoints | vLLM | Any OpenAI-compatible endpoint; locally three llama.cpp servers (LM Studio plus llama.cpp until 2026-09-26); HTTP/1.1 | No vLLM in the development environment; LM Studio does not respond to the h2c upgrade | 09-24 | §4 |
 | CSRF | HTMX requests carry CSRF | Applied only to web routes | Applying it globally blocked every API POST; bearer tokens need no CSRF | 09-24 | §12 |
 | Error codes | Only the error format defined | 400 / 401 / 404 / 409 / 503, with `trace_id` on 503 | Not defined in the spec; also added "write a trace on failure too" per §14 | 09-24, 09-25 | §11, §14 |
 | Health | A single `/health` | `/health/live` (DB) and `/health` (full, parallel, cached) | A model restart should not get the whole service pulled by the load balancer | 09-25 | §11 |
