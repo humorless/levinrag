@@ -7,7 +7,7 @@
 
 **大部分管理工作在命令列與檔案上完成，不在網頁介面裡。** 網頁的 `/admin` 只提供三項功能：執行匯入、查看最近一次匯入報告、瀏覽 trace。帳號與群組用 `bb` 指令管理；文件權限則寫在語料目錄的檔案裡。
 
-以下指令都在專案目錄下執行，並透過 `DATA_DIR` 找到 `app.dtlv`／`index.dtlv`。正式環境的容器裡沒有 `bb`，改用[維運手冊](ops.zh-TW.md#部署kamal)中的 `java … -m` 寫法。server 執行中可以直接執行 `bb user:*` 與 `bb token:*`；匯入語料則請在 server 執行時改用網頁的按鈕（見[匯入語料](#匯入語料)）。
+以下指令都在專案目錄下執行，並透過 `DATA_DIR` 找到 `app.dtlv`／`index.dtlv`。正式環境的容器裡沒有 `bb`，改用[維運手冊](ops.zh-TW.md#部署kamal)中的 `java … -m` 寫法。server 執行中可以直接執行 `bb user:*`、`bb token:*`、`bb acl:report` 與 `bb eval`；匯入語料則請在 server 執行時改用網頁的按鈕（見[匯入語料](#匯入語料)）。
 
 ## 使用者與群組
 

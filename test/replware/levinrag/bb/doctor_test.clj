@@ -104,8 +104,8 @@
         (let [[r] (doctor/check-permissions dir "")]
           (is (= :warn (:level r)))
           (is (str/includes? (:msg r) "只有 admin"))))))
-  (testing "a broken _collection.edn is a failure naming the file: ingest would skip it
-            and the directory would inherit its parent's groups"
+  (testing "a broken _collection.edn is a failure naming the file (ingest keeps
+            the documents it governs out of the index)"
     (doseq [[label text] [["unreadable" "{:read-groups [\"hr]}"]
                           ["not a map" "[\"hr\"]"]
                           ["unknown key" "{:read-group [\"hr\"]}"]

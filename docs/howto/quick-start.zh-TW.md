@@ -128,7 +128,7 @@ bb user:import my-eval/users.edn             # 每位新使用者的密碼只印
 bb acl:report --docs                         # 誰讀得到什麼
 ```
 
-`bb acl:report` 列出每個群組的文件數與擁有者、每位使用者讀得到幾份文件，並以 `[WARN]` 標出沒有任何使用者擁有的群組（通常是打錯字）以及只有 admin 讀得到的文件。繼續之前先處理這些警告。
+`bb acl:report` 列出每個群組的文件數與擁有者（加 `--docs` 會逐份列出文件）、每位使用者讀得到幾份文件，並以 `[WARN]` 標出沒有任何使用者擁有的群組（通常是打錯字）以及只有 admin 讀得到的文件。繼續之前先處理這些警告。
 
 ## 7. 在瀏覽器試用
 
@@ -139,6 +139,8 @@ bb serve
 開啟 http://localhost:8000，以其中一位使用者登入並提問。回答會以 `[1]`、`[2]` 引用段落；點一下就會開啟文件並跳到那一段。用 Ctrl-C 停止 server。畫面說明見[使用者手冊](user.zh-TW.md)。
 
 ## 8. 檢驗主張
+
+本節的指令可以在 `bb serve` 執行中跑（`bb eval`、`bb acl:report`、`bb user:*`、`bb token:*`；2026-09-25 多次驗證過）。`bb ingest` 和 `bb reindex` 不行：server 執行中請從「管理」頁匯入，或像 8.2 那樣在另一個 `DATA_DIR` 建第二份索引。
 
 先寫題目。路徑相對於語料目錄：
 
@@ -166,7 +168,7 @@ bb eval --questions my-eval/questions.edn --users my-eval/users.edn
 1. `bb acl:report --users my-eval/users.edn --docs` 列出預期的權限矩陣：哪位使用者讀得到哪份文件。對照你原本的意圖。
 2. eval 輸出中 `ACL leaks: 0`，結束狀態碼為 0。**只要有任何洩漏，`bb eval` 就以狀態碼 1 結束。** 每個有權限限制的目錄至少放一題 `:must-not-docs`，而且查詢要明顯對得上那份受限文件。
 3. 在瀏覽器以沒有權限的使用者登入，開啟 `http://localhost:8000/docs/<受限文件的路徑>`：看起來必須和一份不存在的文件完全一樣（404，絕不是 403）。
-4. 選做、更深入：`clojure -X:jvm-opts:test` 會執行端到端安全測試。它從索引推導出每一組「文件 × 不能讀它的使用者」，確認沒有任何 API 或網頁路徑會透露那份文件（搜尋、每個 eval 變體、回答、引用、交給模型的 prompt、文件檢視頁）。它使用內附的範例語料與 stub 模型，不需要模型端點。
+4. 選做、更深入：`env -u VLLM_CHAT_BASE_URL clojure -X:jvm-opts:test` 會執行全部測試（約 4–5 分鐘，附 coverage 報告），其中包括端到端安全測試。安全測試從索引推導出每一組「文件 × 不能讀它的使用者」，確認沒有任何 API 或網頁路徑會透露那份文件（搜尋、每個 eval 變體、回答、引用、交給模型的 prompt、文件檢視頁）。它使用內附的範例語料與 stub 模型；`clojure` 不讀 `.env`，而唯一一個使用真實模型的測試，只有在 shell 設了 `VLLM_CHAT_BASE_URL` 時才會跑，`env -u` 可以避免這一點。
 
 `acl:report` 的讀者和檢索過濾用的是同一個函式計算；權限在匯入時就和每份文件一起寫入，過濾發生在檢索層內，不是在 UI。
 
@@ -182,7 +184,7 @@ bb acl:report --users my-eval/users.edn --docs > /tmp/acl-original.txt
 diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 ```
 
-- 兩次 eval 的 recall／MRR／洩漏數應該完全相同（延遲會不同）。如果不同，代表模型不是確定性的（例如同一個 URL 背後換了模型），不是索引的問題。
+- 兩次 eval 的 recall／MRR／洩漏數應該完全相同（延遲會不同）；我們自己實跑時完全相同。如果 `./data` 已經做過很多次增量更新，向量索引的圖結構可能和全新建立的不同，semantic 通道出現極小的差異是可能的；差異很大通常代表模型換了（例如同一個 URL 背後換了模型）。
 - 權限必須完全相同：它只由語料檔案推導而來。
 - 帳號不在索引裡：它們在 `DATA_DIR/app.dtlv`，所以上面的指令都用 `--users`。
 - 如果要直接替換原本的索引：停止 server，執行 `bb reindex`。[維運手冊](ops.zh-TW.md#重建索引)有 server 不停機時的步驟。

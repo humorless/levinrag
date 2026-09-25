@@ -261,7 +261,7 @@ corpus/
 5. **無法照字面套用的設定一律收緊**（2026-09-25）：該文件不匯入（先前已匯入的會從索引移除），並列在報告的 `errors`；絕不退回目錄的群組。涵蓋：`_collection.edn` 無法解析、含有不只一個 EDN 值、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單——它所管轄的每一份文件（直到下層下一個有效宣告為止）都受影響；檔名看起來像、但不完全是 `_collection.edn` 的檔案（`_Collection.edn`、`collection.edn`、`_collections.edn`）也視為壞掉的設定；目錄名稱不會被 trim；以及 frontmatter 的 `read_groups` 不是清單（`read_groups: hr`）、該行沒有值（包括 YAML 多行清單）、拼錯（`read_group`、`read-groups`、`Read_Groups`、`readgroups`）、key 或清單項目加了引號、用了全形冒號、有縮排，或出現不只一次。frontmatter 區塊必須從第一行開始（允許 BOM），並以單獨一行的 `---` 或 `...` 結束；在第一個標題之前、卻不在這樣的區塊裡出現看起來像 `read_groups` 的行，也算錯誤（2026-09-25 審查）。
 6. **因其他原因重新匯入失敗的文件**（例如 embedding 端點掛掉）**會從索引移除**，直到某次匯入成功為止；否則它的舊版本會以舊的、可能較寬的群組繼續被搜到。依規則 5 擋下或依規則 6 移除的每份文件，除了列在報告的 `errors`，也會記一行 `WARN` log（`[INGEST] acl fail-closed: …`／`[INGEST] removed the stale copy of …`：路徑與原因，不含內容）。
 
-`bb acl:report [--users <檔案>] [--docs]` 顯示結果：每個群組有哪些文件、哪些使用者擁有它；每位使用者讀得到幾份文件；加 `--docs` 時列出每份文件的群組與讀得到的使用者。讀者以 `accessible-doc-ids` 計算，也就是檢索時過濾用的同一個函式。它會警告：文件用到、但沒有使用者擁有的群組；只有 admin 讀得到的文件；沒有群組的使用者；沒有文件使用的使用者群組；以及最近一次匯入的錯誤。使用者來自 `app.dtlv`，或用 `--users` 指定的使用者檔。只有路徑和群組名稱，不含文件內容。
+`bb acl:report [--users <檔案>] [--docs]` 顯示結果：每個群組有幾份文件、哪些使用者擁有它；每位使用者讀得到幾份文件；加 `--docs` 時列出每份文件的群組與讀得到的使用者。讀者以 `accessible-doc-ids` 計算，也就是檢索時過濾用的同一個函式。它會警告：文件用到、但沒有使用者擁有的群組；只有 admin 讀得到的文件；沒有群組的使用者；沒有文件使用的使用者群組；以及最近一次匯入的錯誤。使用者來自 `app.dtlv`，或用 `--users` 指定的使用者檔。只有路徑和群組名稱，不含文件內容。
 
 ### 7.3 Markdown 解析與切塊
 

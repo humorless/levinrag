@@ -6,7 +6,7 @@ Audience: the people who manage accounts, document permissions and ingests. For 
 
 **Most admin work happens on the command line and in files, not in the web UI.** The web `/admin` page offers only three things: running an ingest, viewing the latest ingest report, and browsing traces. Accounts and groups are managed with `bb` tasks; document permissions are written in files in the corpus directory.
 
-Run all the commands below from the project directory; they find `app.dtlv` / `index.dtlv` through `DATA_DIR`. There is no `bb` in the production container; use the `java … -m` form from the [Operations guide](ops.md#deployment-kamal) instead. You can run `bb user:*` and `bb token:*` directly while the server is running; to ingest the corpus while the server is running, use the button in the web UI instead (see [Ingesting the corpus](#ingesting-the-corpus)).
+Run all the commands below from the project directory; they find `app.dtlv` / `index.dtlv` through `DATA_DIR`. There is no `bb` in the production container; use the `java … -m` form from the [Operations guide](ops.md#deployment-kamal) instead. You can run `bb user:*`, `bb token:*`, `bb acl:report` and `bb eval` directly while the server is running; to ingest the corpus while the server is running, use the button in the web UI instead (see [Ingesting the corpus](#ingesting-the-corpus)).
 
 ## Users and groups
 

@@ -129,7 +129,7 @@ bb user:import my-eval/users.edn             # prints each new user's password o
 bb acl:report --docs                         # who can read what
 ```
 
-`bb acl:report` lists every group with its documents and holders, every user with the number of documents they can read, and `[WARN]` lines for groups no user holds (usually a typo) and documents only admins can read. Fix those before going on.
+`bb acl:report` lists every group with its number of documents and its holders (`--docs` adds one line per document), every user with the number of documents they can read, and `[WARN]` lines for groups no user holds (usually a typo) and documents only admins can read. Fix those before going on.
 
 ## 7. Try it in the browser
 
@@ -140,6 +140,8 @@ bb serve
 Open http://localhost:8000, log in as one of your users, ask a question. Answers cite passages as `[1]`, `[2]`; clicking one opens the document at that passage. Stop the server with Ctrl-C. The [User guide](user.md) explains the screen.
 
 ## 8. Verify the claims
+
+The commands in this section can run while `bb serve` is running (`bb eval`, `bb acl:report`, `bb user:*`, `bb token:*`; checked repeatedly on 2026-09-25). `bb ingest` and `bb reindex` cannot: while the server runs, ingest from the "管理" (Admin) page, or build a second index in another `DATA_DIR` as in 8.2.
 
 Write your questions first. Paths are relative to the corpus directory:
 
@@ -167,7 +169,7 @@ The table, the per-stage latencies and the path of a results file (`eval/results
 1. `bb acl:report --users my-eval/users.edn --docs` shows the intended matrix: which user reads which document. Check it against what you meant.
 2. In the eval output, `ACL leaks: 0` and exit status 0. **Any leak makes `bb eval` exit with status 1.** Add at least one `:must-not-docs` question per restricted directory, with a query that clearly matches the restricted document.
 3. In the browser, log in as a user without access and open `http://localhost:8000/docs/<path of a restricted document>`: it must look exactly like a document that does not exist (404, never 403).
-4. Optional, deeper: `clojure -X:jvm-opts:test` runs the end-to-end security suite. It derives every "document × user who may not read it" pair from the index and checks that no API or web path reveals the document (search, every eval variant, answers, citations, the prompt given to the model, the document viewer). It runs on the bundled sample corpus with stub models, so it needs no model endpoints.
+4. Optional, deeper: `env -u VLLM_CHAT_BASE_URL clojure -X:jvm-opts:test` runs the whole test suite (about 4–5 minutes, with a coverage report), including the end-to-end security suite. That suite derives every "document × user who may not read it" pair from the index and checks that no API or web path reveals the document (search, every eval variant, answers, citations, the prompt given to the model, the document viewer). It runs on the bundled sample corpus with stub models; `clojure` does not read `.env`, and one test that uses real models runs only when `VLLM_CHAT_BASE_URL` is set in the shell, which `env -u` prevents.
 
 Readers in `acl:report` are computed with the same function retrieval filters with; the permissions are stored with each document at ingest time, and filtering happens inside retrieval, not in the UI.
 
@@ -183,7 +185,7 @@ bb acl:report --users my-eval/users.edn --docs > /tmp/acl-original.txt
 diff /tmp/acl-original.txt /tmp/acl-rebuild.txt && echo "same permissions"
 ```
 
-- The recall / MRR / leak numbers of the two eval runs should be identical (latencies will differ). A difference means the models are not deterministic (for example, a different model loaded at the same URL), not that the index is.
+- The recall / MRR / leak numbers of the two eval runs should be identical (latencies will differ); they were in our own run. If `./data` has been updated incrementally many times, the vector index's graph may be built in a different order than a fresh one, so a tiny difference in the semantic channel is possible; a large one usually means the models changed (for example, a different model loaded at the same URL).
 - The permissions must be identical: they are derived from the corpus files only.
 - Accounts are not in the index: they live in `DATA_DIR/app.dtlv`, which is why the commands above use `--users`.
 - To replace the index in place instead: stop the server, run `bb reindex`. The [Operations guide](ops.md#rebuilding-the-index) has the steps for doing it while the server keeps serving.

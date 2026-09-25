@@ -1299,3 +1299,27 @@ User decision:
   ghaction-github-runtime v4; setup-ruby v1 already runs on Node 24);
   the inputs used are unchanged. Verified locally: the lint-fmt chain
   passes; the workflows themselves are verified by the first push.
+
+## 2026-09-25 — Review M1 / M4 / L4 / L5 / L10: docs match the behaviour
+
+- M1: ops.md and doctor's test still described the old fail-open
+  behaviour; now they say the governed documents are kept out.
+- M4: the quick-start ran `bb eval` / `bb acl:report` while `bb serve` was
+  up, and the docs never said whether that is safe. `index-conn/open` is
+  `d/get-conn` with the schema, so it is not provably read-only; what we
+  have is repeated observation on 2026-09-25 (eval, acl:report, user:*,
+  token:* next to a serving server, health and queries fine afterwards).
+  The docs now say exactly that, and keep `bb ingest` / `bb reindex` off a
+  served `DATA_DIR`. A read-only open is a possible follow-up.
+- L4: "the security suite needs no model endpoints" was false with
+  `VLLM_CHAT_BASE_URL` exported (one `:vllm` test then runs); the command
+  is now `env -u VLLM_CHAT_BASE_URL clojure -X:jvm-opts:test`, described as
+  the whole suite with coverage.
+- L5: `acl:report` prints a document count per group, not the documents;
+  the list of tasks that read `.env` now includes doctor, user:import and
+  acl:report.
+- L10: "identical recall after a rebuild" held in our run, but an index
+  updated incrementally many times may have a differently built vector
+  graph; the guide now says a tiny semantic-channel difference is
+  possible.
+- Not done (user agreed): L9, a guard against demoting the last admin.

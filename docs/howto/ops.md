@@ -46,7 +46,7 @@ bb serve
 
 `bb serve` first builds the web UI's CSS when it is missing (a fresh checkout has none; the build needs `tailwindcss`, which `mise install` provides).
 
-The `bb` tasks that run the app (`serve`, `ingest`, `reindex`, `eval`, `vllm:check`, `user:*`, `token:*`) read `.env` from the project directory and pass its variables to the JVM they start. A variable already set in the shell wins over `.env`, so `DATA_DIR=/tmp/other bb reindex` still works. A malformed line in `.env` stops those tasks with its line number. `.env` is gitignored; `.env.example` lists every variable. The server itself never reads `.env`: without `bb`, export the variables and run
+The `bb` tasks that run the app (`doctor`, `serve`, `ingest`, `reindex`, `eval`, `vllm:check`, `user:*` including `user:import`, `token:*`, `acl:report`) read `.env` from the project directory and pass its variables to the JVM they start. A variable already set in the shell wins over `.env`, so `DATA_DIR=/tmp/other bb reindex` still works. A malformed line in `.env` stops those tasks with its line number. `.env` is gitignored; `.env.example` lists every variable. The server itself never reads `.env`: without `bb`, export the variables and run
 
 ```bash
 clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-extras/run-system {:profile :default :config-path \"config.edn\"}) @(promise)"
@@ -54,7 +54,7 @@ clojure -M:jvm-opts -e "(require '[integrant-extras.core :as ig-extras]) (ig-ext
 
 Production: the uberjar (`bb build` → `target/standalone.jar`) runs with the `:prod` profile on port 80, with `Secure` cookies enabled.
 
-Before the first start, `bb doctor` checks the Java and Clojure versions, `.env`, the required variables, the corpus directory (and PDF / Office files that would not be ingested), every `_collection.edn` (a file ingest cannot read is skipped, and its directory silently inherits the parent's groups), the root's default groups, and finally runs `bb vllm:check`. Each problem comes with a one-line fix; any `[FAIL]` gives a non-zero exit status.
+Before the first start, `bb doctor` checks the Java and Clojure versions, `.env`, the required variables, the corpus directory (and PDF / Office files that would not be ingested), every `_collection.edn` and look-alike file name (ingest keeps the documents a broken one governs out of the index), the root's default groups, and finally runs `bb vllm:check`. Each problem comes with a one-line fix; any `[FAIL]` gives a non-zero exit status.
 
 Check the models before starting: `bb vllm:check`. It sends one request to each of the three endpoints, and probes rerank with a 1500-character document. If the reranker's context is set too small, the short-string test passes but the long document gives `[FAIL] rerank-long`; if you leave that unfixed, every query runs in the `rerank_failed` degraded mode.
 
