@@ -33,33 +33,36 @@ Each framework can do what the others do; the difference is only the center. Lev
 ```mermaid
 flowchart LR
   C[Corpus directory<br/>single source of truth] -->|load| T
-  subgraph T[One transaction]
+  subgraph T[One transaction per document]
     direction TB
     K[Sections and chunks]
     F[Full-text index]
     V[Vectors]
     P[Permissions<br/>computed at write time]
-    L[Link graph]
   end
   T --> X[(Datalevin<br/>index.dtlv)]
+  T -->|second pass| L[Link graph] --> X
   X -->|can be discarded and rebuilt at any time| C
 ```
 
-Chunks, the full-text index, vectors, permissions and the link graph are all derived data computed from the corpus, much like "load, then transform" in ELT for a data warehouse. They are produced in the same embedded database, in the same transaction, so there is never an intermediate state such as "vectors updated, permissions not yet". The index can be fully rebuilt from the corpus at any time; accounts are stored separately and are not affected by a rebuild.
+Chunks, the full-text index, vectors, permissions and the link graph are all derived data computed from the corpus, much like "load, then transform" in ELT for a data warehouse. They live in the same embedded database, and everything derived from one document (sections, chunks, full-text entries, vectors, permissions) is written in one transaction, so a document is never seen in an intermediate state such as "vectors updated, permissions not yet". The unit of atomicity is the document, not the ingest run: documents are committed one at a time, documents whose files are gone are removed at the end of the run, and links between documents are resolved in a second pass. While a run is in progress, readers may see some documents already updated and others not yet; a permission change on a collection reaches its documents one by one in the same way. The index can be fully rebuilt from the corpus at any time; accounts are stored separately and are not affected by a rebuild.
 
-**Why an embedded database fits here**: the usual concerns about embedded databases (backups, high availability, operational maturity) mostly apply when the database holds the single source of truth. In LevinRAG, `index.dtlv` is only derived data and can be discarded as a whole and rebuilt at any time: the index needs no backup; changing the embedding model, the tokenizer or the schema means one rebuild; tests build a fresh index in a temporary directory and delete it afterwards; the same corpus can be built into indexes with different settings and compared side by side. This also lowers the risk of choosing a relatively niche database: the data cannot get trapped in it.
+**Why an embedded database fits here**: the usual concerns about embedded databases (backups, high availability, operational maturity) mostly apply when the database holds the single source of truth. In LevinRAG, `index.dtlv` is only derived data and can be discarded as a whole and rebuilt at any time: the index needs no backup; changing the embedding model, the tokenizer or the schema means one rebuild; tests build a fresh index in a temporary directory and delete it afterwards; the same corpus can be built into indexes with different settings and compared side by side. Apart from the vectors, a rebuild is deterministic: sections, chunk boundaries and ids, permissions and links are computed from the corpus and the settings alone, so a rebuild after changing the chunker differs only where the chunker changed. Vectors come from the embedding server, and vector search is approximate (HNSW), so two builds can rank a few candidates differently. This also lowers the risk of choosing a relatively niche database: the data cannot get trapped in it.
 
 There are three limits: accounts, tokens and traces (`app.dtlv`) are not derived data and still need backups; the cost of a rebuild lies mainly in recomputing embeddings, which may take hours for a large corpus (not yet measured); the rebuild can run in another directory while the server keeps serving, and switching to the new index currently takes one restart (about a dozen seconds measured locally); switching without a restart is on the to-do list.
 
 ## Three invariants
 
 1. **Consistency**: all derived data of a document is written together and deleted together.
+   - A deleted file leaves the index at the next ingest run, in one transaction; from then on no search, answer or document-viewer path can reach it.
+   - What stays behind is outside the index: traces in `app.dtlv` keep each query and the answer text, which may quote the document, and there is no tool to purge them yet.
 2. **Permissions**: permissions are part of the retrieval data model, not a filter in the UI.
    - Filtering happens inside the retrieval layer; every candidate that leaves the retrieval layer has already been filtered.
-   - More candidates are fetched than needed and then filtered, so recall may fall short for users with few permissions; when that happens, it is flagged in the trace.
+   - The full-text and vector engines cannot filter by document before ranking, so more candidates are fetched than needed and then filtered. Recall may still fall short for users with few permissions; when that happens, it is flagged in the trace.
    - The security tests derive the complete "document × user without permission" matrix from the index and check every cell: the document must not appear in search, in Q&A, in the prompt sent to the model, or in the document viewer.
    - Observability must not become a side channel either: traces are stored in full, but when a regular user views their own trace, they do not see the pre-ACL hit count; admins keep all the numbers, to diagnose recall shortfalls caused by permissions.
 3. **Explainability**: the rank and score of every candidate at every stage are recorded in the trace and shown in the Debug panel. This is the equivalent of a database's execution plan and provenance, and it can answer "why this document, and why not that one". It is the core tool for understanding and tuning RAG.
+   - Provenance goes down to the source text: every chunk is an exact character range of the source file, and every passage handed to the model is made of such ranges. A citation opens the document viewer with the cited chunk highlighted, and the viewer warns when the file has changed since it was indexed. The limit: a citation points to a passage (a few chunks), not to a sentence, and only citation numbers are validated, not whether the passage supports the claim.
 
 ## Why Datalevin
 

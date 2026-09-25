@@ -25,11 +25,11 @@ flowchart LR
     D1 --> M[(Metadata / permissions DB)]
   end
   subgraph B[LevinRAG]
-    D2[Corpus] --> T[One transaction:<br/>chunks · full-text index · vectors ·<br/>permissions · link graph] --> X[(Datalevin)]
+    D2[Corpus] --> T[One transaction per document:<br/>chunks · full-text index ·<br/>vectors · permissions] --> X[(Datalevin)]
   end
 ```
 
-- **Derived data is produced in one transaction**; the index is only derived data and can be thrown away and rebuilt at any time.
+- **Each document's derived data is produced in one transaction**; the index is only derived data and can be thrown away and rebuilt at any time.
 - **Permissions are an invariant of retrieval**: computed at write time and filtered inside the retrieval layer, not enforced by the UI; the security tests derive a "document × unauthorized user" matrix from the index and verify every cell.
 - **Retrieval is explainable**: the rank and score of every candidate at every stage are recorded in the trace, so you can answer "why this document, and why not that one".
 - **Runs fully on a local machine**: one JVM plus three model endpoints; tests use stub models.
