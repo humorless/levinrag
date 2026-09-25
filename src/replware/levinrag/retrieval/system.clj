@@ -2,12 +2,12 @@
   "Integrant component bundling what search and answer need: the
    Retriever over index.dtlv, the rerank and chat functions and pipeline
    options."
-  (:require [replware.levinrag.config :as config]
+  (:require [integrant.core :as ig]
+            [replware.levinrag.config :as config]
             [replware.levinrag.llm.chat :as chat]
             [replware.levinrag.llm.embed :as embed]
             [replware.levinrag.llm.rerank-client :as rerank-client]
-            [replware.levinrag.retrieval.datalevin :as rd]
-            [integrant.core :as ig]))
+            [replware.levinrag.retrieval.datalevin :as rd]))
 
 (defn- chat-fn
   "(fn [messages opts] response) over the configured chat endpoint;
@@ -17,7 +17,7 @@
          :as cfg} (config/chat-config)]
     (when-not base-url
       (throw (ex-info "VLLM_CHAT_BASE_URL is not set" {:llm/endpoint :chat
-                                                        :http/status nil})))
+                                                       :http/status nil})))
     (chat/complete! cfg messages (update opts :extra-body #(or % extra-body)))))
 
 (defmethod ig/init-key ::search

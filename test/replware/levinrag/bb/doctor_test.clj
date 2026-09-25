@@ -43,9 +43,12 @@
     (let [css (fn [m] (get (levels (doctor/check-tools (merge {:java-version "openjdk version \"21\""
                                                                :clojure? true} m)))
                            "css"))]
-      (is (= :ok (css {:css? true :tailwind? false})))
-      (is (= :ok (css {:css? false :tailwind? true})))
-      (is (= :warn (css {:css? false :tailwind? false}))))))
+      (is (= :ok (css {:css? true
+                       :tailwind? false})))
+      (is (= :ok (css {:css? false
+                       :tailwind? true})))
+      (is (= :warn (css {:css? false
+                         :tailwind? false}))))))
 
 (deftest test-check-settings
   (testing "chat endpoint and model are required; the rest have defaults"

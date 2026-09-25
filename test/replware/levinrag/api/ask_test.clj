@@ -7,6 +7,8 @@
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
+            [integrant.core :as ig]
+            [jsonista.core :as json]
             [replware.levinrag.auth.token :as token]
             [replware.levinrag.auth.users :as users]
             [replware.levinrag.config :as config]
@@ -19,9 +21,7 @@
             [replware.levinrag.retrieval.system :as system]
             [replware.levinrag.server :as server]
             [replware.levinrag.tmp :as tmp]
-            [replware.levinrag.trace :as trace]
-            [integrant.core :as ig]
-            [jsonista.core :as json]))
+            [replware.levinrag.trace :as trace]))
 
 (use-fixtures :once fx/with-sample-index)
 
@@ -105,7 +105,7 @@
         (is (not (str/includes? (pr-str (:trace/stages t)) (get-in body [:citations 0 :text])))))))
   (testing "debug adds candidates"
     (let [body (:body (post (stub-search (chat-reply "x[1]")) {:query "特休"
-                                                              :debug true} "alice"))]
+                                                               :debug true} "alice"))]
       (is (seq (:candidates body)))
       (is (every? #(contains? % :chunk_id) (:candidates body))))))
 

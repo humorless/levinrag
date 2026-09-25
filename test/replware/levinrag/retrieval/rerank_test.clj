@@ -3,9 +3,9 @@
    HTTP 200 with an error payload all degrade and are flagged). Failure
    cases go through the real rerank client against a stub server."
   (:require [clojure.test :refer [deftest is]]
+            [jsonista.core :as json]
             [replware.levinrag.llm.rerank-client :as rr]
             [replware.levinrag.retrieval.rerank :as rerank]
-            [jsonista.core :as json]
             [ring.adapter.jetty :as jetty]))
 
 (def ^:private cands

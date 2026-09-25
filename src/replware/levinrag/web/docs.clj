@@ -5,8 +5,7 @@
   (:require [datalevin.core :as d]
             [replware.levinrag.docs :as docs]
             [replware.levinrag.ingest.writer :as writer]
-            [replware.levinrag.web.layout :as layout]
-))
+            [replware.levinrag.web.layout :as layout]))
 
 (defn page
   [{:keys [context principal path-params query-params]

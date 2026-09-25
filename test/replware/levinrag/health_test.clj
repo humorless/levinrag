@@ -5,14 +5,14 @@
   (:require [clj-http.client :as http]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
+            [integrant-extras.tests :as ig-extras]
+            [jsonista.core :as json]
+            [reitit-extras.tests :as reitit-extras]
             [replware.levinrag.fixtures :as fx]
             [replware.levinrag.health :as health]
             [replware.levinrag.test-utils :as test-utils]
             [replware.levinrag.tmp :as tmp]
-            [replware.levinrag.web-fixtures :as wf]
-            [integrant-extras.tests :as ig-extras]
-            [jsonista.core :as json]
-            [reitit-extras.tests :as reitit-extras]))
+            [replware.levinrag.web-fixtures :as wf]))
 
 (use-fixtures :once fx/with-sample-index)
 (use-fixtures :each wf/with-app-users)
@@ -111,7 +111,9 @@
                                 :rerank-fn hang
                                 :chat-fn hang} 300)
         ms (quot (- (System/nanoTime) t0) 1000000)]
-    (is (= {:embed "down" :rerank "down" :chat "down"} r))
+    (is (= {:embed "down"
+            :rerank "down"
+            :chat "down"} r))
     (is (< ms 1500) (str ms " ms"))))
 
 (deftest test-chat-probe-checks-the-response

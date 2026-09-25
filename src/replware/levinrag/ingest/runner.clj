@@ -6,11 +6,11 @@
   (:require [clojure.edn :as edn]
             [clojure.java.io :as io]
             [clojure.tools.logging :as log]
+            [integrant.core :as ig]
             [replware.levinrag.config :as config]
             [replware.levinrag.ingest.job :as job]
             [replware.levinrag.ingest.report :as report]
-            [replware.levinrag.llm.embed :as embed]
-            [integrant.core :as ig]))
+            [replware.levinrag.llm.embed :as embed]))
 
 (def ^:private history-size 20)
 

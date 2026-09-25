@@ -8,10 +8,10 @@
 (defn handler
   [{:keys [context principal path-params]}]
   (if-let [{:keys [doc chunks]} (let [db (d/db (:index-conn context))
-                                        path (:path path-params)]
-                                    (if (:admin? principal)
-                                      (docs/lookup-admin db path)
-                                      (docs/lookup-acl db principal path)))]
+                                      path (:path path-params)]
+                                  (if (:admin? principal)
+                                    (docs/lookup-admin db path)
+                                    (docs/lookup-acl db principal path)))]
     {:status 200
      :body {:doc_path (:doc/path doc)
             :title (:doc/title doc)

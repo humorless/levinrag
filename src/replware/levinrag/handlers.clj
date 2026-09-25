@@ -1,7 +1,7 @@
 (ns replware.levinrag.handlers
-  (:require [replware.levinrag.health :as health]
+  (:require [reitit-extras.core :as reitit-extras]
+            [replware.levinrag.health :as health]
             [replware.levinrag.views :as views]
-            [reitit-extras.core :as reitit-extras]
             [ring.util.response :as response]))
 
 (defn default-handler

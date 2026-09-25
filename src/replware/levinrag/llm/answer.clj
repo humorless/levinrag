@@ -74,7 +74,8 @@
     :content system}
    {:role "user"
     :content (str "<sources>\n"
-                  (str/join "\n\n" (for [{:keys [n text] :as p} passages]
+                  (str/join "\n\n" (for [{:keys [n text]
+                                          :as p} passages]
                                      (str "[" n "] " (neutralize (:doc/title p)) "｜" (neutralize (:section/trail p))
                                           "\n" (neutralize text))))
                   "\n</sources>\n\n問題：" query)}])

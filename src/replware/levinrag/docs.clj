@@ -21,15 +21,15 @@
    {:chunk/id :chunk/ordinal :chunk/char-start :chunk/char-end :section/trail}."
   [db eid]
   {:doc (d/pull db [:doc/path :doc/title :doc/hash :doc/tags] eid)
-       :chunks (->> (d/q '[:find [(pull ?c [:chunk/id :chunk/ordinal :chunk/char-start :chunk/char-end
-                                            {:chunk/section [:section/trail]}]) ...]
-                           :in $ ?d :where [?c :chunk/doc ?d]]
-                         db eid)
-                    (map (fn [c] (-> c
-                                     (assoc :section/trail (get-in c [:chunk/section :section/trail]))
-                                     (dissoc :chunk/section))))
-                    (sort-by (juxt :chunk/char-start :chunk/ordinal))
-                    vec)})
+   :chunks (->> (d/q '[:find [(pull ?c [:chunk/id :chunk/ordinal :chunk/char-start :chunk/char-end
+                                        {:chunk/section [:section/trail]}]) ...]
+                       :in $ ?d :where [?c :chunk/doc ?d]]
+                     db eid)
+                (map (fn [c] (-> c
+                                 (assoc :section/trail (get-in c [:chunk/section :section/trail]))
+                                 (dissoc :chunk/section))))
+                (sort-by (juxt :chunk/char-start :chunk/ordinal))
+                vec)})
 
 (defn lookup-admin
   "doc-view for `path` with no ACL check — for admins only. A separate

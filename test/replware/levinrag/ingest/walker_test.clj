@@ -175,7 +175,6 @@
         (doseq [f (reverse (file-seq tmp-dir))]
           (.delete f))))))
 
-
 ;; --- broken permissions files (fail closed) ---
 
 (defn- with-tree [files f]
@@ -194,7 +193,8 @@
                         ["unsupported key (there are no deny/allow overrides)" "{:read-groups [\"hr\"] :acl-overrides []}"]
                         ["groups not strings" "{:read-groups [hr]}"]
                         ["groups not a list" "{:read-groups \"hr\"}"]]]
-    (with-tree {"_collection.edn" "{:read-groups [\"all\"]}" "hr/_collection.edn" text}
+    (with-tree {"_collection.edn" "{:read-groups [\"all\"]}"
+                "hr/_collection.edn" text}
       (fn [dir]
         (let [{:keys [edns broken]} (walker/scan-collection-edns dir)]
           (is (= {"" {:read-groups ["all"]}} edns) label)

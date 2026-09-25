@@ -1,9 +1,9 @@
 (ns replware.levinrag.test-utils
   (:require [hickory.core :as hickory]
+            [integrant-extras.tests :as ig-extras]
             [replware.levinrag.db.app-conn :as app-conn]
             [replware.levinrag.db.index-conn :as index-conn]
-            [replware.levinrag.server :as server]
-            [integrant-extras.tests :as ig-extras]))
+            [replware.levinrag.server :as server]))
 
 (def ^:const TEST-CSRF-TOKEN "test-csrf-token")
 (def ^:const TEST-SECRET-KEY "test-secret-key")

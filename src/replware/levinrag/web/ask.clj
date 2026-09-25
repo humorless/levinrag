@@ -170,8 +170,8 @@
       (try
         (let [{:keys [res trace-id]} (api-ask/answer-and-trace! context principal query (get-in context [:search :opts]))]
           (fragment (result-view res (when debug? (some->> (trace/fetch (d/db (:app-conn context)) trace-id)
-                                                                   (trace/view-for principal)))
-                                   debug?)))
+                                                           (trace/view-for principal)))
+                                 debug?)))
         (catch clojure.lang.ExceptionInfo e
           (if-let [endpoint (:llm/endpoint (ex-data e))]
             (let [id (trace/write-failure! (:app-conn context) {:username (:username principal)

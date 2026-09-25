@@ -3,9 +3,9 @@
    username; the principal is re-read from app.dtlv on every request so
    group and admin changes apply at once."
   (:require [datalevin.core :as d]
+            [reitit-extras.core :as reitit-extras]
             [replware.levinrag.auth.users :as users]
             [replware.levinrag.web.layout :as layout]
-            [reitit-extras.core :as reitit-extras]
             [ring.util.codec :as codec]
             [ring.util.response :as response]))
 

@@ -5,11 +5,11 @@
   (:require [clojure.tools.logging :as log]
             [datalevin.core :as d]
             [datalevin.udf :as udf]
+            [integrant-extras.core :as ig-extras]
+            [integrant.core :as ig]
             [replware.levinrag.config :as config]
             [replware.levinrag.db.schema :as schema]
-            [replware.levinrag.search.analyzer :as analyzer]
-            [integrant-extras.core :as ig-extras]
-            [integrant.core :as ig]))
+            [replware.levinrag.search.analyzer :as analyzer]))
 
 (defonce ^:private udf-registry
   (doto (udf/create-registry)

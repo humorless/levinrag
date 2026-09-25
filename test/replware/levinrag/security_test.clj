@@ -11,17 +11,17 @@
             [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
+            [jsonista.core :as json]
             [replware.levinrag.auth.token :as token]
-            [replware.levinrag.eval.harness :as harness]
             [replware.levinrag.db.index-conn :as index-conn]
+            [replware.levinrag.eval.harness :as harness]
             [replware.levinrag.fixtures :as fx]
             [replware.levinrag.ingest.job :as job]
             [replware.levinrag.retrieval.datalevin :as rd]
             [replware.levinrag.retrieval.pipeline :as pipeline]
             [replware.levinrag.tmp :as tmp]
             [replware.levinrag.web-client :as wc]
-            [replware.levinrag.web-fixtures :as wf]
-            [jsonista.core :as json]))
+            [replware.levinrag.web-fixtures :as wf]))
 
 (use-fixtures :once fx/with-sample-index)
 (use-fixtures :each wf/with-app-users)
@@ -131,17 +131,17 @@
       (testing (str user " × " path " × " (clip q 20))
         (testing "negative control: admin finds the doc with this query"
           (is (contains? (doc-paths (:body (api h (tok "admin") :post "/api/v1/search" {:query q
-                                                                                      :final_k 50})))
+                                                                                        :final_k 50})))
                          path)))
         (doseq [graph [true false]]
           (let [paths (doc-paths (:body (api h (tok user) :post "/api/v1/search" {:query q
-                                                                               :final_k 50
-                                                                               :graph graph})))]
+                                                                                  :final_k 50
+                                                                                  :graph graph})))]
             (is (not (contains? paths path)) (str "search graph=" graph))
             (is (every? readable? paths) (str "search graph=" graph))))
         (reset! seen [])
         (let [paths (doc-paths (:body (api h (tok user) :post "/api/v1/ask" {:query q
-                                                                          :debug true})))
+                                                                             :debug true})))
               ;; the user's own question is echoed after </sources>; only
               ;; what retrieval put in front of the model counts
               prompt (str/join "\n" (for [m (apply concat @seen)]
@@ -209,7 +209,7 @@
     (doseq [q ["特休" "SKU-A1234" "員工手冊" "VPN"]]
       (let [search (:body (api h (tok "nobody") :post "/api/v1/search" {:query q}))
             ask (:body (api h (tok "nobody") :post "/api/v1/ask" {:query q
-                                                                :debug true}))]
+                                                                  :debug true}))]
         (is (empty? (:passages search)) q)
         (is (empty? (:candidates search)) q)
         (is (true? (:no_evidence ask)) q)
@@ -249,7 +249,8 @@
         idx (tmp/dir "acl-fail-closed-index")
         conn (index-conn/open idx fx/dims)
         put! (fn [p text] (io/make-parents (io/file dir p)) (spit (io/file dir p) text))
-        ingest! #(job/ingest! conn {:corpus-dir dir :embed-fn fx/hash-embed})
+        ingest! #(job/ingest! conn {:corpus-dir dir
+                                    :embed-fn fx/hash-embed})
         indexed #(set (keys (fx/doc-groups conn)))
         error-paths (fn [rep] (set (map :path (:errors rep))))]
     (try

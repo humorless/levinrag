@@ -1,7 +1,5 @@
 (ns replware.levinrag.server
   (:require [clojure.tools.logging :as log]
-            [replware.levinrag.handlers :as handlers]
-            [replware.levinrag.routes :as app-routes]
             [integrant-extras.core :as ig-extras]
             [integrant.core :as ig]
             [muuntaja.core :as muuntaja-core]
@@ -13,6 +11,8 @@
             [reitit.ring.middleware.multipart :as ring-multipart]
             [reitit.ring.middleware.muuntaja :as muuntaja]
             [reitit.ring.middleware.parameters :as ring-parameters]
+            [replware.levinrag.handlers :as handlers]
+            [replware.levinrag.routes :as app-routes]
             [ring.adapter.jetty :as jetty]
             [ring.middleware.content-type :as content-type]
             [ring.middleware.cookies :as ring-cookies]

@@ -64,7 +64,7 @@
   (let [c (wc/client (wf/handler))]
     (wc/request! c :get "/login")
     (is (= 403 (:status (wc/request! c :post "/login" :form {"username" "alice"
-                                                           "password" "alice-pw"})))))
+                                                             "password" "alice-pw"})))))
   (let [c (wf/logged-in "alice")]
     (is (= 403 (:status (wc/request! c :post "/logout" :form {}))))))
 

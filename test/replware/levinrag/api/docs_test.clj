@@ -3,11 +3,11 @@
    404 (not 403) for unreadable docs."
   (:require [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
+            [jsonista.core :as json]
             [replware.levinrag.auth.token :as token]
             [replware.levinrag.docs :as docs]
             [replware.levinrag.fixtures :as fx]
-            [replware.levinrag.web-fixtures :as wf]
-            [jsonista.core :as json]))
+            [replware.levinrag.web-fixtures :as wf]))
 
 (use-fixtures :once fx/with-sample-index)
 (use-fixtures :each wf/with-app-users)

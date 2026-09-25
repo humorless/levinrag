@@ -4,14 +4,14 @@
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
+            [jsonista.core :as json]
             [replware.levinrag.auth.token :as token]
             [replware.levinrag.auth.users :as users]
             [replware.levinrag.fixtures :as fx]
             [replware.levinrag.retrieval.datalevin :as rd]
             [replware.levinrag.server :as server]
             [replware.levinrag.tmp :as tmp]
-            [replware.levinrag.trace :as trace]
-            [jsonista.core :as json]))
+            [replware.levinrag.trace :as trace]))
 
 (use-fixtures :once fx/with-sample-index)
 

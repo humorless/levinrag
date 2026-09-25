@@ -72,7 +72,8 @@
         _ (writer/upsert-collections! conn (writer/collection-dirs on-disk edns) edns root-read-groups)
         indexed (indexed-docs (d/db conn))
         opts (assoc opts :chunk-config chunk-config)
-        results (mapv (fn [{:keys [rel-path acl-error] :as file}]
+        results (mapv (fn [{:keys [rel-path acl-error]
+                            :as file}]
                         (try
                           (if acl-error
                             ;; fail closed (SPEC.md §7.2 rule 5): never index

@@ -2,10 +2,10 @@
   "POST /api/v1/ingest and GET /api/v1/ingest/{job_id} (SPEC.md §11):
    admin only (404 otherwise), one job at a time (409)."
   (:require [clojure.test :refer [deftest is use-fixtures]]
+            [jsonista.core :as json]
             [replware.levinrag.auth.token :as token]
             [replware.levinrag.fixtures :as fx]
-            [replware.levinrag.web-fixtures :as wf]
-            [jsonista.core :as json]))
+            [replware.levinrag.web-fixtures :as wf]))
 
 (use-fixtures :once fx/with-sample-index)
 (use-fixtures :each wf/with-app-users)

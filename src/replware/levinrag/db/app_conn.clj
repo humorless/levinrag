@@ -3,9 +3,9 @@
    users, tokens and traces (SPEC.md D1). Never touched by `bb reindex`."
   (:require [clojure.tools.logging :as log]
             [datalevin.core :as d]
-            [replware.levinrag.db.schema :as schema]
             [integrant-extras.core :as ig-extras]
-            [integrant.core :as ig]))
+            [integrant.core :as ig]
+            [replware.levinrag.db.schema :as schema]))
 
 (defmethod ig/assert-key ::app-conn
   [_ params]

@@ -4,11 +4,11 @@
   (:require [clojure.java.io :as io]
             [clojure.test :refer [deftest is testing]]
             [datalevin.core :as d]
+            [integrant.core :as ig]
             [replware.levinrag.db.index-conn :as index-conn]
             [replware.levinrag.fixtures :as fx]
             [replware.levinrag.ingest.runner :as runner]
-            [replware.levinrag.tmp :as tmp]
-            [integrant.core :as ig]))
+            [replware.levinrag.tmp :as tmp]))
 
 (defn wait-done
   "Poll until job `id` is no longer :running (≤ 30 s); returns the job."

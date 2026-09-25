@@ -2,11 +2,11 @@
   "GET /api/v1/traces/{id} (SPEC.md §11): admin or the trace's owner;
    anyone else and unknown ids → 404."
   (:require [clojure.test :refer [deftest is use-fixtures]]
+            [jsonista.core :as json]
             [replware.levinrag.auth.token :as token]
             [replware.levinrag.fixtures :as fx]
             [replware.levinrag.trace :as trace]
-            [replware.levinrag.web-fixtures :as wf]
-            [jsonista.core :as json]))
+            [replware.levinrag.web-fixtures :as wf]))
 
 (use-fixtures :once fx/with-sample-index)
 (use-fixtures :each wf/with-app-users)

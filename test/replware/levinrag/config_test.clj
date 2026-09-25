@@ -1,9 +1,9 @@
 (ns replware.levinrag.config-test
   (:require [clojure.test :refer [deftest is]]
-            [replware.levinrag.config :as config]
-            [replware.levinrag.retrieval.system]
+            [integrant-extras.core :as ig-extras]
             [integrant.core :as ig]
-            [integrant-extras.core :as ig-extras]))
+            [replware.levinrag.config :as config]
+            [replware.levinrag.retrieval.system]))
 
 (defn- with-env [m f]
   (with-redefs [config/env (fn [k] (get m k))] (f)))
@@ -41,7 +41,7 @@
   (with-env {"VLLM_EMBED_TIMEOUT_MS" "2m"}
     #(is (thrown-with-msg? clojure.lang.ExceptionInfo #"VLLM_EMBED_TIMEOUT_MS"
                            (ig/init-key :replware.levinrag.retrieval.system/search {:index-conn nil
-                                                                            :opts {}})))))
+                                                                                    :opts {}})))))
 
 (deftest test-dirs-single-source
   ;; server, runner and both DBs take their paths from one config key
@@ -71,7 +71,7 @@
   (with-env {"VLLM_CHAT_EXTRA_BODY" "not json"}
     #(is (thrown-with-msg? clojure.lang.ExceptionInfo #"VLLM_CHAT_EXTRA_BODY"
                            (ig/init-key :replware.levinrag.retrieval.system/search {:index-conn nil
-                                                                            :opts {}}))))
+                                                                                    :opts {}}))))
   (with-env {}
     #(is (fn? (:chat-fn (ig/init-key :replware.levinrag.retrieval.system/search {:index-conn nil
-                                                                         :opts {}}))))))
+                                                                                 :opts {}}))))))

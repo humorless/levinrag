@@ -4,9 +4,9 @@
   (:require [clj-http.client :as http]
             [clojure.test :refer [deftest is use-fixtures]]
             [hickory.select :as select]
-            [replware.levinrag.test-utils :as test-utils]
             [integrant-extras.tests :as ig-extras]
-            [reitit-extras.tests :as reitit-extras]))
+            [reitit-extras.tests :as reitit-extras]
+            [replware.levinrag.test-utils :as test-utils]))
 
 (use-fixtures :once
   (ig-extras/with-system))
