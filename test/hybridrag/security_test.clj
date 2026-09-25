@@ -67,6 +67,16 @@
                          :when (fx/readable? groups (principals user) p)]
                      (str (title p) "\n" (str/join "\n" ts))))))
 
+(defn- prompt-secrets
+  "Strings from the restricted doc `path` whose presence in `user`'s
+   prompt would prove a leak: its path, title and the start of its first
+   chunk, minus any that also occur in text the user may read (a readable
+   doc can legitimately mention a restricted doc's title or link to its
+   path — public/handbook.md links to hr/leave.md as 請假規定)."
+  [visible-text title texts path]
+  (remove #(str/includes? visible-text %)
+          [path (title path) (clip (first (texts path)) 40)]))
+
 (defn- api [handler token method uri body]
   (let [resp (handler (cond-> {:request-method method
                                :uri uri
@@ -110,8 +120,7 @@
         groups (fx/doc-groups fx/*index*)
         texts (chunk-texts (d/db fx/*index*))
         title (titles (d/db fx/*index*))
-        visible (memoize readable-text)
-        prompt-checks (atom 0)]
+        visible (memoize readable-text)]
     (doseq [{:keys [path user queries]} (matrix)
             q queries
             :let [readable? #(fx/readable? groups (principals user) %)]]
@@ -137,13 +146,11 @@
                                         (:content m))))]
           (is (not (contains? paths path)) "ask")
           (is (every? readable? paths) "ask")
-          (doseq [secret [path (title path) (clip (first (texts path)) 40)]
-                  :when (not (str/includes? (visible user) secret))]
-            (swap! prompt-checks inc)
-            (is (not (str/includes? prompt secret)) (str "prompt contains " secret))))
-        (is (= 404 (:status (api h (tok user) :get (str "/api/v1/docs/" path) nil))))))
-    (testing "the prompt checks ran (not all skipped as publicly visible)"
-      (is (< 50 @prompt-checks)))))
+          (let [secrets (prompt-secrets (visible user) title texts path)]
+            (is (seq secrets) "no prompt check left for this pair (all publicly visible)")
+            (doseq [secret secrets]
+              (is (not (str/includes? prompt secret)) (str "prompt contains " secret)))))
+        (is (= 404 (:status (api h (tok user) :get (str "/api/v1/docs/" path) nil))))))))
 
 (deftest test-web-doc-viewer-hides-unreadable-docs
   (let [clients (into {} (for [u users] [u (wf/logged-in u)]))]

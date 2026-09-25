@@ -129,9 +129,13 @@ first chunk's text (truncated to 1000 chars). Checks:
 1. `/api/v1/search`, each eval variant and `graph` true/false: no passage
    or candidate from the doc.
 2. `/api/v1/ask` with `debug true`: no citation or candidate from it.
-3. The `messages` handed to the chat stub contain neither the doc's path,
-   its title (when not also a readable doc's title), nor its first chunk
-   text.
+3. The `messages` handed to the chat stub (system prompt and `<sources>`;
+   the echoed question is the probe itself) contain neither the doc's
+   path, its title, nor the start of its first chunk — each checked only
+   when it does not also occur in text the user may read (a readable doc
+   can mention a restricted doc's title or link to its path, e.g.
+   `public/handbook.md` → `hr/leave.md` as 請假規定). Every user × doc pair
+   must keep at least one of the three to check.
 4. `GET /api/v1/docs/<path>` and web `GET /docs/<path>` → 404.
 5. Graph: `public/handbook.md` links to `hr/leave.md`; bob's graph
    candidates never include `hr/leave.md`.

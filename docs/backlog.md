@@ -163,11 +163,6 @@ Set aside by the reviewer:
 
 Deferred minors (reviewer findings, not fixed):
 
-- **§18.3 prompt-check guard is global**: `security_test` asserts > 50
-  prompt checks ran overall, not at least one per user × doc pair; the
-  title check is skipped whenever the title occurs anywhere in readable
-  text (the spec only asked to skip when a readable doc has the same
-  title).
 - **Docs**: admin.md says every request "including failures" writes a
   trace (only dependency failures do; 500s do not); the ops.md backup
   one-liner hard-codes `data/app.dtlv` and has no in-container variant
