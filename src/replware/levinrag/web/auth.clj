@@ -69,7 +69,7 @@
 (defn- login-form [request next-path error]
   (layout/page request "登入"
                [:div {:class ["mx-auto" "mt-16" "max-w-sm" "rounded-lg" "border" "border-slate-200" "bg-white" "p-6" "shadow-sm"]}
-                [:h1 {:class ["mb-4" "text-xl" "font-semibold"]} "登入 levinrag"]
+                [:h1 {:class ["mb-4" "text-xl" "font-semibold"]} "登入 LevinRAG"]
                 (when error
                   [:p {:class ["mb-4" "rounded" "bg-red-50" "p-2" "text-sm" "text-red-700"]} error])
                 [:form {:method "post"

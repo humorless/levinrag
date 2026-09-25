@@ -147,3 +147,12 @@
     (cli/run wf/*app* "user:passwd" (cli/parse-args ["alice"])
              :password-fn (constantly "brand-new-pw"))
     (is (= 302 (:status (wc/request! c :get "/"))))))
+
+(deftest test-product-name-in-ui
+  ;; display name is LevinRAG; identifiers (namespace, service) stay levinrag
+  (let [c (wc/client (wf/handler))
+        login (:body (wc/request! c :get "/login"))
+        home (:body (wc/request! (wf/logged-in "alice") :get "/"))]
+    (is (str/includes? login "登入 LevinRAG"))
+    (is (re-find #"<title>[^<]*· LevinRAG</title>" home))
+    (is (not (re-find #">levinrag<|· levinrag|登入 levinrag" (str login home))))))

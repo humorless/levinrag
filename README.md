@@ -1,4 +1,4 @@
-# levinrag
+# LevinRAG
 
 單一 JVM、嵌入式 Datalevin 的企業 RAG MVP：Markdown／純文字語料 → 詞彙＋語意＋連結圖多路召回 → RRF 融合 → cross-encoder rerank → 脈絡擴展 → 帶引用 `[n]` 的回答。內建 ACL、每次查詢的 trace 與評估框架。模型（embedding、rerank、chat）一律透過 OpenAI 相容 API 呼叫。現行規格見 [SPEC.md](SPEC.md)（含尚未完成的工作，§21）；初版規格保存在 [docs/design/2026-09-22-initial-spec.md](docs/design/2026-09-22-initial-spec.md)；每一處設計調整的理由見 [docs/decisions.md](docs/decisions.md)。
 
@@ -10,7 +10,7 @@
 - 權限要在每個儲存各自實作，漏掉一處就是洩漏；
 - 系統行為散落在設定檔、框架內部與外部服務之間，端到端驗證得先啟動一整排服務。對 AI coding agent 而言更是如此。
 
-levinrag 把檢索當成一個**資料系統**來設計：語料目錄是唯一來源，chunk、全文索引、向量、權限與連結圖都是它的衍生資料。這不是新想法，而是把資料庫、資訊檢索與資料工程的既有做法，收斂成一個一致的 RAG 架構。
+LevinRAG 把檢索當成一個**資料系統**來設計：語料目錄是唯一來源，chunk、全文索引、向量、權限與連結圖都是它的衍生資料。這不是新想法，而是把資料庫、資訊檢索與資料工程的既有做法，收斂成一個一致的 RAG 架構。
 
 ```mermaid
 flowchart LR
@@ -20,7 +20,7 @@ flowchart LR
     D1 --> G[(圖 DB)]
     D1 --> M[(metadata／權限 DB)]
   end
-  subgraph B[levinrag]
+  subgraph B[LevinRAG]
     D2[語料] --> T[一個交易：<br/>chunk・全文索引・向量・<br/>權限・連結圖] --> X[(Datalevin)]
   end
 ```

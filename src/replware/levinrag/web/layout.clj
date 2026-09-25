@@ -23,7 +23,7 @@
   (when principal
     [:nav {:class ["flex" "items-center" "gap-4" "px-6" "py-3" "border-b" "border-slate-200" "bg-white"]}
      [:a {:href "/"
-          :class ["font-semibold" "text-slate-900"]} "levinrag"]
+          :class ["font-semibold" "text-slate-900"]} "LevinRAG"]
      [:a {:href "/"
           :class ["text-sm" "text-slate-600" "hover:text-slate-900"]} "問答"]
      (when (:admin? principal)
@@ -52,7 +52,7 @@
     [:link {:rel "stylesheet"
             :type "text/css"
             :href (manifest/asset "css/output.css")}]
-    [:title (str title " · levinrag")]]
+    [:title (str title " · LevinRAG")]]
    [:body {:class ["min-h-screen" "bg-slate-50" "text-slate-800"]
            :hx-headers (when-let [t (csrf-token)] (json/write-value-as-string {"X-CSRF-Token" t}))}
     (nav request)

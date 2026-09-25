@@ -1,4 +1,4 @@
-# levinrag — project notes for Claude Code
+# LevinRAG — project notes for Claude Code
 
 ## nREPL
 
