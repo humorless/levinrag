@@ -36,3 +36,6 @@ data-test/
 
 # browser check (bb browser-check)
 dev/browser/node_modules/
+
+# Private analysis of another repo; keep local, never commit
+/haystack-design-issue.md
