@@ -13,6 +13,7 @@
    ["docs/howto/ops.md" "docs/howto/ops.zh-TW.md"]
    ["docs/howto/admin.md" "docs/howto/admin.zh-TW.md"]
    ["docs/howto/user.md" "docs/howto/user.zh-TW.md"]
+   ["docs/howto/quick-start.md" "docs/howto/quick-start.zh-TW.md"]
    ["docs/design/rationale.md" "docs/design/rationale.zh-TW.md"]])
 
 ;; single-language docs whose links are checked too

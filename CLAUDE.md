@@ -1,5 +1,7 @@
 # LevinRAG — project notes for Claude Code
 
+> **Evaluating LevinRAG (running it on a corpus, checking its claims), not developing it?** Follow `docs/howto/quick-start.md` (Traditional Chinese: `docs/howto/quick-start.zh-TW.md`) and use only the `bb` commands it lists; nothing below is needed.
+
 ## nREPL
 
 Start with (overrides the generic command in `~/.claude/CLAUDE.md`):
@@ -23,6 +25,6 @@ tmux new-session -d -s nrepl 'clojure -M:jvm-opts:test:dev:nrepl --port 1667'
 
 ## Docs in two languages
 
-- README, SPEC, VLLM_SETUP, `docs/howto/*`, `docs/design/rationale` exist as `X.md` (English, authoritative) and `X.zh-TW.md` (Traditional Chinese translation).
+- README, SPEC, VLLM_SETUP, `docs/howto/*` (including quick-start), `docs/design/rationale` exist as `X.md` (English, authoritative) and `X.zh-TW.md` (Traditional Chinese translation).
 - Change one, change the other in the same commit; keep headings identical (other docs link to their anchors). Run `bb docs:check` before committing doc changes.
 - Single-language on purpose: `docs/decisions.md`, `docs/backlog.md`, spikes, plans, handoffs (English); `docs/design/2026-09-22-initial-spec.md` (Chinese, frozen).

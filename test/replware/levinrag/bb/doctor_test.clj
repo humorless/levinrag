@@ -29,15 +29,23 @@
 (deftest test-check-tools
   (is (= {"java" :ok
           "clojure" :ok}
-         (levels (doctor/check-tools {:java-version "openjdk version \"21.0.2\""
-                                      :clojure? true}))))
+         (select-keys (levels (doctor/check-tools {:java-version "openjdk version \"21.0.2\""
+                                                   :clojure? true}))
+                      ["java" "clojure"])))
   (let [r (doctor/check-tools {:java-version "openjdk version \"17.0.1\""
                                :clojure? false})]
     (is (= {"java" :fail
-            "clojure" :fail} (levels r)))
+            "clojure" :fail} (select-keys (levels r) ["java" "clojure"])))
     (is (every? #(str/includes? (:fix %) "mise install") r)))
   (is (= :fail (get (levels (doctor/check-tools {:java-version nil
-                                                 :clojure? true})) "java"))))
+                                                 :clojure? true})) "java")))
+  (testing "the web UI's CSS: built, or buildable by bb serve; otherwise only a warning"
+    (let [css (fn [m] (get (levels (doctor/check-tools (merge {:java-version "openjdk version \"21\""
+                                                               :clojure? true} m)))
+                           "css"))]
+      (is (= :ok (css {:css? true :tailwind? false})))
+      (is (= :ok (css {:css? false :tailwind? true})))
+      (is (= :warn (css {:css? false :tailwind? false}))))))
 
 (deftest test-check-settings
   (testing "chat endpoint and model are required; the rest have defaults"

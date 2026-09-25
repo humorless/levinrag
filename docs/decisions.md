@@ -1128,3 +1128,26 @@ per document, groups and readers. Rulings:
   apply as for `bb user:import`.
 - Read-only; opens `index.dtlv` and `app.dtlv` next to a running server
   (as `bb eval` and `bb user:*` already do).
+
+## 2026-09-25 — Evaluator quick-start guide
+
+Spec text: n/a. `docs/howto/quick-start.md` (+ zh-TW, in `bb docs:check`)
+takes an evaluator who does not know Clojure from `git clone` to checking
+four claims — ACL, rebuildable, explainable, retrieval quality — with an
+"Expected" output per step so an AI agent can follow it. README and
+CLAUDE.md point evaluators to it first.
+
+Found while walking it from a fresh clone: `resources/public/css/output.css`
+is gitignored, so a fresh checkout served the UI unstyled. `bb serve` now
+runs `css-build` when it is missing; `bb doctor` reports the CSS as OK
+(built, or `tailwindcss` available to build it) or WARN (neither) — only a
+warning, since the API and the `bb` tasks do not need it.
+
+Verified by following the guide word for word in a fresh clone (real
+models via LM Studio + llama.cpp, the sample corpus as "my corpus" plus
+one misspelt `read_group` doc): doctor all OK; ingest listed the typo'd
+doc as an error (exit 1), fixed → added; user:import + acl:report; bb
+serve built the CSS; web login as bob: a restricted doc and a
+non-existent one gave the same 404 page; eval 38 questions, 0 leaks; a
+rebuild in `./data-rebuild` gave identical eval metrics and an identical
+`acl:report --docs`; the guide's curl/jq commands ran unchanged.

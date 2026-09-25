@@ -44,6 +44,8 @@ cp .env.example .env      # once; then edit .env
 bb serve
 ```
 
+`bb serve` first builds the web UI's CSS when it is missing (a fresh checkout has none; the build needs `tailwindcss`, which `mise install` provides).
+
 The `bb` tasks that run the app (`serve`, `ingest`, `reindex`, `eval`, `vllm:check`, `user:*`, `token:*`) read `.env` from the project directory and pass its variables to the JVM they start. A variable already set in the shell wins over `.env`, so `DATA_DIR=/tmp/other bb reindex` still works. A malformed line in `.env` stops those tasks with its line number. `.env` is gitignored; `.env.example` lists every variable. The server itself never reads `.env`: without `bb`, export the variables and run
 
 ```bash

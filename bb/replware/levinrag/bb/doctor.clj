@@ -26,10 +26,12 @@
       (if (and (= 1 a) b) (parse-long b) a))))
 
 (defn check-tools
-  "`:java-version` is the `java -version` output (nil when java is missing)."
-  [{:keys [java-version clojure?]}]
+  "`:java-version` is the `java -version` output (nil when java is missing);
+   `:css?` whether the web UI's CSS is built, `:tailwind?` whether
+   tailwindcss is on the PATH to build it (bb serve does, when missing)."
+  [{:keys [java-version clojure? css? tailwind?]}]
   (let [v (java-major java-version)
-        fix "在專案目錄執行 mise install（安裝 .mise.toml 列的 Java、Clojure、Babashka；mise：https://mise.jdx.dev）"]
+        fix "在專案目錄執行 mise trust && mise install（安裝 .mise.toml 列的 Java、Clojure、Babashka 等；mise：https://mise.jdx.dev）"]
     [(cond
        (nil? java-version) (result :fail "java" "找不到 java" fix)
        (nil? v) (result :fail "java" (str "無法判斷 java 版本：" (first (str/split-lines java-version))) fix)
@@ -37,7 +39,12 @@
        :else (result :ok "java" (str "Java " v)))
      (if clojure?
        (result :ok "clojure" "已安裝 Clojure CLI")
-       (result :fail "clojure" "找不到 clojure 指令" fix))]))
+       (result :fail "clojure" "找不到 clojure 指令" fix))
+     (cond
+       css? (result :ok "css" "網頁樣式已建置")
+       tailwind? (result :ok "css" "網頁樣式尚未建置，bb serve 會自動建置")
+       :else (result :warn "css" "網頁樣式尚未建置，也找不到 tailwindcss：網頁會沒有樣式（API 與 bb 指令不受影響）"
+                     "mise install tailwindcss，再執行 bb css-build"))]))
 
 ;; --- settings ---
 
@@ -163,7 +170,9 @@
   "All checks for `env` (the shell environment with `.env` under it)."
   [env dotenv?]
   (let [corpus (get env "CORPUS_DIR" "./corpus")]
-    (concat (check-tools {:java-version (java-version)
+    (concat (check-tools {:css? (.isFile (io/file "resources/public/css/output.css"))
+                          :tailwind? (on-path? "tailwindcss")
+                          :java-version (java-version)
                           :clojure? (on-path? "clojure")})
             (check-settings {:dotenv? dotenv?
                              :env env})

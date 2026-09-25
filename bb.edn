@@ -127,10 +127,13 @@ vllm:check {:doc "Check embed/rerank/chat vLLM endpoints are reachable"
         :task (apply clj "-M:jvm-opts -m replware.levinrag.eval.cli" *command-line-args*)}
 
   serve {:doc "Start the web server (profile :default) on http://localhost:8000"
-         :task (clj "-M:jvm-opts" "-e"
+         :task (do
+                 ;; a fresh checkout has no built CSS (it is gitignored)
+                 (when-not (.isFile (java.io.File. output-css-file)) (run 'css-build))
+                 (clj "-M:jvm-opts" "-e"
                     (str "(require '[integrant-extras.core :as ig-extras]) "
                          "(ig-extras/run-system {:profile :default :config-path \"config.edn\"}) "
-                         "@(promise)"))}
+                         "@(promise)")))}
 
   reindex {:doc "Delete DATA_DIR/index.dtlv and ingest CORPUS_DIR from scratch"
            :task (clj "-M:jvm-opts -m replware.levinrag.ingest.cli reindex")}

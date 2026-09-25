@@ -42,6 +42,7 @@ flowchart LR
 
 ## 使用手冊
 
+- [快速上手：用自己的語料評估 LevinRAG](docs/howto/quick-start.zh-TW.md)：從 `git clone` 到檢驗 ACL、可重建、可解釋與檢索品質等主張，不需要懂 Clojure。**要評估 LevinRAG，從這裡開始。**
 - [維運手冊](docs/howto/ops.zh-TW.md)：部署、環境變數、health、備份、評估。
 - [管理者手冊](docs/howto/admin.zh-TW.md)：使用者與群組、文件權限、匯入、trace。
 - [使用者手冊](docs/howto/user.zh-TW.md)：登入、提問、引用、文件檢視、Debug 面板。

@@ -45,6 +45,8 @@ cp .env.example .env      # 只需一次；接著編輯 .env
 bb serve
 ```
 
+`bb serve` 在網頁 CSS 尚未建置時會先建置它（剛 clone 下來時沒有；建置需要 `tailwindcss`，`mise install` 會安裝）。
+
 會執行應用程式的 `bb` 指令（`serve`、`ingest`、`reindex`、`eval`、`vllm:check`、`user:*`、`token:*`）會讀取專案目錄的 `.env`，把其中的變數傳給它們啟動的 JVM。shell 裡已設定的變數優先於 `.env`，所以 `DATA_DIR=/tmp/other bb reindex` 照樣可用。`.env` 有格式錯誤的行時，這些指令會停下來並指出行號。`.env` 已被 gitignore；`.env.example` 列出所有變數。server 本身不讀 `.env`：不用 `bb` 時，先 export 變數再執行
 
 ```bash
