@@ -5,6 +5,7 @@
   (:require [clojure.string :as str]
             [clojure.test :refer [deftest is testing use-fixtures]]
             [datalevin.core :as d]
+            [hybridrag.auth.cli :as cli]
             [hybridrag.auth.users :as users]
             [hybridrag.fixtures :as fx]
             [hybridrag.web-client :as wc]
@@ -136,4 +137,13 @@
   (let [c (wf/logged-in "alice" :options {:session-max-age-ms 200})]
     (is (= 200 (:status (wc/request! c :get "/"))))
     (Thread/sleep 250)
+    (is (= 302 (:status (wc/request! c :get "/"))))))
+
+(deftest test-cli-passwd-ends-web-sessions
+  ;; the bb user:passwd path end to end: CLI command → web session gone
+  (let [c (wf/logged-in "alice")]
+    (is (= 200 (:status (wc/request! c :get "/"))))
+    (Thread/sleep 5)
+    (cli/run wf/*app* "user:passwd" (cli/parse-args ["alice"])
+             :password-fn (constantly "brand-new-pw"))
     (is (= 302 (:status (wc/request! c :get "/"))))))
