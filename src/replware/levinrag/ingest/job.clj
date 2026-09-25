@@ -1,7 +1,8 @@
 (ns replware.levinrag.ingest.job
   "Incremental ingestion (SPEC.md §7.6): walk → collections → per-file
    hash delta → delete missing docs → resolve links → wait for index."
-  (:require [clojure.tools.logging :as log]
+  (:require [clojure.java.io :as io]
+            [clojure.tools.logging :as log]
             [datalevin.core :as d]
             [replware.levinrag.ingest.chunker :as chunker]
             [replware.levinrag.ingest.walker :as walker]
@@ -77,6 +78,10 @@
               chunk-config chunker/default-config
               index-timeout-ms 60000}
          :as opts}]
+  ;; a missing corpus would look like "every doc was deleted": refuse
+  ;; instead of wiping the index (web runner and `bb ingest` alike)
+  (when-not (.isDirectory (io/file corpus-dir))
+    (throw (ex-info (str "CORPUS_DIR 不存在：" corpus-dir) {:corpus-dir corpus-dir})))
   (let [t0 (System/nanoTime)
         {:keys [edns broken]} (walker/scan-collection-edns corpus-dir)
         files (walker/walk-corpus corpus-dir edns root-read-groups broken)

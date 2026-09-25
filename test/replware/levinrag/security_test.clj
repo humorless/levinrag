@@ -340,3 +340,18 @@
       (ingest!)
       (is (= #{"hr"} (get (fx/doc-groups conn) "pub/memo.md")) "back, with the new groups, once ingest succeeds")
       (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))
+
+(deftest test-missing-corpus-dir-never-wipes-the-index
+  ;; review 2026-09-25 L1: a wrong CORPUS_DIR looked like "every doc was
+  ;; deleted"; the web runner refused it, `bb ingest` did not
+  (let [idx (tmp/dir "missing-corpus-index")
+        conn (index-conn/open idx fx/dims)]
+    (try
+      (job/ingest! conn {:corpus-dir "corpus-sample"
+                         :embed-fn fx/hash-embed})
+      (let [before (fx/doc-groups conn)]
+        (is (thrown-with-msg? clojure.lang.ExceptionInfo #"CORPUS_DIR 不存在"
+                              (job/ingest! conn {:corpus-dir "/nonexistent/corpus"
+                                                 :embed-fn fx/hash-embed})))
+        (is (= before (fx/doc-groups conn))))
+      (finally (d/close conn) (tmp/delete-tree! idx)))))

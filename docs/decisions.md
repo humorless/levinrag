@@ -1245,3 +1245,12 @@ system (macOS default) `_Collection.edn` next to an existing
   by §7.2 rule 5, makes the question measure nothing.
 - A missing `DATA_DIR/index.dtlv` is an error (exit 2); before, eval opened
   (created) an empty index and reported 0 leaks, exit 0.
+
+## 2026-09-25 — Review L1: a missing CORPUS_DIR never wipes the index
+
+The web runner refused a missing corpus directory; `bb ingest` did not,
+and ingest read it as "every doc deleted". With `.env` now driving the
+setting (and `.env.example`'s `./corpus` absent in a fresh checkout) that
+was one typo from an empty index. The check moved into `job/ingest!`
+(both paths), and `bb reindex` checks before deleting `index.dtlv`. The
+CLI prints the message and exits 2.

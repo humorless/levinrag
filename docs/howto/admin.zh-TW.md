@@ -108,6 +108,8 @@ bb acl:report --docs             # 另外逐份列出文件：群組｜讀得到
 - 網頁：以 admin 登入 → 上方「管理」→「執行增量 ingest」。執行期間狀態每 2 秒更新一次；同一時間只能有一個匯入在跑，重複按會顯示「已有 ingest 在執行」。
 - 命令列：`bb ingest`，**只在 server 停止時使用**：兩個 process 同時寫入索引的情況沒有驗證過，而 server 執行中請用網頁按鈕或 `POST /api/v1/ingest`（admin token）。要完整重建時用 `bb reindex`，同樣要先停止 server（見[維運手冊](ops.zh-TW.md#重建索引)）。
 
+`CORPUS_DIR` 不存在時，兩種方式都會拒絕執行，索引維持原狀（否則不存在的目錄看起來就像「所有文件都被刪除」）；`bb reindex` 會在刪除任何東西之前先檢查。
+
 報告摘要（網頁的「最近一次報告」，或 `DATA_DIR/ingest-reports/<時間>.edn`）：
 
 ```

@@ -107,6 +107,8 @@ There are two ways, with the same result; both are incremental ingests that proc
 - Web: log in as admin → "管理" (Admin) at the top → "執行增量 ingest" (Run incremental ingest). While it runs, the status updates every 2 seconds; only one ingest can run at a time, and pressing the button again shows "已有 ingest 在執行" (An ingest is already running).
 - Command line: `bb ingest`, **only when the server is stopped**: two processes writing to the index at the same time has not been verified, and while the server is running you should use the web button or `POST /api/v1/ingest` (admin token). For a full rebuild use `bb reindex`, which likewise requires stopping the server first (see the [Operations guide](ops.md#rebuilding-the-index)).
 
+If `CORPUS_DIR` does not exist, both ways refuse to run and leave the index as it is (a missing directory would otherwise look like "every document was deleted"); `bb reindex` checks before deleting anything.
+
 Report summary (the web page's "最近一次報告" (Latest report), or `DATA_DIR/ingest-reports/<timestamp>.edn`):
 
 ```

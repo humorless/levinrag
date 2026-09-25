@@ -21,6 +21,9 @@
   (let [{:keys [data-dir corpus-dir root-read-groups]} (config/corpus-config)
         embed-cfg (config/embed-config)
         index-dir (str (io/file data-dir "index.dtlv"))
+        ;; before reindex deletes anything
+        _ (when-not (.isDirectory (io/file corpus-dir))
+            (throw (ex-info (str "CORPUS_DIR 不存在：" corpus-dir "（索引未變更）") {:corpus-dir corpus-dir})))
         _ (when reindex? (delete-tree! index-dir))
         conn (index-conn/open index-dir (:dims embed-cfg))]
     (try
@@ -34,6 +37,11 @@
       (finally (d/close conn)))))
 
 (defn -main [& args]
-  (let [rep (ingest-corpus! {:reindex? (= "reindex" (first args))})]
+  (let [code (try
+               (let [rep (ingest-corpus! {:reindex? (= "reindex" (first args))})]
+                 (if (seq (:errors rep)) 1 0))
+               (catch clojure.lang.ExceptionInfo e
+                 (binding [*out* *err*] (println "錯誤：" (ex-message e)))
+                 2))]
     (shutdown-agents)
-    (System/exit (if (seq (:errors rep)) 1 0))))
+    (System/exit code)))
