@@ -42,11 +42,9 @@
 
 (defn recent
   "The newest `n` traces (no stages), newest first; entity id breaks
-   ties between traces written in the same millisecond."
+   ties between traces written in the same millisecond. A backwards scan
+   of the :trace/at index that stops after n datoms, so /admin does not
+   load every trace."
   [db n]
-  (->> (d/q '[:find [(pull ?t [:db/id :trace/id :trace/username :trace/kind :trace/query :trace/at]) ...]
-              :where [?t :trace/id]]
-            db)
-       (sort-by (juxt :trace/at :db/id) #(compare %2 %1))
-       (take n)
-       (mapv #(dissoc % :db/id))))
+  (mapv #(d/pull db [:trace/id :trace/username :trace/kind :trace/query :trace/at] (:e %))
+        (d/rseek-datoms db :ave :trace/at nil nil n)))

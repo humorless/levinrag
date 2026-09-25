@@ -127,8 +127,6 @@ Set aside by the reviewer, for later phases:
 
 Deferred minors (reviewer findings, not fixed):
 
-- **`trace/recent` pulls and sorts every trace** on each `/admin` load;
-  use a range scan on `:trace/at` or cap it.
 - **`/login` has no rate limiting or lockout** (spec silent).
 
 Set aside by the reviewer:
