@@ -62,7 +62,7 @@ my-corpus/
 ```
 
 - A directory uses the nearest `_collection.edn` with `:read-groups` above it (or its own). A lower one **replaces** the one above, it does not add to it.
-- A document's frontmatter `read_groups` replaces the directory's groups entirely. Write the list on one line: `read_groups: [finance-lead]`.
+- A document's frontmatter `read_groups` replaces the directory's groups entirely. Write it once, on one line, with a half-width colon and no quotes: `read_groups: [finance-lead]`; the frontmatter must start on the file's first line with `---`.
 - `[]` means admins only. Files and directories starting with `.` or `_` are skipped (`_drafts/`).
 - **Mistakes fail closed.** A `_collection.edn` that cannot be parsed or has an unknown key, or a malformed or misspelt `read_groups` (`read_group`, a YAML list over several lines, `read_groups: hr`), keeps the affected documents out of the index and lists them as errors. They never fall back to a wider setting.
 

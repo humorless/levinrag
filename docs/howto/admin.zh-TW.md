@@ -84,7 +84,7 @@ read_groups: [all]
 
 - 這份文件放在 `hr/announcements/` 下，但只要寫了 `read_groups`，就**只用它**。這是**覆寫，不是聯集**：結果是 `all` 可讀，`hr` 群組不會因為目錄設定而被加回來（`hr` 成員本身若也在 `all` 裡，就讀得到）。
 - `read_groups: []` 表示除 admin 外沒有人可讀。
-- 清單要寫在同一行：`read_groups: [hr, all]`。YAML 多行清單（`read_groups:` 下面接 `- hr`）、單一個字（`read_groups: hr`）或拼錯的 key（`read_group`、`read-groups`）都會讓該文件在匯入時報錯。
+- 清單要寫在同一行：`read_groups: [hr, all]`，只寫一次、不縮排、用半形冒號、不加引號。區塊必須從檔案第一行的 `---` 開始，並以單獨一行的 `---` 結束。在第一個標題之前出現的其他任何看起來像 `read_groups` 的寫法——YAML 多行清單、單一個字（`read_groups: hr`）、拼錯的 key（`read_group`、`read-groups`）、`---` 前面多一行空白、全形冒號 `：`——都會讓該文件在匯入時報錯。
 - 檔名或目錄名以 `.` 或 `_` 開頭的會被忽略；可以用 `_drafts/` 放尚未公開的草稿。
 
 **匯入後用 `bb acl:report` 檢查結果**：

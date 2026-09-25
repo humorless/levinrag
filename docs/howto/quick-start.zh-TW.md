@@ -61,7 +61,7 @@ my-corpus/
 ```
 
 - 目錄採用往上找最近一個有 `:read-groups` 的 `_collection.edn`（含自己）。下層的宣告會**取代**上層，而不是加上去。
-- 文件 frontmatter 的 `read_groups` 會完全取代目錄的群組。清單要寫在同一行：`read_groups: [finance-lead]`。
+- 文件 frontmatter 的 `read_groups` 會完全取代目錄的群組。只寫一次、寫在同一行、用半形冒號、不加引號：`read_groups: [finance-lead]`；frontmatter 必須從檔案第一行的 `---` 開始。
 - `[]` 表示只有 admin 讀得到。以 `.` 或 `_` 開頭的檔案與目錄會被略過（例如 `_drafts/`）。
 - **寫錯時一律收緊。** `_collection.edn` 無法解析或有不認得的 key，或 `read_groups` 格式不對、拼錯（`read_group`、分成多行的 YAML 清單、`read_groups: hr`），受影響的文件都不會進索引，並列為錯誤；絕不退回較寬的設定。
 

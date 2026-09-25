@@ -1,7 +1,8 @@
 (ns replware.levinrag.ingest.markdown-test
   "Markdown → section list tests (SPEC.md §7.3, T1.2 AC):
    ATX/Setext mixed, no heading, frontmatter only, deep nesting."
-  (:require [clojure.test :refer [deftest is testing]]
+  (:require [clojure.string :as str]
+            [clojure.test :refer [deftest is testing]]
             [replware.levinrag.ingest.markdown :as md]))
 
 (defn- span-text [s {:keys [char-start char-end]}]
@@ -145,3 +146,32 @@ Content"
                             ["Read_Groups: [hr]" #"Read_Groups"]
                             ["readgroups: [hr]" #"readgroups"]]]
         (is (re-find expect (str (md/frontmatter-acl-problem (fm bad)))) bad)))))
+
+(deftest test-frontmatter-acl-problem-fails-closed-on-hidden-read-groups
+  ;; review 2026-09-25 H1: each of these left read_groups unread, so the doc
+  ;; silently took its directory's groups
+  (let [bom "﻿"]
+    (testing "still valid: the frontmatter is found and read_groups applied"
+      (doseq [[label s] [["BOM before a good block" (str bom "---\nread_groups: [hr]\n---\n# x")]
+                         ["--- inside a value" "---\ntitle: Q3---draft\nread_groups: [hr]\n---\n# x"]
+                         ["... closes the block" "---\nread_groups: [hr]\n...\n# x"]
+                         ["trailing space after ---" "--- \nread_groups: [hr]\n--- \n# x"]
+                         ["a YAML comment line" "---\n# owner: hr\nread_groups: [hr]\n---\n# x"]
+                         ["the body mentions read_groups after a heading"
+                          "---\nread_groups: [hr]\n---\n# 權限\n\nread_groups: [all] 表示全公司"]
+                         ["no frontmatter, body mentions it after a heading" "# 權限\n\nread_groups: [all]"]]]
+        (is (nil? (md/frontmatter-acl-problem s)) label)
+        (when (str/includes? s "read_groups: [hr]")
+          (is (= ["hr"] (:read_groups (md/parse-frontmatter s))) label))))
+    (testing "read_groups that would not be applied is a problem"
+      (doseq [[label s] [["blank line before the block" "\n---\nread_groups: [hr]\n---\n# x"]
+                         ["no closing line" "---\nread_groups: [hr]\n# x"]
+                         ["full-width colon" "---\nread_groups：[hr]\n---\n# x"]
+                         ["double-quoted key" "---\n\"read_groups\": [hr]\n---\n# x"]
+                         ["single-quoted key" "---\n'read_groups': [hr]\n---\n# x"]
+                         ["twice, last would win" "---\nread_groups: [hr]\nread_groups: [all]\n---\n# x"]
+                         ["inside a block scalar" "---\nread_groups: [hr]\nnotes: |\n  read_groups: [all]\n---\n# x"]
+                         ["indented" "---\nmeta:\n  read_groups: [hr]\n---\n# x"]
+                         ["single-quoted items" "---\nread_groups: ['hr', 'all']\n---\n# x"]
+                         ["plain text file" "read_groups: [hr]\n\n薪資表"]]]
+        (is (string? (md/frontmatter-acl-problem s)) label)))))

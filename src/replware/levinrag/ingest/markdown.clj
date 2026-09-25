@@ -116,6 +116,21 @@
       (sequential? x) (mapv #(if (symbol? %) (str %) %) x)
       :else x)))
 
+(def ^:private frontmatter-re
+  "A frontmatter block: `---` on the first line (after an optional BOM),
+   closed by a whole `---` or `...` line."
+  #"(?s)\A---[ \t]*\r?\n(?:(.*?)\r?\n)?(?:---|\.\.\.)[ \t]*(?:\r?\n|\z)")
+
+(defn- split-frontmatter
+  "[body rest]: the frontmatter body (nil when there is no block) and the
+   text after the block."
+  [^String md]
+  (let [s (if (str/starts-with? md "﻿") (subs md 1) md)
+        m (re-matcher frontmatter-re s)]
+    (if (.find m)
+      [(or (.group m 1) "") (subs s (.end m))]
+      [nil s])))
+
 (defn parse-frontmatter
   "Extract YAML frontmatter from Markdown string. Returns a map or nil.
 
@@ -130,7 +145,7 @@
    Bare words stay strings; list items become strings
    (e.g., [hr, policy] → [\"hr\" \"policy\"])."
   [^String md]
-  (when-let [[_ body] (re-find #"(?s)^---\r?\n(.*?)\r?\n?---" md)]
+  (when-let [body (first (split-frontmatter md))]
     (reduce
       (fn [m line]
         (if-let [[_ k v] (re-find #"^([^:]+):\s+(.*)$" line)]
@@ -145,30 +160,63 @@
   [k]
   (contains? #{"readgroups" "readgroup"} (str/replace (str/lower-case k) #"[\s_-]" "")))
 
+(def ^:private acl-line-re
+  "A line that could be meant to set read_groups, however it is indented,
+   quoted, spelt or punctuated: [_ indent quote key colon value]."
+  #"^(\s*)([\"']?)([A-Za-z][A-Za-z _-]*?)[\"']?\s*([:：])(.*)$")
+
 (defn frontmatter-acl-problem
-  "Why the frontmatter's read_groups would not be applied as written, or
-   nil (SPEC.md §7.2 rule 5). parse-frontmatter drops a key with nothing
-   after the colon (so a YAML block list is lost), keeps a bare word as a
-   string, and a misspelt key is just another field: each would silently
-   give the doc its directory's groups instead."
+  "Why the doc's read_groups would not be applied as written, or nil
+   (SPEC.md §7.2 rule 5). Looks at the frontmatter block and at every line
+   before the first heading (at most 30), so a read_groups that the parser
+   would not see — a BOM or blank line before `---`, no closing line, a
+   quoted key, a full-width colon, indentation, a second occurrence — is a
+   problem instead of the doc silently taking its directory's groups."
   [^String md]
-  (when-let [[_ body] (re-find #"(?s)^---\r?\n(.*?)\r?\n?---" md)]
-    (let [v (get (parse-frontmatter md) :read_groups ::missing)]
-      (some (fn [line]
-              (when-let [[_ k raw] (re-find #"^\s*([^:#]+?)\s*:(.*)$" line)]
-                (when (acl-key? k)
-                  (cond
-                    (not= "read_groups" k)
-                    (str "frontmatter 的 `" k "` 應寫成 `read_groups`")
+  (let [[body after] (split-frontmatter md)
+        hits (fn [where lines]
+               (keep (fn [line]
+                       (when-let [[_ indent q k colon] (re-find acl-line-re line)]
+                         (when (acl-key? k)
+                           {:where where
+                            :indent indent
+                            :quote q
+                            :k k
+                            :colon colon
+                            :line line})))
+                     lines))
+        found (concat (hits :inside (some-> body str/split-lines))
+                      (hits :outside (->> (str/split-lines after)
+                                          (take-while #(not (re-find #"^#{1,6}(\s|$)" %)))
+                                          (take 30))))
+        {:keys [indent k colon line]
+         q :quote} (first found)
+        v (get (parse-frontmatter md) :read_groups ::missing)]
+    (cond
+      (empty? found) nil
 
-                    (= ::missing v)
-                    (str "frontmatter 的 `read_groups` 沒有值或格式不對（冒號後要有空白，"
-                         "不支援 YAML 多行清單），請寫成 read_groups: [hr, all]")
+      (some #(= :outside (:where %)) found)
+      (str "`" (str/trim (:line (first (filter #(= :outside (:where %)) found))))
+           "` 不在 frontmatter 裡：frontmatter 必須從檔案第一行的 `---` 開始，"
+           "並以單獨一行的 `---` 結束")
 
-                    (not (and (sequential? v) (every? string? v)))
-                    (str "frontmatter 的 `read_groups` 必須是清單，例如 read_groups: [hr, all]；目前是 "
-                         (str/trim raw))))))
-            (str/split-lines body)))))
+      (next found) "frontmatter 裡的 `read_groups` 出現了不只一次（包括縮排或多行文字裡的）"
+      (seq q) "frontmatter 的 key 不要加引號，請寫成 read_groups: [hr, all]"
+      (seq indent) "frontmatter 的 `read_groups` 不能縮排，請寫在最外層"
+      (not= ":" colon) "frontmatter 的 `read_groups` 要用半形冒號 `:`"
+      (not= "read_groups" k) (str "frontmatter 的 `" k "` 應寫成 `read_groups`")
+
+      (= ::missing v)
+      (str "frontmatter 的 `read_groups` 沒有值或格式不對（冒號後要有空白，"
+           "不支援 YAML 多行清單），請寫成 read_groups: [hr, all]")
+
+      (not (and (sequential? v) (every? string? v)))
+      (str "frontmatter 的 `read_groups` 必須是清單，例如 read_groups: [hr, all]；目前是 "
+           (str/trim (subs line (inc (str/index-of line ":")))))
+
+      ;; EDN has no ' quote: ['hr'] would silently become the group "'hr'"
+      (some #(str/includes? % "'") v)
+      "frontmatter 的 `read_groups` 清單項目不要加單引號，請寫成 read_groups: [hr, all]")))
 
 ;; --- Links (SPEC.md §7.5) ---
 

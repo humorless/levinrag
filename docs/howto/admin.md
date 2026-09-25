@@ -83,7 +83,7 @@ read_groups: [all]
 
 - This document sits under `hr/announcements/`, but because it declares `read_groups`, **only that is used**. It is an **override, not a union**: the result is that `all` can read it, and the `hr` group is not added back by the directory setting (`hr` members who are also in `all` can read it).
 - `read_groups: []` means no one except admins can read it.
-- Write the list on one line: `read_groups: [hr, all]`. A YAML block list (`read_groups:` followed by `- hr` lines), a bare word (`read_groups: hr`) or a misspelt key (`read_group`, `read-groups`) is an ingest error for that document.
+- Write the list on one line: `read_groups: [hr, all]`, once, not indented, with a half-width colon and no quotes. The block must start on the first line of the file with `---` and end with a line that is only `---`. Anything else that looks like `read_groups` before the first heading — a YAML block list, a bare word (`read_groups: hr`), a misspelt key (`read_group`, `read-groups`), a blank line before `---`, a full-width colon `：` — is an ingest error for that document.
 - Files or directories whose names start with `.` or `_` are ignored; you can use `_drafts/` for drafts that are not yet public.
 
 **Check the result with `bb acl:report`** after an ingest:

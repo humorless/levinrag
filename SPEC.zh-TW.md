@@ -258,7 +258,7 @@ corpus/
 2. 文件的 effective groups：frontmatter 有 `read_groups` 時**只用它（覆寫，不是聯集）**；否則等於所屬目錄的 effective groups。
 3. 只改 `_collection.edn` 或 frontmatter 的 `read_groups` 時，**不重新計算 embedding**：chunk 的文字沒變，就沿用已存的向量。frontmatter 的變動會改變字元位移，所以文件仍然會重新解析（2026-09-25）。報告中計為 `acl-updated`。
 4. 空集合 `[]` 表示除 admin 外沒有人可讀。
-5. **無法照字面套用的設定一律收緊**（2026-09-25）：該文件不匯入（先前已匯入的會從索引移除），並列在報告的 `errors`；絕不退回目錄的群組。涵蓋：`_collection.edn` 無法解析、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單——它所管轄的每一份文件（直到下層下一個有效宣告為止）都受影響；以及 frontmatter 的 `read_groups` 不是清單（`read_groups: hr`）、該行沒有值（包括 YAML 多行清單），或拼錯（`read_group`、`read-groups`、`Read_Groups`、`readgroups`）。
+5. **無法照字面套用的設定一律收緊**（2026-09-25）：該文件不匯入（先前已匯入的會從索引移除），並列在報告的 `errors`；絕不退回目錄的群組。涵蓋：`_collection.edn` 無法解析、不是 map、有 `:name`／`:read-groups` 以外的 key，或 `:read-groups` 不是字串清單——它所管轄的每一份文件（直到下層下一個有效宣告為止）都受影響；以及 frontmatter 的 `read_groups` 不是清單（`read_groups: hr`）、該行沒有值（包括 YAML 多行清單）、拼錯（`read_group`、`read-groups`、`Read_Groups`、`readgroups`）、key 或清單項目加了引號、用了全形冒號、有縮排，或出現不只一次。frontmatter 區塊必須從第一行開始（允許 BOM），並以單獨一行的 `---` 或 `...` 結束；在第一個標題之前、卻不在這樣的區塊裡出現看起來像 `read_groups` 的行，也算錯誤（2026-09-25 審查）。
 
 `bb acl:report [--users <檔案>] [--docs]` 顯示結果：每個群組有哪些文件、哪些使用者擁有它；每位使用者讀得到幾份文件；加 `--docs` 時列出每份文件的群組與讀得到的使用者。讀者以 `accessible-doc-ids` 計算，也就是檢索時過濾用的同一個函式。它會警告：文件用到、但沒有使用者擁有的群組；只有 admin 讀得到的文件；沒有群組的使用者；沒有文件使用的使用者群組；以及最近一次匯入的錯誤。使用者來自 `app.dtlv`，或用 `--users` 指定的使用者檔。只有路徑和群組名稱，不含文件內容。
 

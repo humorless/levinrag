@@ -1161,3 +1161,21 @@ as an unknown key. User decision: delete the code and its tests rather
 than keep an unused second ACL model. The ACL model is only: a directory's
 nearest `:read-groups`, a document's frontmatter `read_groups` override,
 `[]` for admins only.
+
+## 2026-09-25 — Review H1: frontmatter read_groups the parser did not see
+
+The phase review found shapes where `read_groups` was silently ignored and
+the doc took its directory's groups: a BOM or a blank line before `---`,
+`---` inside a value (the lazy regex closed the block early), no closing
+line, a `...` closing line, a full-width colon, a quoted key, a second
+`read_groups` line (last wins, including one inside a block scalar).
+
+Now: the block is line-anchored (`\A`, optional BOM, closed by a whole
+`---` or `...` line), and `frontmatter-acl-problem` scans the block plus
+every line before the first heading (at most 30) for anything that looks
+like `read_groups` — any quoting, indentation, spelling, colon width. Found
+outside the block, more than once, quoted, indented, full-width, misspelt,
+unparsed, not a list of strings, or with `'` in an item → the doc fails
+closed. A body that mentions `read_groups` after a heading is not affected.
+Docs with valid frontmatter behind a BOM, or with `---` inside a value, now
+get their read_groups applied (before, the second silently fell back).

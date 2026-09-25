@@ -286,3 +286,26 @@
         (is (= #{"hr"} (get (fx/doc-groups conn) "hr/leave.md")))
         (is (= #{"hr"} (get (fx/doc-groups conn) "hr/sub/deep.md"))))
       (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))
+
+(deftest test-hidden-frontmatter-read-groups-fail-closed
+  ;; review 2026-09-25 H1: read_groups the parser would not see must keep the
+  ;; doc out of the index, not give it the root's `all`
+  (let [dir (tmp/dir "acl-hidden-fm")
+        idx (tmp/dir "acl-hidden-fm-index")
+        conn (index-conn/open idx fx/dims)
+        docs {"pub/bom-blank.md" "﻿\n---\nread_groups: [hr]\n---\n# a\n\nx"
+              "pub/unclosed.md" "---\nread_groups: [hr]\n# b\n\nx"
+              "pub/fullwidth.md" "---\nread_groups：[hr]\n---\n# c\n\nx"
+              "pub/quoted-key.md" "---\n\"read_groups\": [hr]\n---\n# d\n\nx"
+              "pub/twice.md" "---\nread_groups: [hr]\nread_groups: [all]\n---\n# e\n\nx"
+              "pub/block-scalar.md" "---\nread_groups: [hr]\nnotes: |\n  read_groups: [all]\n---\n# f\n\nx"
+              "pub/plain.txt" "read_groups: [hr]\n\n薪資表"
+              "pub/ok.md" "﻿---\ntitle: Q3---draft\nread_groups: [hr]\n---\n# ok\n\nx"}]
+    (try
+      (spit (io/file dir "_collection.edn") "{:read-groups [\"all\"]}")
+      (doseq [[p text] docs] (io/make-parents (io/file dir p)) (spit (io/file dir p) text))
+      (let [rep (job/ingest! conn {:corpus-dir dir
+                                   :embed-fn fx/hash-embed})]
+        (is (= (disj (set (keys docs)) "pub/ok.md") (set (map :path (:errors rep)))))
+        (is (= {"pub/ok.md" #{"hr"}} (fx/doc-groups conn))))
+      (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! dir)))))
