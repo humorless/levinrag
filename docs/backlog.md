@@ -223,6 +223,16 @@ neither about core retrieval:
 
 ## Dev environment: llama.cpp only, without LM Studio? (2026-09-26)
 
+**Done 2026-09-26** — measured and switched: `/ask` p50 9.04 s → 6.43 s,
+eval identical, memory 12.2 GB → 9.8 GB (`docs/spikes/llama-cpp-only.md`).
+The analysis below is kept as it was written.
+
+
+**Done 2026-09-26** — measured and switched: `/ask` p50 9.04 s → 6.43 s,
+eval identical, memory 12.2 GB → 9.8 GB (`docs/spikes/llama-cpp-only.md`).
+The analysis below is kept as it was written.
+
+
 User question: can llama.cpp cover everything LM Studio does here, so the
 Mac dev environment depends on one tool? Analysis:
 
