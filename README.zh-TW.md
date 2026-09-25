@@ -74,6 +74,7 @@ flowchart LR
 - nREPL、測試迴圈：見 [CLAUDE.md](CLAUDE.md)。
 - 完整測試（乾淨 JVM＋coverage）：`clojure -X:jvm-opts:test`；lint：`clj-kondo --lint src test`。
 - 需要真實模型的測試標記 `:vllm`，未設定 `VLLM_*` 時自動略過。
+- `bb docs:check`：檢查中英文件的標題是否一致、有沒有語言切換，以及連結與錨點是否正確（`bb check` 也會執行）。
 - `bb tasks` 列出所有 Babashka 指令。
 
 ### Browser check (no JS errors)

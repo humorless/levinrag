@@ -39,7 +39,12 @@
         :task (clojure "-X:test:jvm-opts")}
 
   check {:doc "Run all code checks and tests"
-         :depends [fmt lint outdated test]}
+         :depends [fmt lint outdated docs:check test]}
+
+  docs:check {:doc "Bilingual docs in sync: headings, language switches, links and anchors"
+              :extra-paths ["dev"]
+              :requires ([docs-check])
+              :task (docs-check/-main)}
 
   css-watch {:doc "Rebuild css on file change in watch mode"
              ; Use "exec" to be able to run in the repl

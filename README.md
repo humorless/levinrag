@@ -74,6 +74,7 @@ How to set this up is in the [Administrator guide](docs/howto/admin.md#document-
 - nREPL, test loop: see [CLAUDE.md](CLAUDE.md).
 - Full test run (clean JVM + coverage): `clojure -X:jvm-opts:test`; lint: `clj-kondo --lint src test`.
 - Tests that need real models are tagged `:vllm` and are skipped automatically when `VLLM_*` is not set.
+- `bb docs:check`: the English and Traditional Chinese docs have matching headings, language switches, and working links and anchors (also part of `bb check`).
 - `bb tasks` lists all Babashka commands.
 
 ### Browser check (no JS errors)
