@@ -1198,3 +1198,19 @@ the report. Now one `WARN` per doc — `[INGEST] acl fail-closed: <path>
 (removed from index|not indexed) <reason>` and `[INGEST] removed the stale
 copy of <path>` — path and reason only. WARN, not ERROR: a settings
 mistake, not a system fault.
+
+## 2026-09-25 — Review H2(b): the viewer does not serve text the index has not seen
+
+Review finding: the document viewer checks the indexed ACL but renders the
+file as it is on disk now. Between an edit and the next ingest (or after a
+failed re-ingest) the new text — possibly under new, narrower
+`read_groups` — was shown to the old audience.
+
+Decision (user approved): when the file's sha256 differs from `:doc/hash`,
+non-admins get only "文件已更新，重新匯入後才能檢視。" and no text at all
+(not the old text either: the viewer has only the file, and the file is
+what changed). Admins still see the current file with the old notice —
+admins read everything anyway, and the user's rule is not to make admin
+debugging harder. `GET /api/v1/docs` returns only metadata and chunk
+ranges from the index, so it needs no change. Search results and answers
+come from indexed chunk text, not the file.

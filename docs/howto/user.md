@@ -41,7 +41,7 @@ The answer (UI output, shown as is) says that annual leave depends on seniority 
 
 "開啟文件" (Open document) opens the document viewer and scrolls to the cited passage, which is highlighted.
 
-- If the document was modified after it was indexed, the top of the page shows "文件在建立索引後已變更，標示的位置可能不準確。" (The document has changed since it was indexed; the highlighted position may be inaccurate.)
+- If the document was modified after it was indexed, the page shows only "文件已更新，重新匯入後才能檢視。" (The document has been updated; it can be viewed after the next ingest.) Ask an administrator to run an ingest. Administrators see the current file with the notice "文件在建立索引後已變更，標示的位置可能不準確。" (The document has changed since it was indexed; the highlighted position may be inaccurate.)
 - For a document you do not have permission to read, whether you open it directly by URL or click through from elsewhere, you only see "找不到頁面" (Page not found). The system does not reveal whether that document exists.
 
 ## Permissions: same question, different people see different things

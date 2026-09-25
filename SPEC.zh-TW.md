@@ -533,7 +533,7 @@ HTMX 加 Hiccup 的伺服器端渲染，樣式用 Tailwind v4。沒有 DaisyUI�
 | `/` | 問答頁：輸入框、Debug 開關；`POST /ask`（HTMX）回傳結果片段 |
 | 結果片段 | 回答（`[n]` 可點擊，捲動到對應來源）、來源面板（標題、章節、摘錄、「開啟文件」）；Debug 開啟時附 Debug 面板；另有無證據、降級、錯誤等提示（錯誤提示含 trace id） |
 | Debug 面板 | 所有候選：chunk id、lexical 名次、semantic 名次、RRF、graph 標記、rerank 分數、是否選中；各階段耗時、模型與 token 數、flags、degraded。**數值讀自已儲存的 trace**，有測試逐欄比對 |
-| `/docs/*path` | 以 commonmark 渲染原檔（escape HTML、過濾 URL），被引用的 chunk 以底色標出，可用 `?chunk=` 直達。檔案在建立索引後被改過時顯示提示。看不到的文件回 404 |
+| `/docs/*path` | 以 commonmark 渲染原檔（escape HTML、過濾 URL），被引用的 chunk 以底色標出，可用 `?chunk=` 直達。檔案在建立索引後被改過時（hash 不同），非 admin 只看到提示、看不到檔案的任何文字，因為索引裡的權限不涵蓋新內容，而新內容可能帶著更窄的 `read_groups`（2026-09-25 審查）；admin 會看到目前的檔案並附提示。看不到的文件回 404 |
 | `/admin` | admin 限定：執行增量匯入（執行中每 2 秒更新狀態）、最近一次報告、index lag、最近 50 筆 trace 與明細 |
 
 未登入時，一般請求 302 導向 `/login?next=…`，HTMX 請求改回 `HX-Redirect: /login`。非 admin 存取 admin 頁面時回 404。`bb browser-check`（Playwright）是「沒有 JS 錯誤」的驗收工具。

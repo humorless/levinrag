@@ -79,13 +79,24 @@
                                :opts {}}}})
         (finally (d/close conn) (tmp/delete-tree! idx) (tmp/delete-tree! corpus))))))
 
-(deftest test-doc-changed-notice
+(deftest test-doc-changed-since-indexing
+  ;; review 2026-09-25 H2(b): the file on disk may carry new text and new,
+  ;; narrower read_groups that no ingest has applied yet. The indexed ACL
+  ;; says nothing about the new text, so non-admins do not get it.
   (with-tmp-corpus
     #(spit (io/file % "hr/leave.md") "\n\n新增的一行。\n" :append true)
     (fn [opts]
       (let [{:keys [status body]} (wc/request! (apply wf/logged-in "alice" (mapcat identity opts)) :get "/docs/hr/leave.md")]
         (is (= 200 status))
-        (is (str/includes? body "文件在建立索引後已變更"))))))
+        (is (str/includes? body "重新匯入後才能檢視"))
+        (is (not (str/includes? body "新增的一行")) "no new text")
+        (is (not (str/includes? body "特休")) "no old text either: the file is what changed")
+        (is (empty? (sel (s/tag :article) body))))
+      (testing "admins still see the current file, with a notice"
+        (let [{:keys [status body]} (wc/request! (apply wf/logged-in "admin" (mapcat identity opts)) :get "/docs/hr/leave.md")]
+          (is (= 200 status))
+          (is (str/includes? body "文件在建立索引後已變更"))
+          (is (str/includes? body "新增的一行")))))))
 
 (deftest test-doc-file-missing
   (with-tmp-corpus

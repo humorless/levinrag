@@ -20,13 +20,21 @@
       (layout/not-found request)
       (let [{:keys [doc chunks]} found
             raw (java.nio.file.Files/readAllBytes (.toPath file))
-            changed? (not= (writer/sha256-hex raw) (:doc/hash doc))]
+            changed? (not= (writer/sha256-hex raw) (:doc/hash doc))
+            notice (fn [text] [:p {:class ["mb-4" "rounded" "bg-amber-50" "p-3" "text-sm" "text-amber-800"]} text])]
         (layout/render request (:doc/title doc)
                        [:header {:class ["mb-6"]}
                         [:h1 {:class ["text-2xl" "font-semibold"]} (:doc/title doc)]
                         [:p {:class ["mt-1" "font-mono" "text-xs" "text-slate-500"]} (:doc/path doc)]]
-                       (when changed?
-                         [:p {:class ["mb-4" "rounded" "bg-amber-50" "p-3" "text-sm" "text-amber-800"]}
-                          "文件在建立索引後已變更，標示的位置可能不準確。"])
-                       [:article {:class ["md-doc" "space-y-3" "rounded" "border" "border-slate-200" "bg-white" "p-6"]}
-                        (docs/render-blocks (String. ^bytes raw "UTF-8") chunks (get query-params "chunk"))])))))
+                       (cond
+                         ;; the file on disk may carry new text under new,
+                         ;; narrower read_groups that no ingest has applied:
+                         ;; the indexed ACL does not cover it (SPEC.md §12)
+                         (and changed? (not (:admin? principal)))
+                         (notice "文件已更新，重新匯入後才能檢視。")
+
+                         :else
+                         (list
+                           (when changed? (notice "文件在建立索引後已變更，標示的位置可能不準確。"))
+                           [:article {:class ["md-doc" "space-y-3" "rounded" "border" "border-slate-200" "bg-white" "p-6"]}
+                            (docs/render-blocks (String. ^bytes raw "UTF-8") chunks (get query-params "chunk"))])))))))
