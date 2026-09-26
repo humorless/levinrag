@@ -741,20 +741,26 @@ Items accumulated during development, with their background notes: see `docs/bac
 
 Grouped by nature. Before starting any of these, confirm the scope first (large items follow the process in §0 item 8), and update this section when done.
 
+**Priority** (user, 2026-09-26): these three come first; they are marked **priority** in the tables below.
+
+1. A larger, harder eval corpus (§21.3): today every variant scores 1.0 on the sample corpus, so "measured, not asserted" shows nothing; it is also the prerequisite for the rerank threshold (§21.1) and for deciding on HyDE / doc2query.
+2. Scale (§21.1): the README states a ceiling of about 100k chunks that has not been measured (R6).
+3. T5.4 `/ask` SSE streaming (§21.2): an answer takes 10–30 s with nothing shown; needs the design doc for the citation-validation conflict first.
+
 ### 21.1 Verify the initial success criteria (needs the user's environment)
 
 | Item | Needs | Output |
 |---|---|---|
 | **One production deployment** (Kamal) | Server, domain, registry account, model endpoints | Fix the deployment section of `docs/howto/ops.md` and remove "not yet verified" |
 | **Latency** (§1.2: retrieval + rerank p50 < 800 ms) | vLLM on a GPU (or an equivalent rerank backend) | Measure with `bb eval`'s per-stage p50 / p95, record in decisions |
-| **Scale** (≤ 5,000 documents / 100k chunks) | A corpus near the limit (a synthetic one can be generated with `dev/spikes/gen_synthetic_corpus.clj`) | Ingest time, query latency, memory; a recommended `-Xmx` |
+| **Scale** (≤ 5,000 documents / 100k chunks) — **priority** | A corpus near the limit (a synthetic one can be generated with `dev/spikes/gen_synthetic_corpus.clj`) | Ingest time, query latency, memory; a recommended `-Xmx` |
 | **Rerank threshold** | 5–10 real questions from the user | Decide whether `rerank-min-score` can be tightened from -7 to near -4; recalibrate after switching to vLLM (R4) |
 
 ### 21.2 Deferred, can be developed independently
 
 | Item | Description |
 |---|---|
-| **T5.4 `/ask` SSE streaming** | Conflicts with §10.2 citation validation: text already streamed out has been sent, so invalid citations cannot be removed afterwards. Three options: append a correction afterwards, delay rendering on the client, or buffer citations. Needs a design doc |
+| **T5.4 `/ask` SSE streaming** — **priority** | Conflicts with §10.2 citation validation: text already streamed out has been sent, so invalid citations cannot be removed afterwards. Three options: append a correction afterwards, delay rendering on the client, or buffer citations. Needs a design doc |
 | `/login` rate limiting or lockout | The user decided not to include it in Phase 5 |
 | Citation ranges `[1-3]` | Currently not supported by §10.2 |
 | Locking for concurrent ingest from multiple processes | Currently relies on a documented rule: do not run CLI ingest while the server is running |
@@ -768,11 +774,11 @@ Grouped by nature. Before starting any of these, confirm the scope first (large 
 | HyDE / doc2query | If real questions are abstract like those for the book corpus and scores are low (analysis in `docs/backlog.md`) |
 | Conversation history and multi-turn follow-ups | Must be done together with query rewriting (currently a non-goal in §1.3) |
 | Keycloak SSO (OIDC) | A production launch requirement; the D9 interface is already in place |
-| A larger, harder eval corpus | To make variant comparison and threshold calibration meaningful (§15.2 limitation) |
+| **A larger, harder eval corpus** — **priority** | To make variant comparison and threshold calibration meaningful (§15.2 limitation). Decided: do it (user, 2026-09-26) |
 
 ### 21.4 Before publishing (GitHub)
 
-- Confirm that the contents of `no-commit/` never entered the git history.
+- ~~Confirm that the contents of `no-commit/` never entered the git history.~~ **Done 2026-09-26**: `.gitignore` has `no-commit/*`, and `git log --all -- no-commit` finds no commit touching that path (137 commits checked).
 
 ---
 
