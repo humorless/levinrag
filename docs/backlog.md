@@ -228,11 +228,6 @@ eval identical, memory 12.2 GB → 9.8 GB (`docs/spikes/llama-cpp-only.md`).
 The analysis below is kept as it was written.
 
 
-**Done 2026-09-26** — measured and switched: `/ask` p50 9.04 s → 6.43 s,
-eval identical, memory 12.2 GB → 9.8 GB (`docs/spikes/llama-cpp-only.md`).
-The analysis below is kept as it was written.
-
-
 User question: can llama.cpp cover everything LM Studio does here, so the
 Mac dev environment depends on one tool? Analysis:
 
@@ -266,3 +261,32 @@ Mac dev environment depends on one tool? Analysis:
   eval metrics are unchanged; then update VLLM_SETUP, `.env.example`,
   `bb dev:models`, the dev guide.
 - Not urgent (user, 2026-09-26).
+
+## Docs checked against behavior, not only structure (2026-09-26)
+
+`bb docs:check` catches broken links, anchors and headings that drift
+between English and Chinese, but nothing checks that what the docs *say*
+matches what the code *does*. Found while drawing the ACL decision tree in
+`admin.md`: that a broken governing `_collection.edn` excludes a document
+even when its frontmatter `read_groups` is valid is only clear from
+`walker/resolve-acl-for-file`, not from the prose. Every such claim is
+kept in line by hand, twice (two languages). Candidates, cheapest first:
+
+- **Quoted messages exist in the code.** Every UI / CLI message the docs
+  quote (`user.md` "Special messages", the "When something goes wrong"
+  tables, `錯誤：…`, `[FAIL] rerank-long`) should be found verbatim in
+  `src/` or `bb/`. A `docs:check` step: extract the quoted CJK strings,
+  `rg` for each, fail on a miss.
+- **Environment variable defaults.** The `ops.md` table, `.env.example`
+  and the defaults in `config.clj` should agree (names and default
+  values); a check can compare the three.
+- **ACL rules as named tests.** One test per rule in `admin.md`'s decision
+  tree (fail closed on frontmatter, broken `_collection.edn` wins over
+  frontmatter, nearest `:read-groups`, `ROOT_READ_GROUPS`, override not
+  union, `[]` = admins only), each naming the doc section it backs, so a
+  rule change fails a test that points at the doc to update.
+- **"Expected" output blocks.** The report lines shown in `quick-start.md`
+  and `admin.md` (`docs: … added, … updated, …`, `chunks: …`, the
+  `bb doctor` lines, the eval table header): golden tests on the
+  formatting functions, or a check that runs them on the sample corpus
+  and compares the line shapes (numbers masked).
