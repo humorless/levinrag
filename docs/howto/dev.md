@@ -72,10 +72,23 @@ After changing `.env`, restart what reads it: the server with `tmux kill-session
 |---|---|
 | nREPL test loop | See [CLAUDE.md](../../CLAUDE.md#tests) |
 | `bb check` | What CI runs: format check, lint, bilingual docs check, full test suite; changes no files |
+| `bb test` | Full test suite in a clean JVM, with a coverage report (`clojure -X:jvm-opts:test`). Tests that need real models are tagged `:vllm` and skipped when `VLLM_*` is not set |
+| `bb lint` | clj-kondo on `src`, `test` and `bb` |
 | `bb fmt` | Format the code (cljfmt) |
 | `bb css-watch` | Rebuild the CSS while you edit Tailwind classes; `bb serve` only builds it when it is missing |
-| `bb browser-check` | Drive the web UI in Chrome and fail on any JS error |
+| `bb browser-check` | Drive the web UI in Chrome and fail on any JS error ([below](#browser-check)) |
 | `bb docs:check` | English and Traditional Chinese docs in sync |
+| `bb tasks` | List every Babashka task |
+
+## Browser check
+
+`bb browser-check` builds the CSS, starts a throwaway server on port 8765 (`dev/browser_server.clj`: the sample corpus with a stub embedder, stub rerank and chat, users `alice`/`alice-pw` and `admin`/`admin-pw`) and drives the UI in the locally installed Google Chrome with Playwright (`dev/browser/check.mjs`): log in, ask with Debug on, open a citation and its document, run an ingest from the admin page, open a trace. Any console error, uncaught page error or failed asset request fails the run.
+
+It needs Node.js; `playwright-core` is installed on first run (it uses the local Chrome and downloads no browser). It is not part of `bb test` or `bb check`.
+
+## Front-end assets
+
+The JavaScript libraries (htmx, Alpine.js) are vendored in `resources/public/js`, so there is no JavaScript build step. To change a version or add a file, edit the URL list of the `fetch-assets` task in `bb.edn` and run `bb fetch-assets`; commit the updated files.
 
 ## When something goes wrong
 

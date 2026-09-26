@@ -73,10 +73,23 @@ bb dev:down     # 停止全部五個 tmux session：levinrag、nrepl、embed、c
 |---|---|
 | nREPL 測試流程 | 見 [CLAUDE.md](../../CLAUDE.md#tests) |
 | `bb check` | CI 執行的內容：格式檢查、lint、雙語文件檢查、完整測試；不會改動檔案 |
+| `bb test` | 在乾淨的 JVM 裡跑完整測試，附 coverage 報告（`clojure -X:jvm-opts:test`）。需要真實模型的測試標記 `:vllm`，未設定 `VLLM_*` 時自動略過 |
+| `bb lint` | 用 clj-kondo 檢查 `src`、`test` 與 `bb` |
 | `bb fmt` | 排版程式碼（cljfmt） |
 | `bb css-watch` | 編輯 Tailwind class 時自動重建 CSS；`bb serve` 只會在 CSS 不存在時建置 |
-| `bb browser-check` | 在 Chrome 裡操作網頁 UI，任何 JS 錯誤都算失敗 |
+| `bb browser-check` | 在 Chrome 裡操作網頁 UI，任何 JS 錯誤都算失敗（[見下方](#browser-check)） |
 | `bb docs:check` | 中英文件保持同步 |
+| `bb tasks` | 列出所有 Babashka 指令 |
+
+## Browser check
+
+`bb browser-check` 會建置 CSS，在 port 8765 啟動一個用完即丟的 server（`dev/browser_server.clj`：範例語料、stub embedder、stub rerank 與 chat，使用者 `alice`/`alice-pw` 與 `admin`/`admin-pw`），再用 Playwright 操作本機安裝的 Google Chrome（`dev/browser/check.mjs`）：登入、開 Debug 提問、打開引用與它的文件、在管理頁執行匯入、打開一筆 trace。任何 console 錯誤、未捕捉的頁面錯誤或載入失敗的資源，都會讓這次檢查失敗。
+
+需要 Node.js；第一次執行時會安裝 `playwright-core`（使用本機的 Chrome，不另外下載瀏覽器）。它不包含在 `bb test` 或 `bb check` 裡。
+
+## 前端資源
+
+JavaScript 函式庫（htmx、Alpine.js）直接放在 `resources/public/js`，所以沒有 JavaScript 的建置步驟。要換版本或新增檔案，就修改 `bb.edn` 裡 `fetch-assets` 任務的 URL 清單，執行 `bb fetch-assets`，再 commit 更新後的檔案。
 
 ## 出問題時
 

@@ -4,7 +4,7 @@ English | [繁體中文](README.zh-TW.md)
 
 > The web UI is currently in Traditional Chinese (UI localization is on the backlog).
 
-An enterprise RAG MVP in a single JVM with embedded Datalevin: Markdown / plain-text corpus → multi-channel recall (lexical + semantic + link graph) → RRF fusion → cross-encoder rerank → context expansion → an answer with `[n]` citations. Built-in ACL, a per-query trace and an evaluation framework. All models (embedding, rerank, chat) are called through OpenAI-compatible APIs. The current spec is [SPEC.md](SPEC.md) (including remaining work, §21; Traditional Chinese translation: [SPEC.zh-TW.md](SPEC.zh-TW.md)); the initial spec is kept in [docs/design/2026-09-22-initial-spec.md](docs/design/2026-09-22-initial-spec.md); the reason for every design change is in [docs/decisions.md](docs/decisions.md).
+An enterprise RAG MVP in a single JVM with embedded Datalevin: Markdown / plain-text corpus → multi-channel recall (lexical + semantic + link graph) → RRF fusion → cross-encoder rerank → context expansion → an answer with `[n]` citations. Built-in ACL, a per-query trace and an evaluation framework. All models (embedding, rerank, chat) are called through OpenAI-compatible APIs.
 
 ## Design rationale
 
@@ -30,7 +30,7 @@ flowchart LR
 ```
 
 - **Each document's derived data is produced in one transaction**; the index is only derived data and can be thrown away and rebuilt at any time.
-- **Permissions are an invariant of retrieval**: computed at write time and filtered inside the retrieval layer, not enforced by the UI; the security tests derive a "document × unauthorized user" matrix from the index and verify every cell.
+- **Permissions are an invariant of retrieval**: computed at write time and filtered inside the retrieval layer, not enforced by the UI; the security tests derive a "document × unauthorized user" matrix from the index and verify every cell. The rules are in the [Administrator guide](docs/howto/admin.md#document-permissions).
 - **Retrieval is explainable**: the rank and score of every candidate at every stage are recorded in the trace, so you can answer "why this document, and why not that one".
 - **Runs fully on a local machine**: one JVM plus three model endpoints; tests use stub models.
 
@@ -40,66 +40,20 @@ The costs are just as clear: a scale ceiling of about 100,000 chunks, no horizon
 
 The full argument (comparison with the frameworks, why Datalevin, scope of applicability, open questions) is in [docs/design/rationale.md](docs/design/rationale.md).
 
-## Guides
+## Where to start
 
-- [Quick start: evaluate LevinRAG on your own corpus](docs/howto/quick-start.md): from `git clone` to checking the ACL, rebuildability, explainability and retrieval-quality claims, without knowing Clojure. **Start here if you are evaluating LevinRAG.**
-- [Developer guide](docs/howto/dev.md): first-time setup on a Mac, starting everything with `bb dev:models` and `bb dev:up` (also after a reboot), daily commands.
-- [Operations guide](docs/howto/ops.md): deployment, environment variables, health, backups, evaluation.
-- [Administrator guide](docs/howto/admin.md): users and groups, document permissions, ingest, trace.
-- [User guide](docs/howto/user.md): login, asking questions, citations, document viewer, Debug panel.
+| You want to… | Read |
+|---|---|
+| Evaluate LevinRAG on your own corpus and check its claims, without knowing Clojure | [Quick start](docs/howto/quick-start.md) — **start here** |
+| Ask questions in the web UI | [User guide](docs/howto/user.md) |
+| Manage users, groups, document permissions and ingests | [Administrator guide](docs/howto/admin.md) |
+| Deploy, monitor, back up | [Operations guide](docs/howto/ops.md) |
+| Set up the three model endpoints (vLLM on a GPU, or llama.cpp on a laptop) | [VLLM_SETUP.md](VLLM_SETUP.md) |
+| Develop LevinRAG | [Developer guide](docs/howto/dev.md); AI coding agents also read [CLAUDE.md](CLAUDE.md) |
 
-## Quick start (local)
+## Reference
 
-1. Copy the settings template and fill in the model endpoints: `cp .env.example .env`. Every `bb` task below reads `.env` (variables exported in the shell win). The full list is in the [Operations guide](docs/howto/ops.md#environment-variables).
-2. Start the three model endpoints as described in [VLLM_SETUP.md](VLLM_SETUP.md), then check everything: `bb doctor` (tools, `.env`, the corpus, the permissions files, then the model endpoints; continue only when there is no `[FAIL]`).
-3. Ingest the corpus: `bb ingest`.
-4. Create a user: `bb user:create alice --groups all,hr`, then set the password with `bb user:passwd alice` (add `--admin` for an administrator).
-5. Start the server: `bb serve` (details in the [Operations guide](docs/howto/ops.md#starting-the-server)), open http://localhost:8000 and log in.
-
-## Document permission rules (ACL)
-
-Permissions are computed at ingest time and written into the index; queries only compare groups:
-
-1. **Directory**: walk up to the nearest `_collection.edn` (including the directory itself) that declares `:read-groups`; if there is none, use `ROOT_READ_GROUPS`.
-2. **Document**: when the frontmatter has `read_groups`, **only that is used: it overrides, it is not a union**. For example, if the directory is `["hr"]` and the document says `read_groups: ["all"]`, only `all` can read it; `hr` is not added back.
-3. An empty group list `[]` means nobody except admins can read it.
-4. A permissions setting that cannot be applied as written (a broken `_collection.edn`, a misspelt or malformed `read_groups`) keeps the affected documents out of the index and lists them in the ingest report's errors; it never falls back to a wider setting.
-5. A document you cannot see always returns 404 (never 403), so its existence is not revealed.
-
-How to set this up is in the [Administrator guide](docs/howto/admin.md#document-permissions).
-
-## Development
-
-- nREPL, test loop: see [CLAUDE.md](CLAUDE.md).
-- Full test run (clean JVM + coverage): `clojure -X:jvm-opts:test`; lint: `clj-kondo --lint src test bb`.
-- Tests that need real models are tagged `:vllm` and are skipped automatically when `VLLM_*` is not set.
-- `bb docs:check`: the English and Traditional Chinese docs have matching headings, language switches, and working links and anchors (also part of `bb check`).
-- `bb tasks` lists all Babashka commands.
-
-### Browser check (no JS errors)
-
-`bb browser-check` builds the CSS, starts a throwaway server on port 8765
-(`dev/browser_server.clj`: sample corpus with a stub embedder, stub
-rerank and chat, users `alice`/`alice-pw` and `admin`/`admin-pw`) and
-drives the UI in the locally installed Google Chrome with Playwright
-(`dev/browser/check.mjs`): login, ask with Debug on, open a citation and
-its document, run an ingest from the admin page, open a trace. Any
-console error, uncaught page error or failed asset request fails the
-run. Needs Node.js; `playwright-core` is installed on first run (it uses
-the local Chrome and downloads no browser). Not part of `bb test`.
-
-## Update assets
-
-The idea is to vendor all js-files in the project repo eliminating build step for js part.
-
-Once you want to update the version of AlpineJS, HTMX or add a new asset, edit version in bb.edn file at `fetch-assets` and run:
-
-```shell
-bb fetch-assets
-```
-
-Your assets will be updated in `resources/public` folder.
-
-## Deployment
-
-See the [Operations guide](docs/howto/ops.md#deployment-kamal).
+- [SPEC.md](SPEC.md): the current spec, including remaining work (§21).
+- [docs/decisions.md](docs/decisions.md): the reason for every design change.
+- [docs/design/rationale.md](docs/design/rationale.md): the full design argument.
+- [docs/design/2026-09-22-initial-spec.md](docs/design/2026-09-22-initial-spec.md): the initial spec (Chinese, frozen).
